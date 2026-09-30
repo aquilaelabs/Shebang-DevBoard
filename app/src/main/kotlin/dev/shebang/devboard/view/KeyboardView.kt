@@ -86,6 +86,8 @@ class KeyboardView(context: Context) : View(context) {
     var glideTrailEnabled = true
     /** Dipping into the space bar during a glide starts the next word. */
     var phraseGlideEnabled = false
+    /** A quick flick up on a key types its corner character (its first long-press alternate). */
+    var flickEnabled = true
 
     private val density = resources.displayMetrics.density
     /** The preview/alternates overlay, owned by the IME root so it can draw above the top row. */
@@ -122,6 +124,7 @@ class KeyboardView(context: Context) : View(context) {
     private val pointerKey = arrayOfNulls<Key>(MAX_POINTERS)
     private val pointerDownX = FloatArray(MAX_POINTERS)
     private val pointerDownY = FloatArray(MAX_POINTERS)
+    private val pointerDownT = LongArray(MAX_POINTERS)
     private val pointerLastX = FloatArray(MAX_POINTERS)
     private val pointerCancelled = BooleanArray(MAX_POINTERS)
     /** Pressed keys are drawn highlighted; pressedCount avoids scanning when nothing is down. */
@@ -357,6 +360,7 @@ class KeyboardView(context: Context) : View(context) {
                 pointerKey[id] = key
                 pointerDownX[id] = x
                 pointerDownY[id] = y
+                pointerDownT[id] = event.eventTime
                 pointerLastX[id] = x
                 pointerCancelled[id] = false
                 pressedCount++
@@ -583,8 +587,18 @@ class KeyboardView(context: Context) : View(context) {
             handler.removeCallbacks(repeatRunnable)
         }
         val l = listener
+        val flick = wasActive && fromUp && !pointerCancelled[id] && isFlick(id, key, x, y, t)
         when {
             pointerCancelled[id] -> Unit
+            flick -> {
+                // A flick up types the corner character; a glide it started is dropped.
+                if (gliding) {
+                    resetSpaceState()
+                    l?.onGlideCancel()
+                }
+                val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.alternates
+                l?.onAlternate(key, alts[0])
+            }
             wasActive && popup.isAlternates -> popup.selectedAlternate()?.let { l?.onAlternate(key, it) }
             wasActive && gliding -> {
                 var trailingSpace = false
@@ -618,6 +632,20 @@ class KeyboardView(context: Context) : View(context) {
             longPressPending = false
         }
         invalidate()
+    }
+
+    /**
+     * A flick up: quick (at most [FLICK_MS]), between half a row and 1.3 rows up, and nearly straight (less
+     * than 0.6 of a key sideways), on a key with a corner character. Glides between letters a row apart
+     * almost always move sideways too, and take longer.
+     */
+    private fun isFlick(id: Int, key: Key, x: Float, y: Float, t: Long): Boolean {
+        val g = geometry ?: return false
+        if (!flickEnabled || key.alternates.isEmpty() || popup.isAlternates || cursorDrag || deleteDrag || repeatFired) return false
+        if (key.action != KeyAction.NONE || key.def.text == null) return false
+        if (t - pointerDownT[id] > FLICK_MS) return false
+        val up = pointerDownY[id] - y
+        return up >= g.rowHeightPx * 0.5f && up <= g.rowHeightPx * 1.3f && abs(x - pointerDownX[id]) < g.letterKeyWidth * 0.6f
     }
 
     private fun onShiftTap() {
@@ -661,6 +689,7 @@ class KeyboardView(context: Context) : View(context) {
         private const val TRAIL_SEGMENTS = 60
         private const val MIN_SAMPLE_PX = 2f
         private const val LONG_PRESS_MS = 320L
+        private const val FLICK_MS = 250L
         private const val DOUBLE_TAP_MS = 350L
         private const val REPEAT_DELAY_MS = 380L
         private const val REPEAT_START_MS = 80L
