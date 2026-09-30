@@ -19,6 +19,10 @@
 - Settings > Personal words > Undo recent learning goes back to how learned words and swipe adaptation stood at the start of any of the last 14 days (3cf59d0)
 - Twelve original themes (Night, Day, Phosphor, Amber, Deep Sea, Ember, Orchid, Forest, Paper, Glacier, Sand, High Contrast) plus Auto and Wallpaper, picked from swatches in Settings > Appearance; the setup and settings screens follow the theme (925a20f)
 - Backspacing back to a word reopens it: the strip offers what else it could be, and a pick or a glide replaces it (c3b3a8a)
+- Code mode pairs brackets and quotes, steps over a closing one, and backspace between an empty pair takes both (Settings: Pair brackets and quotes) (04cb7b0)
+- Swipe left from backspace to delete whole words, drag the space bar with shift on to select, and Undo and Redo keys on the default terminal bar (04cb7b0)
+- Flick up on a key to type the character in its corner (Settings: Flick up for symbols) (04cb7b0)
+- The keyboard remembers text or code mode per app, and each app can have its own terminal bar (04cb7b0)
 
 ### Changed
 
@@ -29,6 +33,7 @@
 - A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (925a20f)
 - Suggestions while typing rank by how common words really are, so the likelier word comes first (ff7863d)
 - With the number row on, the top-row letters no longer show or hold the digits (ef17318)
+- Autocorrect leaves code alone: words like getUser, max_retries or user2, and any word already used in the text around the cursor (04cb7b0)
 
 ### Fixed
 
