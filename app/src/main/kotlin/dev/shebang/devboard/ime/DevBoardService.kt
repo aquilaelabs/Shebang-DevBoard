@@ -36,6 +36,7 @@ import dev.shebang.devboard.layout.KeyAction
 import dev.shebang.devboard.layout.KeyCodeNames
 import dev.shebang.devboard.layout.KeyboardGeometry
 import dev.shebang.devboard.layout.LayoutDef
+import dev.shebang.devboard.settings.AppProfiles
 import dev.shebang.devboard.settings.Settings
 import dev.shebang.devboard.settings.SettingsRepository
 import dev.shebang.devboard.view.ImeRootView
@@ -72,6 +73,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var settings = Settings()
     private var theme: KeyboardTheme? = null
     private var barConfig: BarConfig? = null
+    private lateinit var appProfiles: AppProfiles
+    /** The app the current field belongs to (its package name), for its own mode and bar. */
+    private var currentApp = ""
     private val modifiers = ModifierState()
 
     private var root: ImeRootView? = null
@@ -102,6 +106,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         layouts = LayoutRepository(this)
         glideSession = GlideSession(this)
         personal = PersonalWords.get(filesDir)
+        appProfiles = AppProfiles(this)
         adaptation = GlideAdaptation.get(filesDir)
         background.execute { adaptation.load() }
         languageLoader = LanguageLoader(
@@ -127,18 +132,22 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     // ---- Settings ------------------------------------------------------------------------------------
 
+    /** The terminal bar for the current app: its own when it has one, else the bar for all apps. */
+    private fun applyBar() {
+        val json = settings.appBars[currentApp] ?: settings.barJson
+        barConfig = json?.let { runCatching { BarConfig.parse(it) }.getOrNull() } ?: layouts.defaultBar
+        strip?.bar?.setConfig(barConfig!!)
+    }
+
     private fun applySettings(s: Settings) {
         val heightChanged = s.heightScale != settings.heightScale || s.numberRow != settings.numberRow
         val themeChanged = s.palette != settings.palette || theme == null
-        val barChanged = s.barJson != settings.barJson || barConfig == null
+        val barChanged = s.barJson != settings.barJson || s.appBars != settings.appBars || barConfig == null
         settings = s
         feedback.settings = s
         text.settings = s
         if (themeChanged) applyTheme()
-        if (barChanged) {
-            barConfig = s.barJson?.let { runCatching { BarConfig.parse(it) }.getOrNull() } ?: layouts.defaultBar
-            strip?.bar?.setConfig(barConfig!!)
-        }
+        if (barChanged) applyBar()
         strip?.setMode(s.stripMode)
         keyboard?.keyPreviewEnabled = s.keyPreview
         keyboard?.glideTrailEnabled = s.glideTrail
@@ -329,6 +338,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         super.onStartInputView(info, restarting)
         field = FieldInfo.from(info)
         text.startInput(field)
+        val app = info?.packageName.orEmpty()
+        if (app != currentApp) {
+            // Another app: its own mode (the one last used there) and its own bar.
+            currentApp = app
+            if (app != packageName) appProfiles.noteApp(app)
+            mode = if (appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
+            applyBar()
+        }
         // Words deleted in settings (same process) take effect the next time the keyboard opens.
         bundle?.let { if (it.vocabularyVersion != personal.vocabularyVersion) languageLoader.rebuild() }
         modifiers.clearAll()
@@ -581,6 +598,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (mode == m) return
         text.finishComposing()
         mode = m
+        appProfiles.setMode(currentApp, if (m == Mode.CODE) AppProfiles.CODE else AppProfiles.TEXT)
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
         rebuildGeometry()

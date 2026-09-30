@@ -70,6 +70,8 @@ class SettingsActivity : ComponentActivity() {
             val settings by repo.settings.collectAsStateWithLifecycle(initialValue = Settings())
             val scope = rememberCoroutineScope()
             var editingBar by remember { mutableStateOf(false) }
+            var barApp by remember { mutableStateOf<String?>(null) }
+            val profiles = remember { AppProfiles(this@SettingsActivity) }
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
             DevBoardTheme(settings.palette) {
@@ -81,11 +83,23 @@ class SettingsActivity : ComponentActivity() {
                     GlideRecorderScreen(settings = settings, onBack = { recording = false })
                 } else if (editingBar) {
                     BackHandler { editingBar = false }
-                    val bar = settings.barJson?.let { runCatching { BarConfig.parse(it) }.getOrNull() } ?: defaultBar
+                    val allAppsBar = settings.barJson?.let { runCatching { BarConfig.parse(it) }.getOrNull() } ?: defaultBar
+                    val app = barApp
+                    val bar = app?.let { a -> settings.appBars[a]?.let { runCatching { BarConfig.parse(it) }.getOrNull() } } ?: allAppsBar
                     BarEditorScreen(
                         bar = bar,
-                        onChange = { newBar -> scope.launch { repo.update { it.copy(barJson = newBar.toJson()) } } },
-                        onReset = { scope.launch { repo.update { it.copy(barJson = null) } } },
+                        apps = profiles.seenApps(),
+                        app = app,
+                        appHasOwnBar = app != null && app in settings.appBars,
+                        onPickApp = { barApp = it },
+                        onChange = { newBar ->
+                            scope.launch {
+                                repo.update { s -> if (app == null) s.copy(barJson = newBar.toJson()) else s.copy(appBars = s.appBars + (app to newBar.toJson())) }
+                            }
+                        },
+                        onReset = {
+                            scope.launch { repo.update { s -> if (app == null) s.copy(barJson = null) else s.copy(appBars = s.appBars - app) } }
+                        },
                         onBack = { editingBar = false },
                     )
                 } else {
@@ -233,10 +247,24 @@ private fun SliderRow(title: String, valueLabel: String, value: Float, range: Cl
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun BarEditorScreen(bar: BarConfig, onChange: (BarConfig) -> Unit, onReset: () -> Unit, onBack: () -> Unit) {
+fun BarEditorScreen(
+    bar: BarConfig,
+    apps: List<String>,
+    app: String?,
+    appHasOwnBar: Boolean,
+    onPickApp: (String?) -> Unit,
+    onChange: (BarConfig) -> Unit,
+    onReset: () -> Unit,
+    onBack: () -> Unit,
+) {
     val context = LocalContext.current
     var addDialog by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
+    var appMenuOpen by remember { mutableStateOf(false) }
+    fun appName(pkg: String): String = runCatching {
+        val pm = context.packageManager
+        pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+    }.getOrDefault(pkg)
 
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
@@ -264,12 +292,38 @@ fun BarEditorScreen(bar: BarConfig, onChange: (BarConfig) -> Unit, onReset: () -
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(text = { Text("Export JSON") }, onClick = { menuOpen = false; exportLauncher.launch("devboard-bar.json") })
                     DropdownMenuItem(text = { Text("Import JSON") }, onClick = { menuOpen = false; importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) })
-                    DropdownMenuItem(text = { Text("Reset to default") }, onClick = { menuOpen = false; onReset() })
+                    DropdownMenuItem(
+                        text = { Text(if (app == null) "Reset to default" else "Use the bar for all apps") },
+                        enabled = app == null || appHasOwnBar,
+                        onClick = { menuOpen = false; onReset() },
+                    )
                 }
             },
         )
     }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+            item {
+                ListItem(
+                    headlineContent = { Text(if (app == null) "Bar for all apps" else "Bar for ${appName(app)}") },
+                    supportingContent = {
+                        Text(
+                            when {
+                                app == null -> "Tap to give an app you have typed in a bar of its own"
+                                appHasOwnBar -> "This app's own bar"
+                                else -> "Uses the bar for all apps until you change it here"
+                            }
+                        )
+                    },
+                    modifier = Modifier.clickable { appMenuOpen = true },
+                )
+                DropdownMenu(expanded = appMenuOpen, onDismissRequest = { appMenuOpen = false }) {
+                    DropdownMenuItem(text = { Text("All apps") }, onClick = { appMenuOpen = false; onPickApp(null) })
+                    for (pkg in apps) {
+                        DropdownMenuItem(text = { Text(appName(pkg)) }, onClick = { appMenuOpen = false; onPickApp(pkg) })
+                    }
+                }
+                HorizontalDivider()
+            }
             itemsIndexed(bar.items, key = { i, item -> "$i-${item.label}" }) { index, item ->
                 ListItem(
                     headlineContent = { Text(item.label) },

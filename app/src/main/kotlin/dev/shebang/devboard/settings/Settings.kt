@@ -42,4 +42,6 @@ data class Settings(
     val stripMode: StripMode = StripMode.AUTO,
     /** Terminal bar as JSON, or null for the bundled default. */
     val barJson: String? = null,
+    /** Apps with a terminal bar of their own: package name to bar JSON. Others use [barJson]. */
+    val appBars: Map<String, String> = emptyMap(),
 )

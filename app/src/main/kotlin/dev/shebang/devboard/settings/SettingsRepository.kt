@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.json.Json
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "devboard_settings")
 
@@ -49,6 +50,7 @@ class SettingsRepository(context: Context) {
             pairBrackets = p[Keys.PAIR_BRACKETS] ?: d.pairBrackets,
             stripMode = p[Keys.STRIP_MODE]?.let { runCatching { StripMode.valueOf(it) }.getOrNull() } ?: d.stripMode,
             barJson = p[Keys.BAR_JSON],
+            appBars = p[Keys.APP_BARS]?.let { runCatching { appBarsJson.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap(),
         )
     }
 
@@ -72,6 +74,7 @@ class SettingsRepository(context: Context) {
         p[Keys.PAIR_BRACKETS] = s.pairBrackets
         p[Keys.STRIP_MODE] = s.stripMode.name
         if (s.barJson == null) p.remove(Keys.BAR_JSON) else p[Keys.BAR_JSON] = s.barJson
+        if (s.appBars.isEmpty()) p.remove(Keys.APP_BARS) else p[Keys.APP_BARS] = appBarsJson.encodeToString(s.appBars)
     }
 
     private object Keys {
@@ -94,6 +97,7 @@ class SettingsRepository(context: Context) {
         val PAIR_BRACKETS = booleanPreferencesKey("pair_brackets")
         val STRIP_MODE = stringPreferencesKey("strip_mode")
         val BAR_JSON = stringPreferencesKey("bar_json")
+        val APP_BARS = stringPreferencesKey("bar_json_apps")
     }
 
     companion object {
@@ -103,3 +107,5 @@ class SettingsRepository(context: Context) {
             instance ?: synchronized(this) { instance ?: SettingsRepository(context).also { instance = it } }
     }
 }
+
+private val appBarsJson = Json { ignoreUnknownKeys = true }
