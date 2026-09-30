@@ -7,30 +7,30 @@ import kotlin.math.ln
 import kotlin.math.sqrt
 
 /** Tunable constants of [StreamingGlideDecoder]. Distances are in key pitches (the spacing between key centres). */
-class GlideParams(
+data class GlideParams(
     /** Spacing of resampled gesture points along the path. */
     val spacing: Float = 0.25f,
-    val sigmaVertex: Float = 0.42f,
-    val sigmaMid: Float = 0.45f,
+    val sigmaVertex: Float = 0.84f,
+    val sigmaMid: Float = 1.125f,
     val sigmaStart: Float = 0.40f,
     /** A first letter farther than this from the touch-down point is not considered. */
     val startRadius: Float = 1.6f,
-    val stayCost: Float = 0.8f,
-    val skipCost: Float = 0.35f,
+    val stayCost: Float = 0.4f,
+    val skipCost: Float = 0.2625f,
     /** Lifting before reaching the last key: cost per state short of it. */
-    val endCost: Float = 0.8f,
+    val endCost: Float = 1.8f,
     /** Weight of ln(slowness) in the evidence that a point is a letter the finger meant. */
     val slowWeight: Float = 1.0f,
     /**
      * Weight of the turning angle (radians) in the same evidence. Off: on the simulator it lowered accuracy,
      * because the position alignment already places letters at corners. Kept for tuning on recorded glides.
      */
-    val turnWeight: Float = 0f,
+    val turnWeight: Float = 0.5f,
     /** Penalty per radian of turning beyond 0.6 on a stretch between letters, where the path should be straight. */
     val turnMidWeight: Float = 0f,
     /** Evidence a cruising, straight point needs to overcome to count as a letter. */
-    val vertexBias: Float = 0.5f,
-    val lmWeight: Float = 1.0f,
+    val vertexBias: Float = 1.0f,
+    val lmWeight: Float = 0.75f,
     val lookaheadWeight: Float = 0.5f,
     val beamWidth: Float = 10f,
     val maxTokens: Int = 3000,
@@ -44,10 +44,10 @@ class GlideParams(
      * Phrase gliding: cost per point of the approach from the space bar to the next word's first letter, which
      * belongs to no letter. A word after a dip may start anywhere on its first [leadInLimit] points.
      */
-    val leadInCost: Float = 0.3f,
+    val leadInCost: Float = 0f,
     val leadInLimit: Int = 40,
     /** Phrase gliding: cost per point of coasting from a word's last letter down into the space bar. */
-    val leadOutCost: Float = 0.3f,
+    val leadOutCost: Float = 0f,
 )
 
 /** What came before a glide in the text. */

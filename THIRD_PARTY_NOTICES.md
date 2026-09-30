@@ -59,6 +59,38 @@ Princeton University and LICENSEE agrees to preserve same.
   counts are shipped; counts involving "tom" were scaled down (see the README's Decisions). Tatoeba publishes a
   subset of its sentences under CC0 as well.
 
+### FUTO swipe dataset (swipe.futo.org)
+- Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the
+  decoder's default parameters (`GlideParams`) were chosen on its dev split. No part of the data is in this
+  repository or the app: the tests read a copy downloaded to the machine they run on.
+- Source: FUTO, <https://huggingface.co/datasets/futo-org/swipe.futo.org> (`dev.jsonl`, `test.jsonl` and
+  `swipe-5/layouts/qwerty.json`), downloaded 2026-09-30.
+- Licence: MIT.
+
+```
+MIT License
+
+Copyright (c) 2025 FUTO
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ## Icons
 
 ### Material Symbols / Material Design Icons (Google)

@@ -119,8 +119,9 @@ class GlideTuningTest {
         assumeTrue(System.getenv("GLIDE_TUNE") != null)
         val bench = GlideBenchmarkTest()
         val sentences = GlideBenchmarkTest.heldOut.drop(1800).take(300)
-        for (lin in listOf(0.1f, 0.2f, 0.3f, 0.5f)) {
-            val line = listOf(0.1f, 0.2f, 0.3f, 0.5f).joinToString("  ") { lout ->
+        val costs = listOf(0f, 0.02f, 0.05f, 0.1f)
+        for (lin in costs) {
+            val line = costs.joinToString("  ") { lout ->
                 val rnd = Random(41)
                 val decoder = StreamingGlideDecoder(language, GlideParams(leadInCost = lin, leadOutCost = lout))
                 var n = 0
@@ -140,9 +141,9 @@ class GlideTuningTest {
                         }
                     }
                 }
-                "out %.1f=%.1f%%".format(lout, 100.0 * ok / n)
+                "out %.2f=%.1f%%".format(lout, 100.0 * ok / n)
             }
-            println("GLIDE TUNE lead-in %.1f  %s".format(lin, line))
+            println("GLIDE TUNE lead-in %.2f  %s".format(lin, line))
         }
     }
 
