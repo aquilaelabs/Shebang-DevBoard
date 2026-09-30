@@ -27,6 +27,7 @@
 - Swipe adaptation learns slowly, ignores sloppy glides and only takes so much each day, so one careless day cannot throw it off (3cf59d0)
 - A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (925a20f)
 - Suggestions while typing rank by how common words really are, so the likelier word comes first (ff7863d)
+- With the number row on, the top-row letters no longer show or hold the digits (ef17318)
 
 ### Fixed
 
@@ -35,3 +36,4 @@
 - Redoing a word no longer copies the capital of words like I or I'd onto the new word (3cf59d0)
 - Autocorrect fixes far more typos (89% of one-slip typos in testing, from 58%): it weighs all suggestions by how common they are and how likely the slip is, corrects before punctuation, restores missing apostrophes (dont, cant, youre), and backspace right after undoes it (ff7863d)
 - A lone i (and i'm, i'd, i'll, i've) is capitalised when the word ends (ff7863d)
+- The setup screen has one settings button instead of two (ef17318)
