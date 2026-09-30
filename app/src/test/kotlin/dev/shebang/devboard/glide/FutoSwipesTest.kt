@@ -18,7 +18,7 @@ import java.io.File
  * The data is not in the repository: download it from https://huggingface.co/datasets/futo-org/swipe.futo.org
  */
 class FutoSwipesTest {
-    private class Swipe(val word: String, val context: Int, val layout: KeyLayoutModel, val x: FloatArray, val y: FloatArray, val t: LongArray)
+    private class Swipe(val word: String, val context: Int, val context2: Int, val layout: KeyLayoutModel, val x: FloatArray, val y: FloatArray, val t: LongArray)
 
     private val dictionary get() = GlideBenchmarkTest.dictionary
     private val lm get() = GlideBenchmarkTest.lm
@@ -38,9 +38,21 @@ class FutoSwipesTest {
                 outOfVocabulary++
                 continue
             }
-            out += Swipe(r.word, contextOf(r), r.layout, r.x, r.y, r.t)
+            out += Swipe(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t)
         }
         return out to outOfVocabulary
+    }
+
+    private fun beforeOf(r: FutoData.Record): String {
+        val tokens = r.sentence.split(' ').filter { it.isNotEmpty() }
+        return tokens.take(r.wordIdx).joinToString(" ") + if (r.wordIdx > 0) " " else ""
+    }
+
+    /** The word before the context word, for the trigram. */
+    private fun context2Of(r: FutoData.Record): Int {
+        if (r.sentence.isEmpty() || r.wordIdx < 0) return NgramModel.UNKNOWN
+        val w2 = GlideText.contextWord2(beforeOf(r))
+        return if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
     }
 
     /** The word before this one in its sentence, as the keyboard would read it from the field. */
@@ -57,7 +69,7 @@ class FutoSwipesTest {
         val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, params)
         val s = Score()
         for (sw in swipes) {
-            decoder.begin(sw.layout, GlideContext(if (useContext) sw.context else NgramModel.UNKNOWN), sw.t[0])
+            decoder.begin(sw.layout, if (useContext) GlideContext(sw.context, context2 = sw.context2) else GlideContext(NgramModel.UNKNOWN), sw.t[0])
             for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
             val r = decoder.finish()?.alternatives?.map { dictionary.lower[it] }.orEmpty()
             s.n++

@@ -26,7 +26,7 @@ class PersonalLearningTest {
 
     private fun tempFile(): File = Files.createTempDirectory("devboard").toFile().resolve(PersonalWords.FILE)
 
-    private val data: NgramData by lazy { File("src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramData.load(it) } }
+    private val data: NgramData by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramData.load(it) } }
 
     @Test
     fun aNewWordBecomesKnownOnItsSecondUse() {

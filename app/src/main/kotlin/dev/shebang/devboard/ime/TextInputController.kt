@@ -80,6 +80,12 @@ class TextInputController(
      */
     var identifierScorer: ((stroke: FloatArray, letters: String) -> Float?)? = null
 
+    /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
+    var predictionModel: Pair<Dictionary, NgramModel>? = null
+    /** Next words the strip offers now (after a space); empty when it offers something else. */
+    private var predictions: List<String> = emptyList()
+    private var predictGeneration = 0
+
     /** Code-like identifiers in the text around the cursor, most used first, and when they were read. */
     private var identifiers: List<String> = emptyList()
     private var identifiersReadAt = Long.MIN_VALUE / 2
@@ -381,7 +387,7 @@ class TextInputController(
         val glideBefore = lastGlide
         settle()
         lastGlide = null
-        if (glideBefore != null) clearCandidates()
+        if (glideBefore != null || predictions.isNotEmpty()) clearCandidates()
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
@@ -481,6 +487,34 @@ class TextInputController(
         }
         lastActionWasSpace = true
         lastSpaceTime = now
+        showPredictions(ic)
+    }
+
+    /**
+     * After a space: the strip offers the three words most likely to come next, given the two before the
+     * cursor (the corpus model mixed with the user's own word pairs), capitalised at a sentence start.
+     */
+    private fun showPredictions(ic: InputConnection) {
+        // Not in code mode, where the next word is rarely English.
+        if (!settings.nextWord || codeMode || !field.allowsComposing || isComposing || target != null) return
+        val model = predictionModel ?: return
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
+        val w1 = GlideText.contextWord(before)
+        val w2 = GlideText.contextWord2(before)
+        val gen = ++predictGeneration
+        background.execute {
+            val (dictionary, lm) = model
+            val c1 = GlideText.contextId(w1, dictionary, lm)
+            val c2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
+            val start = w1 == GlideText.SENTENCE_START
+            val words = lm.predict(c2, c1, 3).map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
+            postToMain {
+                if (gen != predictGeneration || isComposing || words.isEmpty()) return@postToMain
+                predictions = words
+                ui.showCandidates(arrangeBestMiddle(words))
+                ui.setComposing(true)
+            }
+        }
     }
 
     /**
@@ -888,6 +922,8 @@ class TextInputController(
     private fun clearCandidates() {
         candidates = emptyList()
         suggestGeneration++
+        predictGeneration++
+        predictions = emptyList()
         ui.showCandidates(emptyList())
         ui.setComposing(isComposing)
     }
@@ -934,6 +970,17 @@ class TextInputController(
             return
         }
         ownEdit()
+        if (!isComposing && lastGlide == null && chosen in predictions) {
+            // A predicted word goes in with a space, and the next ones are offered.
+            val context = learningContext(ic)
+            ic.commitText("$chosen ", 1)
+            learnAs(chosen, context)
+            clearCandidates()
+            lastActionWasSpace = true
+            lastSpaceTime = clock()
+            showPredictions(ic)
+            return
+        }
         val join = joinOffer
         if (join != null && join.glide === lastGlide && (chosen == join.camel || chosen == join.snake)) {
             // The run of glided words becomes one name.
@@ -993,6 +1040,7 @@ class TextInputController(
             clearCandidates()
             lastActionWasSpace = true
             lastSpaceTime = clock()
+            showPredictions(ic)
         }
     }
 
@@ -1006,7 +1054,10 @@ class TextInputController(
     fun glideContext(dictionary: Dictionary, lm: NgramModel): GlideContext {
         val ic = connection() ?: return GlideContext(NgramModel.SENTENCE_START)
         resolveTarget(ic)
-        return GlideContext(GlideText.contextId(GlideText.contextWord(textBeforeTarget(ic)), dictionary, lm))
+        val before = textBeforeTarget(ic)
+        val w2 = GlideText.contextWord2(before)
+        val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
+        return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2)
     }
 
     /**

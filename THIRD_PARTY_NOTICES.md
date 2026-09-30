@@ -50,7 +50,7 @@ Princeton University and LICENSEE agrees to preserve same.
 ```
 
 ### Tatoeba English sentences
-- Used for: `app/src/main/assets/dict/en_ngrams.bin` (word and word-pair counts, built by
+- Used for: `app/src/main/assets/dict/en_ngrams.bin` (word, word-pair and three-word counts, built by
   `tools/build_ngrams.py`) and `app/src/test/resources/glide/heldout_sentences.tsv` (3,000 sentences, lowercased
   and stripped of punctuation, held out of the counts for the glide benchmark; each line keeps its Tatoeba id).
 - Source: Tatoeba, <https://tatoeba.org>, per-language export `eng_sentences.tsv.bz2` downloaded 2026-09-30.
@@ -58,6 +58,14 @@ Princeton University and LICENSEE agrees to preserve same.
   <https://creativecommons.org/licenses/by/2.0/fr/>. Changes: sentences were tokenised and lowercased and only
   counts are shipped; counts involving "tom" were scaled down (see the README's Decisions). Tatoeba publishes a
   subset of its sentences under CC0 as well.
+
+### Common Voice English sentences
+- Used for: `app/src/main/assets/dict/en_ngrams.bin` (word, word-pair and three-word counts, built by
+  `tools/build_ngrams.py --cv`), alongside the Tatoeba counts.
+- Source: Mozilla Common Voice, <https://github.com/common-voice/common-voice>, the English sentence
+  collection in `server/data/en/*.txt` (13 files, 1.58 million lines), downloaded 2026-09-30.
+- Licence: the sentences are public domain under CC0 1.0 (<https://creativecommons.org/publicdomain/zero/1.0/>);
+  Common Voice accepts only CC0 sentences into the collection. Only counts are shipped.
 
 ### FUTO swipe dataset (swipe.futo.org)
 - Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the

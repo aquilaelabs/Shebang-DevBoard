@@ -35,6 +35,14 @@ class LongIntMap(expected: Int = 16) {
         size++
     }
 
+    /** Calls [action] with every key (in no particular order). */
+    inline fun forEachKey(action: (Long) -> Unit) {
+        for (i in usedSlots.indices) if (usedSlots[i]) action(keySlots[i])
+    }
+
+    @PublishedApi internal val usedSlots: BooleanArray get() = used
+    @PublishedApi internal val keySlots: LongArray get() = keys
+
     private fun grow() {
         val oldKeys = keys
         val oldValues = values

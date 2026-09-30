@@ -48,6 +48,7 @@ class SettingsRepository(context: Context) {
             autoCaps = p[Keys.AUTO_CAPS] ?: d.autoCaps,
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
             pairBrackets = p[Keys.PAIR_BRACKETS] ?: d.pairBrackets,
+            nextWord = p[Keys.NEXT_WORD] ?: d.nextWord,
             stripMode = p[Keys.STRIP_MODE]?.let { runCatching { StripMode.valueOf(it) }.getOrNull() } ?: d.stripMode,
             barJson = p[Keys.BAR_JSON],
             appBars = p[Keys.APP_BARS]?.let { runCatching { appBarsJson.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap(),
@@ -72,6 +73,7 @@ class SettingsRepository(context: Context) {
         p[Keys.AUTO_CAPS] = s.autoCaps
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
         p[Keys.PAIR_BRACKETS] = s.pairBrackets
+        p[Keys.NEXT_WORD] = s.nextWord
         p[Keys.STRIP_MODE] = s.stripMode.name
         if (s.barJson == null) p.remove(Keys.BAR_JSON) else p[Keys.BAR_JSON] = s.barJson
         if (s.appBars.isEmpty()) p.remove(Keys.APP_BARS) else p[Keys.APP_BARS] = appBarsJson.encodeToString(s.appBars)
@@ -95,6 +97,7 @@ class SettingsRepository(context: Context) {
         val AUTO_CAPS = booleanPreferencesKey("auto_caps")
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
         val PAIR_BRACKETS = booleanPreferencesKey("pair_brackets")
+        val NEXT_WORD = booleanPreferencesKey("next_word")
         val STRIP_MODE = stringPreferencesKey("strip_mode")
         val BAR_JSON = stringPreferencesKey("bar_json")
         val APP_BARS = stringPreferencesKey("bar_json_apps")

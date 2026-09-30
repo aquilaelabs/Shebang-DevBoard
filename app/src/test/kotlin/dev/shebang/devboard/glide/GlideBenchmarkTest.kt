@@ -31,7 +31,7 @@ class GlideBenchmarkTest {
         val dictionary: Dictionary by lazy {
             Dictionary.parse(File("src/main/assets/dict/en_words.txt").bufferedReader().readLines().asSequence())
         }
-        val lm: NgramModel by lazy { File("src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
+        val lm: NgramModel by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
         val language: GlideLanguage by lazy { GlideLanguage.build(dictionary, lm) }
 
         /** The 1,000 most frequent glide-able words, by the n-gram model's unigram counts. */

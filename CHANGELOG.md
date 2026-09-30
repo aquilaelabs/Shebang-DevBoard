@@ -24,6 +24,7 @@
 - Flick up on a key to type the character in its corner (Settings: Flick up for symbols) (04cb7b0)
 - The keyboard remembers text or code mode per app, and each app can have its own terminal bar (04cb7b0)
 - Code-aware words: identifiers already in the text are suggested as you type and offered after a glide, and words glided in a row can be joined as camelCase or snake_case (c5888d9)
+- Next-word suggestions: after a space the strip offers the three words most likely to come next; tap one to write it and get the next three. Settings > Next-word suggestions turns them off (8e1d2ae)
 
 ### Changed
 
@@ -35,6 +36,7 @@
 - Suggestions while typing rank by how common words really are, so the likelier word comes first (ff7863d)
 - With the number row on, the top-row letters no longer show or hold the digits (ef17318)
 - Autocorrect leaves code alone: words like getUser, max_retries or user2, and any word already used in the text around the cursor (04cb7b0)
+- Glide reads the two words before it, not one, from a larger language model (Tatoeba plus Common Voice's public-domain sentences): real swipes right first time 88.9% -> 91.0%, phrase glides 90.9% -> 91.2%. The app is 5.6 MB larger (8e1d2ae)
 
 ### Fixed
 

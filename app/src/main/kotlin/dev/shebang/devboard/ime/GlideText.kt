@@ -29,6 +29,24 @@ object GlideText {
         return if (word.all { it.isLetter() || it == '\'' }) word.trim('\'') else ""
     }
 
+    /**
+     * The word before the one [contextWord] reads (for the trigram), the same way; "" when that one is not a
+     * word (a sentence start or unknown has nothing before it that counts).
+     */
+    fun contextWord2(before: CharSequence): String {
+        var i = before.length - 1
+        while (i >= 0) {
+            val c = before[i]
+            if (c == '\n' || c == '.' || c == '!' || c == '?') return ""
+            if (c.isLetterOrDigit() || c == '\'' || c == '’') break
+            if (!c.isWhitespace() && c !in SKIPPED) return ""
+            i--
+        }
+        if (i < 0) return ""
+        while (i >= 0 && (before[i].isLetterOrDigit() || before[i] == '\'' || before[i] == '’')) i--
+        return contextWord(before.subSequence(0, i + 1))
+    }
+
     /** The model context for a word from [contextWord]. */
     fun contextId(word: String, dictionary: Dictionary, lm: NgramModel): Int = when (word) {
         SENTENCE_START -> NgramModel.SENTENCE_START

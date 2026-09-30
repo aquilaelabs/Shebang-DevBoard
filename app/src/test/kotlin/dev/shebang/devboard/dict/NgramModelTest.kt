@@ -10,7 +10,7 @@ class NgramModelTest {
         val dictionary: Dictionary by lazy {
             Dictionary.parse(File("src/main/assets/dict/en_words.txt").readLines().asSequence())
         }
-        val lm: NgramModel by lazy { File("src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
+        val lm: NgramModel by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
     }
 
     private fun idx(w: String) = dictionary.indexOfLower(w).also { assertTrue("$w missing", it >= 0) }

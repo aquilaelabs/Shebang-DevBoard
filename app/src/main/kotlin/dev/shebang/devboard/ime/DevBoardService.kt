@@ -177,6 +177,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideSession.language = b.glide
         glideLanguage = b.glide
         text.suggester = b.suggester
+        text.predictionModel = b.dictionary to b.lm
         // Dictionary positions changed: remembered glides and the targeted word go.
         if (!first) text.onLanguageChanged()
     }

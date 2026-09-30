@@ -59,6 +59,8 @@ class GlideContext(
     val context: Int,
     /** Recent glided words still intact right before the cursor, oldest first. A new glide may revise them. */
     val history: List<GlideWord> = emptyList(),
+    /** The word before [context] (same kinds of value), for the trigram; [NgramModel.UNKNOWN] when not known. */
+    val context2: Int = NgramModel.UNKNOWN,
 )
 
 /** A glided word as it stands in the text, with its runners-up so later glides can revise it. */
@@ -199,6 +201,8 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     private var historyCount = 0
     private val historyWord = IntArray(MAX_HISTORY)
     private var baseContext = NgramModel.SENTENCE_START
+    /** The word before [baseContext], for the trigram of the first segment. */
+    private var baseContext2 = NgramModel.UNKNOWN
     private var totalPoints = 0
     /** Set while re-running the beam wider for a word that found no candidate. */
     private var wide = false
@@ -263,12 +267,16 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         this.phrase = phrase
         leadIn = false
         baseContext = context.context
+        baseContext2 = context.context2
         segments = 0
         totalPoints = 0
         val all = context.history
         val first = maxOf(0, all.size - MAX_HISTORY)
         // History beyond the window still sets the context of the window's first word.
-        if (first > 0) baseContext = lm.contextOf(all[first - 1].word)
+        if (first > 0) {
+            baseContext = lm.contextOf(all[first - 1].word)
+            baseContext2 = if (first > 1) lm.contextOf(all[first - 2].word) else context.context
+        }
         historyCount = 0
         for (h in first until all.size) {
             val e = all[h]
@@ -971,7 +979,7 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         for (a in 0 until segCount[0]) {
             val w = segWords[0][a]
             vitCost[0][a] = if (fixHistory && historyCount > 0 && w != historyWord[0]) blocked
-            else segCost[0][a] + lmW * lm.cost(w, baseContext)
+            else segCost[0][a] + lmW * lm.cost3(w, baseContext2, baseContext)
             vitBack[0][a] = -1
         }
         for (s in 1 until count) {
@@ -988,7 +996,9 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
                 for (b in 0 until segCount[s - 1]) {
                     val pc = vitCost[s - 1][b]
                     if (pc >= blocked) continue
-                    val c = pc + lmW * lm.cost(w, lm.contextOf(segWords[s - 1][b]))
+                    // The word before that one: on the best path into b (exact would need pair states).
+                    val prev2 = if (s == 1) baseContext else lm.contextOf(segWords[s - 2][vitBack[s - 1][b].coerceAtLeast(0)])
+                    val c = pc + lmW * lm.cost3(w, prev2, lm.contextOf(segWords[s - 1][b]))
                     if (c < best) {
                         best = c
                         arg = b
@@ -1062,8 +1072,13 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         // Alternatives for the last word, given the words before it.
         val last = count - 1
         val lastCtx = if (last > 0) lm.contextOf(segWords[last - 1][path[last - 1]]) else baseContext
+        val lastCtx2 = when {
+            last > 1 -> lm.contextOf(segWords[last - 2][path[last - 2]])
+            last == 1 -> baseContext
+            else -> baseContext2
+        }
         val k = segCount[last]
-        val order = (0 until k).sortedBy { segCost[last][it] + params.lmWeight * lm.cost(segWords[last][it], lastCtx) }
+        val order = (0 until k).sortedBy { segCost[last][it] + params.lmWeight * lm.cost3(segWords[last][it], lastCtx2, lastCtx) }
         val alternatives = IntArray(minOf(5, k)) { segWords[last][order[it]] }
         return GlideResult(words, strokes, observations, entries, alternatives, history, firstRevised, totalPoints)
     }

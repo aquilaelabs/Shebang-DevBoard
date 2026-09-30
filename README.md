@@ -34,11 +34,14 @@ adb shell ime set dev.shebang.devboard/.ime.DevBoardService
 Or open the **Shebang DevBoard** launcher entry and follow its three steps (enable, select, test).
 
 Regenerate the word list from a SCOWL release, then the n-gram model from Tatoeba's English sentence export
-(<https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2>):
+(<https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2>) and Common Voice's English
+sentence collection (the `server/data/en/*.txt` files of <https://github.com/common-voice/common-voice>, in
+one folder). `--exclude` keeps the FUTO test and dev sentences out of the counts, so the real-swipe benchmark
+stays fair:
 
 ```sh
 tools/build_wordlist.py /path/to/scowl-2020.12.07 50
-tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2
+tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
 ## Layout of the code
@@ -73,7 +76,8 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
 3. **Live preview.** Every 40 ms the strip shows the word (or words) the glide would write if the finger
    lifted now.
 4. **After lift.** The best 48 candidates are re-aligned exactly (dynamic time warping over the same model,
-   with the gesture's final speed statistics) and scored with the bigram model given the word before them.
+   with the gesture's final speed statistics) and scored with the language model given the two words before
+   them.
    The result is ready well within a millisecond on the JVM; the emulator logs 2 to 55 ms.
 5. **Into the field, and redoing a word.** Glided words go straight into the field, with a space before them
    after a word and a space after them before one; a letter typed right after a glide starts a new word.
@@ -83,13 +87,19 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    To add a word instead, tap between words (a cursor at a word's edge targets nothing), or press space
    while a word is targeted, which moves past it. After the keyboard's own edits nothing is targeted, so
    gliding on never replaces anything, and nothing else in the field is ever rewritten. Each glide is
-   decoded after the word before it, with the bigram model mixed with the user's own word pairs, against a
+   decoded after the two words before it, with the language model mixed with the user's own word pairs, against a
    stroke measured on keys shifted by the user's learned offsets.
 6. **Phrase gliding** (setting, off by default). Dipping below the middle of the space bar, or resting on it
    for 150 ms, ends a word without lifting; the space key lights up when the dip counts. The travel down to
    and up from the space bar belongs to no letter, so a word may finish early and coast into the space bar,
    and the next one may start anywhere on its approach, each at a small cost per point. Lifting inside the
-   space bar after a dip adds a trailing space.
+   space bar after a dip adds a trailing space. The words of one stroke are decoded together, each scored
+   with the two words before it, so a later word can change an earlier one before anything is written.
+7. **Next-word suggestions** (setting, on by default). After a space the strip offers the three words most
+   likely to come next, from the two words before the cursor (the three-word model mixed with the user's
+   own word pairs), capitalised at a sentence start. Tapping one writes it with a space and offers the next;
+   typing a letter replaces them with that word's suggestions. None in code mode, password fields or fields
+   that ask for no suggestions.
 
 The whole-word SHARK2 decoder (Kristensson & Zhai 2004) that shipped first is kept in the tests as the
 baseline. `GestureSimulator` produces human-like strokes: noisy aim with a per-stroke offset, corners cut
@@ -102,19 +112,20 @@ Real fingers are sloppier than the simulator. The [FUTO swipe dataset](https://h
 and the sentence it came from; the decoder's parameters are tuned on its dev split (coordinate descent,
 `FutoSwipesTest.futoTune`) and measured on its test split, which the tuning never saw:
 
-| Real swipes (FUTO test split, 10,000 in-dictionary words, word before known) | Before tuning | Tuned |
-|---|---|---|
-| Top-1 / top-3 | 80.9% / 85.7% | 89.0% / 95.6% |
-| Top-1 without the word before | 79.0% (5,000 swipes) | 86.7% |
-| Time per swipe after lift (JVM) | 0.50 ms | 1.28 ms |
+| Real swipes (FUTO test split, 10,000 in-dictionary words, words before known) | Before tuning | Tuned | Tuned, three-word model |
+|---|---|---|---|
+| Top-1 / top-3 | 80.9% / 85.7% | 89.0% / 95.6% | 91.0% / 96.1% |
+| Top-1 without the words before | 79.0% (5,000 swipes) | 86.7% | 87.8% |
+| Time per swipe after lift (JVM) | 0.50 ms | 1.28 ms | 2.4 ms (2.3 ms for the pair model in the same run) |
 
-`FrictionTest` writes 600 of the dataset's sentences (6,282 words) through the text controller the way a
+`FrictionTest` writes 400 of the dataset's sentences (4,205 words) through the text controller the way a
 person would: each word glided with the swipe made for it, punctuation, digits and one-letter words tapped,
 shift tapped for a capital the keyboard would not give, and a misread word fixed the cheapest way that
 works (a strip alternative, else tapping inside it and gliding it again with someone else's swipe, else
-selecting it and typing it). With the tuned decoder 89.4% of glided words are right first time, 6.5% are
-fixed from the strip, 2.5% by gliding again and 1.6% only by typing; 99.0% of sentences end up exactly as
-meant, the rest differing only in capitals (the dataset's own lowercase after "?" and "!", and "may" for
+selecting it and typing it). With the tuned decoder and the three-word model 92.4% of glided words are right
+first time, 4.7% are fixed from the strip, 1.9% by gliding again and 1.0% only by typing (232 letters typed;
+with pairs alone 90.5%, 5.9%, 2.1% and 1.4%, 302 letters); 99.0% of sentences end up exactly as meant, the
+rest differing only in capitals (the dataset's own lowercase after "?" and "!", and "may" for
 the month).
 
 `GlideBenchmarkTest` prints the simulator's view, tuned values first, earlier values (tuned on the
@@ -122,12 +133,12 @@ simulator) second:
 
 | Simulated strokes | Whole-word decoder | Streaming decoder, tuned / before |
 |---|---|---|
-| 1,000 most frequent words, no context, top-1 / top-3 | 73.0% / 87.2% | 91.7% / 99.0%, before 94.3% / 98.6% |
-| 3,679 words of 600 held-out sentences, top-1 | 73.7% | 92.8% alone, 96.1% with context (99.5% top-3); before 93.9% and 96.3% |
-| Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 87.2% / 97.7%, before 94.5% / 99.5% |
-| Phrase strokes of 2-4 words with the travel to and from the space bar | | 90.9% (95.9% one stroke per word), before 94.2% |
-| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 96.0% when glided, 97.0% at sentence end |
-| A swiper who lands 0.15 key right and 0.3 row low, before and after ten days of adapting (`GlideAdaptationTest`) | | 83.0% before, 89.0% after |
+| 1,000 most frequent words, no context, top-1 / top-3 | 76.1% / 88.1% | 90.8% / 99.5%, before 94.3% / 98.6% |
+| 3,679 words of 600 held-out sentences, top-1 | 73.7% | 92.6% alone, 95.5% with context (99.3% top-3); before 93.9% and 96.3% |
+| Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 87.8% / 98.2%, before 94.5% / 99.5% |
+| Phrase strokes of 2-4 words with the travel to and from the space bar | | 91.2% (95.4% one stroke per word), before 94.2% |
+| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 95.9% when glided, 97.2% at sentence end |
+| A swiper who lands 0.15 key right and 0.3 row low, before and after ten days of adapting (`GlideAdaptationTest`) | | 84.0% before, 91.3% after |
 
 The looser matching costs a little on the simulator's neat strokes and wins much more on real ones. Record
 your own with **Settings > Record glides**, which prompts common words on the real keyboard and keeps each
@@ -181,10 +192,22 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   ("ability's") are dropped, but the 's contractions of a closed set of pronouns and function words ("it's",
   "that's", "let's") are kept: SCOWL files them among the possessives. 61,846 words, 760 KB as text, written
   in the order the app searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
-- **Word frequencies and context**: unigram and bigram counts from Tatoeba's English sentences (2.0 million
-  sentences, 15.7 million words; CC BY 2.0 FR), counted only for words in the word list. Bigrams seen once are
-  dropped from the 1.8 MB asset; smoothing is Witten-Bell back to the unigram, which mixes the real count with
-  a small pseudo-count by SCOWL tier so unseen words still rank. Tatoeba uses "Tom" as its default name (3%
+- **Word frequencies and context**: word, word-pair and three-word counts from Tatoeba's English sentences
+  (2.0 million sentences; CC BY 2.0 FR), counted twice, and Common Voice's English sentence collection (1.6
+  million sentences; CC0), counted once: 43.5 million weighted words, counted only for words in the word list.
+  Pairs are kept from a weighted count of 2 (so a Tatoeba pair seen once stays), with the 400 most frequent
+  followers of a word; three-word counts only after pairs seen 20 times, followers from a count of 3, the 24
+  most frequent. 7.4 MB, up from 1.8 MB for Tatoeba's pairs alone. Smoothing is Witten-Bell: the three-word
+  count backs off to the pair, the pair to the unigram, which mixes the real count with a small pseudo-count
+  by SCOWL tier so unseen words still rank; what pruning dropped from a context also goes to the lower order
+  (without that the three-word model scored worse than pairs alone: perplexity 182 against 178 on held-out
+  sentences; with it 104 against 155). The weights were picked on the FUTO test split and the held-out
+  sentences, against Tatoeba alone and both corpora at equal weight: Common Voice lifts real swipes from 88.9%
+  to 91.0% top-1 (its sentences are closer to what people write than Tatoeba's short lessons), and counting
+  Tatoeba twice keeps phrase glides at 91.2% (90.1% at equal weight) at 2 MB more. The FUTO test and dev
+  sentences are excluded from the counts. The cost: autocorrect, which ranks by the unigram alone, fixes
+  88.5% of slips instead of 89.1%, and the simulator's held-out Tatoeba sentences score a little lower with
+  context (95.5% against 96.1%). Tatoeba uses "Tom" as its default name (3%
   of all words); counts involving "tom" are scaled to the level of "john". Punctuation other than . ! ? is
   ignored for context; digits and words outside the list break it. Every sentence whose id ends in 7 modulo
   50 is held out of the counts; 3,000 of them are the benchmark's test sentences.
@@ -205,7 +228,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   times wider when a word finds no candidate), 48 candidates re-aligned, 16 kept per word. Tuned on real
   swipes (the FUTO dataset's dev split, see Glide typing); a second pass from these values found nothing
   better. The earlier values (sigma 0.42 and 0.45, stay 0.8, skip 0.35, early lift 0.8, bias 0.5, turning 0,
-  bigram 1.0) were tuned on the simulator and scored 80.9% on real swipes against 89.0% now. The cost: with
+  bigram 1.0) were tuned on the simulator and scored 80.9% on real swipes against 89.0% after tuning (91.0%
+  with the three-word model, whose context weight kept the tuned 0.75). The cost: with
   no context a perfectly drawn "hello" now reads "help" first ("hello" second), because matching is loose
   enough for real fingers; words that share a path ("of" and "off", "to" and "too") were always settled by
   frequency and context.
@@ -283,7 +307,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   after an autocorrect puts back what was typed, and that word is not corrected again in the field. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
-  (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe): 89.1% fixed, 9.2%
+  (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe): 88.5% fixed, 9.9%
   changed to another word (mostly real ambiguities such as "tht" for "that" or "the"), 1.6% left alone; no
   correctly typed word changed. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
   and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
