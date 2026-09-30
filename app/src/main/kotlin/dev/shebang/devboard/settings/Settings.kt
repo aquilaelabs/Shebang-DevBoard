@@ -26,6 +26,10 @@ data class Settings(
     val keySounds: Boolean = false,
     val glide: Boolean = true,
     val glideTrail: Boolean = true,
+    /** Dip into the space bar mid-glide to start the next word in the same stroke. */
+    val phraseGlide: Boolean = false,
+    /** Let a new glide rewrite the recent glided words when it makes another reading more likely. */
+    val reviseGlide: Boolean = true,
     val autocorrect: Boolean = false,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,

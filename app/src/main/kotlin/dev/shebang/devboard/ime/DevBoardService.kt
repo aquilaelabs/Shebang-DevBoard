@@ -15,10 +15,10 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import dev.shebang.devboard.dict.DictionaryLoader
 import dev.shebang.devboard.dict.Suggester
-import dev.shebang.devboard.glide.GlideDecoder
-import dev.shebang.devboard.glide.IdealPathCache
+import dev.shebang.devboard.glide.GlideLanguage
+import dev.shebang.devboard.glide.GlideResult
+import dev.shebang.devboard.glide.GlideSession
 import dev.shebang.devboard.glide.KeyLayoutModel
 import dev.shebang.devboard.input.CharDispatch
 import dev.shebang.devboard.input.KeyEventMapper
@@ -52,12 +52,14 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
-class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui {
+class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui,
+    GlideSession.Listener {
 
     private enum class Mode { TEXT, CODE }
 
     private lateinit var layouts: LayoutRepository
-    private lateinit var dictLoader: DictionaryLoader
+    private lateinit var languageLoader: LanguageLoader
+    private lateinit var glideSession: GlideSession
     private lateinit var feedback: Feedback
     private lateinit var text: TextInputController
     private val main = Handler(Looper.getMainLooper())
@@ -80,14 +82,25 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var geometry: KeyboardGeometry? = null
     private var geometryVersion = 0
     private var glideModel: KeyLayoutModel? = null
-    private val idealPaths = IdealPathCache()
-    private var glideDecoder: GlideDecoder? = null
+    private var glideLanguage: GlideLanguage? = null
+    /** The glide in progress (its session id), or -1. */
+    private var glideId = -1
+    private var glideCapitalize = false
+    private var glideTrailingSpace = false
     private var autoShifted = false
 
     override fun onCreate() {
         super.onCreate()
         layouts = LayoutRepository(this)
-        dictLoader = DictionaryLoader(this)
+        glideSession = GlideSession(this)
+        languageLoader = LanguageLoader(
+            this,
+            onDictionary = { d -> main.post { text.suggester = Suggester(d) } },
+            onGlideLanguage = { lang ->
+                glideSession.language = lang
+                main.post { glideLanguage = lang }
+            },
+        )
         feedback = Feedback(this)
         text = TextInputController({ currentInputConnection }, this, background, main)
         settingsJob = scope.launch {
@@ -98,6 +111,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onDestroy() {
         settingsJob?.cancel()
         scope.cancel()
+        glideSession.release()
         background.shutdownNow()
         super.onDestroy()
     }
@@ -119,6 +133,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         strip?.setMode(s.stripMode)
         keyboard?.keyPreviewEnabled = s.keyPreview
         keyboard?.glideTrailEnabled = s.glideTrail
+        keyboard?.phraseGlideEnabled = s.phraseGlide
         if (heightChanged) rebuildGeometry()
     }
 
@@ -162,6 +177,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         s.setMode(settings.stripMode)
         k.keyPreviewEnabled = settings.keyPreview
         k.glideTrailEnabled = settings.glideTrail
+        k.phraseGlideEnabled = settings.phraseGlide
         rebuildGeometry()
         return container
     }
@@ -193,7 +209,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val layout = currentLayout()
         val dm = resources.displayMetrics
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        val baseRow = (if (landscape) 40f else 52f) * dm.density * settings.heightScale
+        val baseRow = KeyboardSizing.rowHeightPx(resources, settings.heightScale)
         val rowScale = if (layout.mode == "code") 0.86f else 1f
         val numberRow = settings.numberRow && layout.mode == "text"
         val rows = layout.rows.size + (if (numberRow && layout.numberRow != null) 1 else 0)
@@ -207,8 +223,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             widthPx = width,
             heightPx = height,
             numberRow = numberRow,
-            horizontalGapPx = 5f * dm.density,
-            verticalGapPx = 8f * dm.density,
+            horizontalGapPx = KeyboardSizing.horizontalGapPx(resources),
+            verticalGapPx = KeyboardSizing.verticalGapPx(resources),
             version = ++geometryVersion,
         )
         geometry = g
@@ -238,16 +254,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
         rebuildGeometry()
-        if (field.allowsComposing && glideDecoder == null) {
-            dictLoader.ensureLoading { dict ->
-                main.post {
-                    if (glideDecoder == null) {
-                        text.suggester = Suggester(dict)
-                        glideDecoder = GlideDecoder(dict, idealPaths)
-                    }
-                }
-            }
-        }
+        if (field.allowsComposing) languageLoader.ensureLoading()
         updateAutoCaps()
     }
 
@@ -389,27 +396,62 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         afterEdit()
     }
 
-    override fun onGlide(points: FloatArray, count: Int) {
+    override fun onGlideStart(points: FloatArray, times: LongArray, count: Int) {
         val g = geometry ?: return
-        val decoder = glideDecoder ?: return
-        if (!settings.glide || !field.allowsGlide || mode != Mode.TEXT) return
-        val copy = points.copyOf(2 * count)
-        val model = glideModelFor(g)
-        val capitalize = keyboard?.shiftState != ShiftState.OFF
-        val started = SystemClock.uptimeMillis()
-        background.execute {
-            val results = decoder.decode(copy, count, model)
-            val elapsed = SystemClock.uptimeMillis() - started
-            if (elapsed > 100) Log.w(TAG, "glide decode took ${elapsed}ms")
-            main.post {
-                if (results.isNotEmpty()) {
-                    text.commitGlide(results, capitalize)
-                    keyboard?.releaseOneShotShift()
-                    if (autoShifted) autoShifted = false
-                    afterEdit()
-                }
-            }
+        val lang = glideLanguage ?: return
+        if (!isGlideAllowed() || count == 0) return
+        val context = text.glideContext(lang.dictionary, lang.lm, settings.reviseGlide)
+        glideCapitalize = keyboard?.shiftState != ShiftState.OFF
+        glideTrailingSpace = false
+        glideId = glideSession.start(glideModelFor(g), context, times[0], settings.phraseGlide)
+        for (i in 0 until count) glideSession.point(points[2 * i], points[2 * i + 1], times[i])
+        strip?.setComposing(true)
+        strip?.suggestions?.showPreview("")
+    }
+
+    override fun onGlidePoint(x: Float, y: Float, t: Long) {
+        if (glideId >= 0) glideSession.point(x, y, t)
+    }
+
+    override fun onGlideBoundary() {
+        if (glideId >= 0) glideSession.boundary()
+    }
+
+    override fun onGlideEnd(x: Float, y: Float, t: Long, trailingSpace: Boolean) {
+        if (glideId < 0) return
+        glideTrailingSpace = trailingSpace
+        // Lifting inside the space bar after a dip: that point belongs to no word.
+        if (trailingSpace) glideSession.end(Float.NaN, Float.NaN, t) else glideSession.end(x, y, t)
+    }
+
+    override fun onGlideCancel() {
+        if (glideId < 0) return
+        glideSession.cancel()
+        glideId = -1
+        showCandidates(emptyList())
+        setComposing(text.isComposing)
+    }
+
+    override fun onGlidePreview(id: Int, result: GlideResult) {
+        if (id != glideId || keyboard?.isGliding != true) return
+        val lang = glideLanguage ?: return
+        strip?.suggestions?.showPreview(text.previewText(result, lang.dictionary, glideCapitalize))
+    }
+
+    override fun onGlideResult(id: Int, result: GlideResult?, decodeMs: Float) {
+        if (id != glideId) return
+        glideId = -1
+        Log.d(TAG, "glide decoded in %.1f ms after lift".format(decodeMs))
+        val lang = glideLanguage
+        if (result == null || lang == null) {
+            showCandidates(emptyList())
+            setComposing(text.isComposing)
+            return
         }
+        text.commitGlide(result, lang.dictionary, glideCapitalize, glideTrailingSpace)
+        keyboard?.releaseOneShotShift()
+        if (autoShifted) autoShifted = false
+        afterEdit()
     }
 
     override fun onSpaceLongPress() {
@@ -426,7 +468,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         autoShifted = false
     }
 
-    override fun isGlideAllowed(): Boolean = settings.glide && mode == Mode.TEXT && field.allowsGlide && glideDecoder != null
+    override fun isGlideAllowed(): Boolean = settings.glide && mode == Mode.TEXT && field.allowsGlide && glideLanguage != null
 
     override fun onKeyboardWidthChanged(widthPx: Int) {
         rebuildGeometry()

@@ -40,6 +40,8 @@ class SettingsRepository(context: Context) {
             keySounds = p[Keys.KEY_SOUNDS] ?: d.keySounds,
             glide = p[Keys.GLIDE] ?: d.glide,
             glideTrail = p[Keys.GLIDE_TRAIL] ?: d.glideTrail,
+            phraseGlide = p[Keys.PHRASE_GLIDE] ?: d.phraseGlide,
+            reviseGlide = p[Keys.REVISE_GLIDE] ?: d.reviseGlide,
             autocorrect = p[Keys.AUTOCORRECT] ?: d.autocorrect,
             autoCaps = p[Keys.AUTO_CAPS] ?: d.autoCaps,
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
@@ -59,6 +61,8 @@ class SettingsRepository(context: Context) {
         p[Keys.KEY_SOUNDS] = s.keySounds
         p[Keys.GLIDE] = s.glide
         p[Keys.GLIDE_TRAIL] = s.glideTrail
+        p[Keys.PHRASE_GLIDE] = s.phraseGlide
+        p[Keys.REVISE_GLIDE] = s.reviseGlide
         p[Keys.AUTOCORRECT] = s.autocorrect
         p[Keys.AUTO_CAPS] = s.autoCaps
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
@@ -77,6 +81,8 @@ class SettingsRepository(context: Context) {
         val KEY_SOUNDS = booleanPreferencesKey("key_sounds")
         val GLIDE = booleanPreferencesKey("glide")
         val GLIDE_TRAIL = booleanPreferencesKey("glide_trail")
+        val PHRASE_GLIDE = booleanPreferencesKey("phrase_glide")
+        val REVISE_GLIDE = booleanPreferencesKey("revise_glide")
         val AUTOCORRECT = booleanPreferencesKey("autocorrect")
         val AUTO_CAPS = booleanPreferencesKey("auto_caps")
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")

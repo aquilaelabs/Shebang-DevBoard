@@ -45,6 +45,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -69,8 +70,12 @@ class SettingsActivity : ComponentActivity() {
             val settings by repo.settings.collectAsStateWithLifecycle(initialValue = Settings())
             val scope = rememberCoroutineScope()
             var editingBar by remember { mutableStateOf(false) }
+            var recording by remember { mutableStateOf(false) }
             DevBoardTheme(settings.theme, settings.dynamicColor) {
-                if (editingBar) {
+                if (recording) {
+                    BackHandler { recording = false }
+                    GlideRecorderScreen(settings = settings, onBack = { recording = false })
+                } else if (editingBar) {
                     BackHandler { editingBar = false }
                     val bar = settings.barJson?.let { runCatching { BarConfig.parse(it) }.getOrNull() } ?: defaultBar
                     BarEditorScreen(
@@ -84,6 +89,7 @@ class SettingsActivity : ComponentActivity() {
                         settings = settings,
                         update = { f -> scope.launch { repo.update(f) } },
                         onEditBar = { editingBar = true },
+                        onRecordGlides = { recording = true },
                         onBack = { finish() },
                     )
                 }
@@ -94,7 +100,13 @@ class SettingsActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(settings: Settings, update: ((Settings) -> Settings) -> Unit, onEditBar: () -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(
+    settings: Settings,
+    update: ((Settings) -> Settings) -> Unit,
+    onEditBar: () -> Unit,
+    onRecordGlides: () -> Unit,
+    onBack: () -> Unit,
+) {
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("DevBoard settings") },
@@ -123,6 +135,23 @@ fun SettingsScreen(settings: Settings, update: ((Settings) -> Settings) -> Unit,
             item { SectionHeader("Typing") }
             item { SwitchRow("Glide typing", "Slide across letters to write a word", settings.glide) { v -> update { it.copy(glide = v) } } }
             item { SwitchRow("Glide trail", "Draw the path while gliding", settings.glideTrail, enabled = settings.glide) { v -> update { it.copy(glideTrail = v) } } }
+            item {
+                SwitchRow("Phrase gliding", "Dip into the space bar mid-glide to start the next word", settings.phraseGlide, enabled = settings.glide) { v ->
+                    update { it.copy(phraseGlide = v) }
+                }
+            }
+            item {
+                SwitchRow("Fix earlier glided words", "Rewrite recent glided words when the next one makes their meaning clear", settings.reviseGlide, enabled = settings.glide) { v ->
+                    update { it.copy(reviseGlide = v) }
+                }
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Record glides") },
+                    supportingContent = { Text("Glide prompted words to measure accuracy on your own fingers. Kept on this phone.") },
+                    modifier = Modifier.clickable(onClick = onRecordGlides),
+                )
+            }
             item { SwitchRow("Autocorrect", "Fix the word when you press space", settings.autocorrect) { v -> update { it.copy(autocorrect = v) } } }
             item { SwitchRow("Auto-capitalize", "Shift at the start of sentences", settings.autoCaps) { v -> update { it.copy(autoCaps = v) } } }
             item { SwitchRow("Double-space period", "Two spaces insert \". \"", settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } } }
@@ -334,4 +363,118 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
             }
         },
     )
+}
+
+// ---- Glide recorder ----------------------------------------------------------------------------------
+
+/** The most frequent glide-able words, shuffled: the prompts for recording. */
+private fun recorderPrompts(context: android.content.Context): List<String> {
+    val dictionary = context.assets.open(dev.shebang.devboard.ime.LanguageLoader.DICTIONARY_ASSET).bufferedReader()
+        .useLines { dev.shebang.devboard.dict.Dictionary.parse(it) }
+    val lm = context.assets.open(dev.shebang.devboard.dict.NgramModel.ASSET).use { dev.shebang.devboard.dict.NgramModel.load(it, dictionary) }
+    val seq = IntArray(64)
+    val words = (0 until dictionary.size)
+        .filter { dev.shebang.devboard.glide.LexiconTrie.keySequence(dictionary.lower[it], seq) >= 2 }
+        .sortedBy { lm.unigramCost(it) }
+        .map { dictionary.lower[it] }
+        .distinct()
+        .take(1000)
+    return words.shuffled()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
+    val context = LocalContext.current
+    val store = remember { GlideTraceStore(context) }
+    val scope = rememberCoroutineScope()
+    var count by remember { mutableStateOf(0) }
+    var prompts by remember { mutableStateOf<List<String>>(emptyList()) }
+    var index by remember { mutableStateOf(0) }
+    var confirmClear by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.count() }
+        prompts = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) { recorderPrompts(context) }
+    }
+    val prompt = prompts.getOrNull(index % maxOf(1, prompts.size))
+    val currentPrompt = androidx.compose.runtime.rememberUpdatedState(prompt)
+    val density = androidx.compose.ui.platform.LocalDensity.current.density
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri: Uri? ->
+        uri ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { store.exportTo(it) } }.isSuccess
+            }
+            Toast.makeText(context, if (ok) "Glides exported" else "Export failed", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    Scaffold(topBar = {
+        TopAppBar(
+            title = { Text("Record glides") },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            actions = {
+                TextButton(onClick = { exportLauncher.launch("devboard-glides.jsonl") }, enabled = count > 0) { Text("Export") }
+                IconButton(onClick = { confirmClear = true }, enabled = count > 0) { Icon(Icons.Default.Delete, contentDescription = "Delete all") }
+            },
+        )
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Text(
+                "Glide each word on the keyboard below. Nothing else is recorded, and samples stay on this phone until you export them.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(16.dp),
+            )
+            Text(
+                prompt ?: "Loading words\u2026",
+                style = MaterialTheme.typography.displaySmall,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Text(
+                "$count recorded",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                TextButton(onClick = { index++ }, enabled = prompt != null) { Text("Skip") }
+                TextButton(onClick = {
+                    scope.launch {
+                        count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.removeLast(); store.count() }
+                    }
+                }, enabled = count > 0) { Text("Undo last") }
+            }
+            Spacer(Modifier.weight(1f))
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx ->
+                    GlideRecorderView(ctx, dev.shebang.devboard.ime.LayoutRepository(ctx).text, settings) { xs, ys, ts, g ->
+                        val word = currentPrompt.value ?: return@GlideRecorderView
+                        val trace = GlideRecorderView.trace(word, xs, ys, ts, g, density)
+                        index++
+                        scope.launch {
+                            count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.add(trace); store.count() }
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            title = { Text("Delete all recorded glides?") },
+            text = { Text("This removes the $count samples kept on this phone.") },
+            confirmButton = {
+                Button(onClick = {
+                    confirmClear = false
+                    scope.launch { count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.clear(); 0 } }
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+        )
+    }
 }

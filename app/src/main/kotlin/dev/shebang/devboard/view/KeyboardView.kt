@@ -24,6 +24,10 @@ enum class ShiftState { OFF, ON, LOCKED }
  *
  * Touch paths are kept in primitive arrays and paints/rects are preallocated, so a keystroke allocates
  * nothing on the main thread. Geometry is swapped in as a whole when the size, layout or variant changes.
+ *
+ * A glide is streamed to the listener while the finger moves: every recorded point with its touch time
+ * (historical samples included), and, with phrase gliding on, a word boundary each time the finger dips
+ * deliberately into the space bar (past its middle, or resting there).
  */
 class KeyboardView(context: Context) : View(context) {
 
@@ -36,8 +40,16 @@ class KeyboardView(context: Context) : View(context) {
         fun onKeyRepeat(key: Key)
         /** Alternate chosen from the long-press popup. */
         fun onAlternate(key: Key, text: String)
-        /** A glide finished; [points] is interleaved x,y with [count] points. */
-        fun onGlide(points: FloatArray, count: Int)
+        /** A touch became a glide: the points so far, x,y interleaved in [points], touch times in [times]. */
+        fun onGlideStart(points: FloatArray, times: LongArray, count: Int)
+        /** The next recorded point of the glide. */
+        fun onGlidePoint(x: Float, y: Float, t: Long)
+        /** Phrase gliding: the finger dipped into the space bar, ending one word. */
+        fun onGlideBoundary()
+        /** The finger lifted; [trailingSpace] when it lifted in the space bar after a dip. */
+        fun onGlideEnd(x: Float, y: Float, t: Long, trailingSpace: Boolean)
+        /** The glide was abandoned (touch cancelled). */
+        fun onGlideCancel()
         fun onSpaceLongPress()
         /** Cursor drag along the space bar: +1 right, -1 left. */
         fun onCursorMove(steps: Int)
@@ -68,6 +80,8 @@ class KeyboardView(context: Context) : View(context) {
         }
     var keyPreviewEnabled = true
     var glideTrailEnabled = true
+    /** Dipping into the space bar during a glide starts the next word. */
+    var phraseGlideEnabled = false
 
     private val density = resources.displayMetrics.density
     /** The preview/alternates overlay, owned by the IME root so it can draw above the top row. */
@@ -113,12 +127,29 @@ class KeyboardView(context: Context) : View(context) {
     private var cursorDrag = false
     private var cursorDragAccum = 0f
 
-    // Glide path: interleaved x,y.
+    // Glide path: interleaved x,y, with touch times.
     private val glidePoints = FloatArray(2 * MAX_GLIDE_POINTS)
+    private val glideTimes = LongArray(MAX_GLIDE_POINTS)
     private var glideCount = 0
     private var gliding = false
     private var glideLength = 0f
     private var lastShiftTapTime = 0L
+
+    // Phrase gliding: points inside the space bar are held back until it is clear whether the dip was meant.
+    private var spaceKey: Key? = null
+    private var inSpace = false
+    private var spaceArmed = false
+    private var spaceEnterTime = 0L
+    private val spaceBufX = FloatArray(SPACE_BUFFER)
+    private val spaceBufY = FloatArray(SPACE_BUFFER)
+    private val spaceBufT = LongArray(SPACE_BUFFER)
+    private var spaceBufCount = 0
+    private val spaceDwellRunnable = Runnable {
+        if (gliding && inSpace && !spaceArmed) {
+            spaceArmed = true
+            invalidate()
+        }
+    }
 
     private val longPressRunnable = Runnable { onLongPress() }
     private val repeatRunnable = object : Runnable {
@@ -146,6 +177,7 @@ class KeyboardView(context: Context) : View(context) {
 
     fun setGeometry(g: KeyboardGeometry) {
         geometry = g
+        spaceKey = g.keys.firstOrNull { it.action == KeyAction.SPACE && g.layout.composing }
         radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
         labelSize = g.rowHeightPx * 0.42f
         hintSize = g.rowHeightPx * 0.22f
@@ -201,7 +233,7 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     private fun drawKey(canvas: Canvas, key: Key, shifted: Boolean) {
-        val pressed = isPressed(key)
+        val pressed = isPressed(key) || (spaceArmed && key === spaceKey)
         val action = key.action
         val accentKey = action == KeyAction.ENTER || (action == KeyAction.SHIFT && shiftState == ShiftState.LOCKED)
         keyPaint.color = when {
@@ -281,8 +313,12 @@ class KeyboardView(context: Context) : View(context) {
                 val idx = event.actionIndex
                 val id = event.getPointerId(idx)
                 if (id >= MAX_POINTERS) return true
+                // A glide owns the keyboard until it ends: other fingers are ignored.
+                if (gliding) return true
                 // A second finger commits the first key's tap immediately (fast typing).
-                if (activePointer >= 0 && activePointer != id && !gliding && !cursorDrag) finishPointer(activePointer, pointerLastX[activePointer], -1f, false)
+                if (activePointer >= 0 && activePointer != id && !cursorDrag) {
+                    finishPointer(activePointer, pointerLastX[activePointer], -1f, false, event.eventTime)
+                }
                 val x = event.getX(idx)
                 val y = event.getY(idx)
                 val key = g.keyAt(x, y) ?: return true
@@ -303,8 +339,10 @@ class KeyboardView(context: Context) : View(context) {
                 if (key.letter != 0.toChar()) {
                     glidePoints[0] = x
                     glidePoints[1] = y
+                    glideTimes[0] = event.eventTime
                     glideCount = 1
                 }
+                resetSpaceState()
                 listener?.onKeyDown(key)
                 handler.removeCallbacks(longPressRunnable)
                 handler.removeCallbacks(repeatRunnable)
@@ -324,23 +362,29 @@ class KeyboardView(context: Context) : View(context) {
                     val id = event.getPointerId(i)
                     if (id >= MAX_POINTERS || id != activePointer) continue
                     val key = pointerKey[id] ?: continue
-                    val x = event.getX(i)
-                    val y = event.getY(i)
-                    handleMove(g, id, key, x, y)
-                    pointerLastX[id] = x
+                    // Touchscreens report faster than the display: batched samples keep the path and its timing.
+                    for (h in 0 until event.historySize) {
+                        handleMove(g, id, key, event.getHistoricalX(i, h), event.getHistoricalY(i, h), event.getHistoricalEventTime(h))
+                    }
+                    handleMove(g, id, key, event.getX(i), event.getY(i), event.eventTime)
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
                 val idx = event.actionIndex
                 val id = event.getPointerId(idx)
-                if (id < MAX_POINTERS) finishPointer(id, event.getX(idx), event.getY(idx), true)
+                if (id < MAX_POINTERS) finishPointer(id, event.getX(idx), event.getY(idx), true, event.eventTime)
             }
             MotionEvent.ACTION_CANCEL -> cancelAllTouches()
         }
         return true
     }
 
-    private fun handleMove(g: KeyboardGeometry, id: Int, key: Key, x: Float, y: Float) {
+    private fun handleMove(g: KeyboardGeometry, id: Int, key: Key, x: Float, y: Float, t: Long) {
+        moveTo(g, id, key, x, y, t)
+        pointerLastX[id] = x
+    }
+
+    private fun moveTo(g: KeyboardGeometry, id: Int, key: Key, x: Float, y: Float, t: Long) {
         if (popup.isAlternates) {
             popup.updateSelection(x)
             return
@@ -372,7 +416,9 @@ class KeyboardView(context: Context) : View(context) {
             longPressPending = false
         }
         if (key.letter == 0.toChar()) return
-        // Record the path while the finger is on a letter key start.
+        if (gliding && phraseGlideEnabled) trackSpace(x, y, t)
+        // Record the path (touches that start on a letter), keeping points at least 2 dp apart.
+        var recorded = false
         if (glideCount in 1 until MAX_GLIDE_POINTS) {
             val px = glidePoints[2 * glideCount - 2]
             val py = glidePoints[2 * glideCount - 1]
@@ -382,8 +428,10 @@ class KeyboardView(context: Context) : View(context) {
             if (d >= MIN_SAMPLE_PX * density) {
                 glidePoints[2 * glideCount] = x
                 glidePoints[2 * glideCount + 1] = y
+                glideTimes[glideCount] = t
                 glideCount++
                 glideLength += d
+                recorded = true
             }
         }
         if (!gliding && glideLength > kw * 0.5f && listener?.isGlideAllowed() == true) {
@@ -393,9 +441,69 @@ class KeyboardView(context: Context) : View(context) {
                 handler.removeCallbacks(longPressRunnable)
                 longPressPending = false
                 popup.dismiss()
+                listener?.onGlideStart(glidePoints, glideTimes, glideCount)
+                invalidate()
+                return
             }
         }
-        if (gliding) invalidate()
+        if (gliding) {
+            if (recorded) {
+                if (inSpace) bufferSpacePoint(x, y, t) else listener?.onGlidePoint(x, y, t)
+            }
+            invalidate()
+        }
+    }
+
+    // ---- Phrase gliding ------------------------------------------------------------------------------
+
+    /** Tracks the finger against the space bar; a dip past its middle or a rest there arms a word boundary. */
+    private fun trackSpace(x: Float, y: Float, t: Long) {
+        val space = spaceKey ?: return
+        if (space.contains(x, y)) {
+            if (!inSpace) {
+                inSpace = true
+                spaceArmed = false
+                spaceEnterTime = t
+                spaceBufCount = 0
+                handler.removeCallbacks(spaceDwellRunnable)
+                handler.postDelayed(spaceDwellRunnable, SPACE_DWELL_MS)
+            }
+            if (!spaceArmed && (y > space.centerY || t - spaceEnterTime >= SPACE_DWELL_MS)) {
+                spaceArmed = true
+                invalidate()
+            }
+        } else if (inSpace) {
+            leaveSpace()
+        }
+    }
+
+    private fun bufferSpacePoint(x: Float, y: Float, t: Long) {
+        if (spaceBufCount >= SPACE_BUFFER) return
+        spaceBufX[spaceBufCount] = x
+        spaceBufY[spaceBufCount] = y
+        spaceBufT[spaceBufCount] = t
+        spaceBufCount++
+    }
+
+    /** Back out of the space bar: a boundary if the dip was deliberate, otherwise the held points are the word's. */
+    private fun leaveSpace() {
+        inSpace = false
+        handler.removeCallbacks(spaceDwellRunnable)
+        if (spaceArmed) {
+            spaceArmed = false
+            listener?.onGlideBoundary()
+        } else {
+            for (k in 0 until spaceBufCount) listener?.onGlidePoint(spaceBufX[k], spaceBufY[k], spaceBufT[k])
+        }
+        spaceBufCount = 0
+        invalidate()
+    }
+
+    private fun resetSpaceState() {
+        inSpace = false
+        spaceArmed = false
+        spaceBufCount = 0
+        handler.removeCallbacks(spaceDwellRunnable)
     }
 
     private fun onLongPress() {
@@ -416,7 +524,7 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
-    private fun finishPointer(id: Int, x: Float, y: Float, fromUp: Boolean) {
+    private fun finishPointer(id: Int, x: Float, y: Float, fromUp: Boolean, t: Long) {
         val key = pointerKey[id] ?: return
         val wasActive = id == activePointer
         if (wasActive) {
@@ -428,7 +536,16 @@ class KeyboardView(context: Context) : View(context) {
             pointerCancelled[id] -> Unit
             wasActive && popup.isAlternates -> popup.selectedAlternate()?.let { l?.onAlternate(key, it) }
             wasActive && gliding -> {
-                if (glideCount >= 2) l?.onGlide(glidePoints, glideCount)
+                var trailingSpace = false
+                if (inSpace) {
+                    if (spaceArmed) {
+                        trailingSpace = true
+                    } else {
+                        for (k in 0 until spaceBufCount) l?.onGlidePoint(spaceBufX[k], spaceBufY[k], spaceBufT[k])
+                    }
+                }
+                resetSpaceState()
+                l?.onGlideEnd(x, y, t, trailingSpace)
             }
             wasActive && cursorDrag -> Unit
             wasActive && repeatFired -> Unit
@@ -461,6 +578,8 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     fun cancelAllTouches() {
+        if (gliding) listener?.onGlideCancel()
+        resetSpaceState()
         handler.removeCallbacks(longPressRunnable)
         handler.removeCallbacks(repeatRunnable)
         popup.dismiss()
@@ -490,5 +609,8 @@ class KeyboardView(context: Context) : View(context) {
         private const val REPEAT_START_MS = 80L
         private const val REPEAT_MIN_MS = 25L
         private const val REPEAT_ACCEL = 0.85f
+        /** Resting this long in the space bar during a glide also ends a word. */
+        private const val SPACE_DWELL_MS = 150L
+        private const val SPACE_BUFFER = 256
     }
 }

@@ -47,7 +47,26 @@ class SuggestionStripView(context: Context) : LinearLayout(context) {
         }
     }
 
+    /** One line across the whole strip: the words a glide will write if the finger lifts now. */
+    fun showPreview(text: String) {
+        setSideSlotsVisible(false)
+        slots[1].text = text
+        slots[1].setTypeface(null, android.graphics.Typeface.BOLD)
+    }
+
+    private fun setSideSlotsVisible(visible: Boolean) {
+        val v = if (visible) VISIBLE else GONE
+        if (slots[0].visibility == v) return
+        slots[0].visibility = v
+        slots[2].visibility = v
+        for (i in 0 until childCount) {
+            val c = getChildAt(i)
+            if (c.tag == "divider") c.visibility = v
+        }
+    }
+
     fun show(words: List<String>) {
+        setSideSlotsVisible(true)
         for (i in slots.indices) {
             slots[i].text = words.getOrNull(i) ?: ""
             // The middle slot (best candidate) is bold, like most keyboards.

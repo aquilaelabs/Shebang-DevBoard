@@ -8,6 +8,9 @@ import kotlin.math.sqrt
 data class GlideCandidate(val word: String, val score: Double)
 
 /**
+ * The original SHARK2-style decoder, kept in the tests as the baseline the streaming decoder is measured
+ * against. It shipped in the app until the streaming decoder replaced it.
+ *
  * SHARK2-style shape-writing decoder (Kristensson & Zhai, UIST 2004), written from the paper:
  *
  *  1. Prune by start/end key proximity (words indexed by first and last letter) and rough path length.
