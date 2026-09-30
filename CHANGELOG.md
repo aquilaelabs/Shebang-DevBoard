@@ -9,3 +9,7 @@
 - Terminal bar with sticky Ctrl/Alt/Shift/Meta, real KeyEvents for terminals, hold-to-repeat arrows and Del, snippets, and a JSON editor with import/export (4447b83)
 - Field-aware behaviour: raw input for terminals, no suggestions or glide in password fields, numeric pad for number/phone/date, @ and / for email/URL (4447b83)
 - Setup screen with the three enable/select/test steps and a Material 3 settings app (theme, height, haptics, sounds, glide, autocorrect, strip mode) (4447b83)
+
+### Changed
+
+- Key preview and alternates draw inside the keyboard window; autocorrect and auto-capitalisation no longer do dictionary or editor work per keystroke on the main thread (8d54743)
