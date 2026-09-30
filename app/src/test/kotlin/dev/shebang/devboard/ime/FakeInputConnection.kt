@@ -16,7 +16,8 @@ class FakeInputConnection(initial: String = "") : InputConnection {
     var cursor = initial.length
     var composingStart = -1
         private set
-    private var composingEnd = -1
+    var composingEnd = -1
+        private set
     /** End of the selection, which starts at [cursor]; -1 when nothing is selected. */
     var selectionEnd = -1
     val keyEvents = ArrayList<KeyEvent>()

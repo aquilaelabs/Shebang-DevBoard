@@ -397,7 +397,12 @@ class TextInputController(
             ) {
                 ic.commitText(" ", 1)
             }
-            if (word.isEmpty()) refreshIdentifiers(ic)
+            if (word.isEmpty()) {
+                refreshIdentifiers(ic)
+                // Typing on at the end of a word that is not composing (the field dropped it, or the cursor was
+                // put there): the whole word is composed, so the underline and a strip pick cover all of it.
+                if (recomposeWordBeforeCursor(ic) != null) reopenedGlide = null
+            }
             word.append(text)
             ic.setComposingText(word, 1)
             ui.setComposing(true)
@@ -625,25 +630,7 @@ class TextInputController(
      * a glide or a strip pick replaces it.
      */
     private fun reopenWordBeforeCursor(ic: InputConnection) {
-        if (!field.allowsComposing || isComposing) return
-        val after = ic.getTextAfterCursor(1, 0)
-        if (!after.isNullOrEmpty() && (after[0].isLetterOrDigit() || isLetterInWord(after[0]))) return
-        val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: return
-        var b = 0
-        while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
-        if (b == 0 || b == MAX_WORD) return
-        // A word glued to digits or symbols before it ("x86") is not reopened.
-        if (b < before.length && before[before.length - 1 - b].isLetterOrDigit()) return
-        val text = before.substring(before.length - b)
-        if (!text.first().isLetter()) return
-        ownEdit()
-        ic.beginBatchEdit()
-        ic.deleteSurroundingText(b, 0)
-        ic.setComposingText(text, 1)
-        ic.endBatchEdit()
-        word.setLength(0)
-        word.append(text)
-        reopened = text
+        val text = recomposeWordBeforeCursor(ic) ?: return
         reopenedGlide = recentMatch(text)
         ui.setComposing(true)
         val g = reopenedGlide
@@ -658,6 +645,34 @@ class TextInputController(
         } else {
             requestSuggestions()
         }
+    }
+
+    /**
+     * Makes the word ending at the cursor the composing word again and returns it, or null when there is none:
+     * a letter or digit follows the cursor, nothing is selected, the word is glued to digits or symbols before
+     * it ("x86"), or it does not start with a letter.
+     */
+    private fun recomposeWordBeforeCursor(ic: InputConnection): String? {
+        if (!field.allowsComposing || isComposing) return null
+        if (!ic.getSelectedText(0).isNullOrEmpty()) return null
+        val after = ic.getTextAfterCursor(1, 0)
+        if (!after.isNullOrEmpty() && (after[0].isLetterOrDigit() || isLetterInWord(after[0]))) return null
+        val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: return null
+        var b = 0
+        while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
+        if (b == 0 || b == MAX_WORD) return null
+        if (b < before.length && before[before.length - 1 - b].isLetterOrDigit()) return null
+        val text = before.substring(before.length - b)
+        if (!text.first().isLetter()) return null
+        ownEdit()
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(b, 0)
+        ic.setComposingText(text, 1)
+        ic.endBatchEdit()
+        word.setLength(0)
+        word.append(text)
+        reopened = text
+        return text
     }
 
     /** The reopened composing word as a target, so a glide replaces it the way it replaces a tapped word. */

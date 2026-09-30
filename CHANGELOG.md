@@ -47,3 +47,4 @@
 - A lone i (and i'm, i'd, i'll, i've) is capitalised when the word ends (ff7863d)
 - The setup screen has one settings button instead of two (ef17318)
 - Tapping a word in the suggestion strip gives the same feedback (vibration, click) as a key (c3b3a8a)
+- Typing on at the end of a word (after backspacing into it, or when the app dropped the word being typed) takes in the whole word, so the underline and a suggestion cover all of it rather than only the new letters (f981e15)
