@@ -153,6 +153,16 @@ class TextInputController(
     private var target: Target? = null
     private var targetGeneration = 0
 
+    /** The selection as the field last reported it (-1 before any report). */
+    private var selStart = -1
+    private var selEnd = -1
+
+    /** A swipe from backspace in progress: the cursor it started at, and where each word before it begins. */
+    private var deleteAnchor = -1
+    private var deleteBefore = ""
+    private var deleteOffsets = IntArray(0)
+    private var deletePreview = ""
+
     /** When the keyboard last changed the field: selection reports soon after are its own, not the user's. */
     private var lastOwnEdit = Long.MIN_VALUE / 2
 
@@ -193,6 +203,9 @@ class TextInputController(
      * selected word, becomes the target. The last glide stays unlearned until the next edit, which may redo it.
      */
     fun onSelectionChanged(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+        selStart = newSelStart
+        selEnd = newSelEnd
+        if (deleteAnchor >= 0) return
         if (isComposing) {
             val insideComposing = newSelStart == newSelEnd && newSelStart == candidatesEnd && candidatesStart >= 0
             // A report can lag the keyboard's own edits: ask the field whether the word still ends at the cursor.
@@ -601,6 +614,80 @@ class TextInputController(
         t.sentenceStart = GlideText.contextWord(before.subSequence(0, maxOf(0, before.length - text.length))) == GlideText.SENTENCE_START
         return t
     }
+
+    /**
+     * Swiping left from backspace: the last [n] words before the cursor (each with the spaces after it) are
+     * selected to show what will go; 0 selects nothing. The first call reads the text before the cursor once.
+     */
+    fun previewDeleteWords(n: Int) {
+        val ic = connection() ?: return
+        if (deleteAnchor < 0) {
+            dropTarget()
+            if (isComposing) endWord(ic, "", correct = false, deferOk = false)
+            lastGlide = null
+            lastAutocorrect = null
+            settle()
+            if (selEnd < 0 || selStart != selEnd) return
+            deleteAnchor = selEnd
+            deleteBefore = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: ""
+            deleteOffsets = wordOffsets(deleteBefore)
+        }
+        val k = n.coerceIn(0, deleteOffsets.size - 1)
+        val len = deleteOffsets[k]
+        ownEdit()
+        ic.setSelection(deleteAnchor - len, deleteAnchor)
+        deletePreview = deleteBefore.takeLast(len)
+    }
+
+    /**
+     * The swipe from backspace ended: the [n] words go (the previewed selection, when it still is exactly
+     * that; otherwise the words before the cursor), or with 0 the cursor is put back.
+     */
+    fun deleteWords(n: Int) {
+        val ic = connection() ?: return
+        val anchor = deleteAnchor
+        deleteAnchor = -1
+        ownEdit()
+        // Whatever the strip offered was for text that is going.
+        clearCandidates()
+        if (n <= 0) {
+            if (anchor >= 0) ic.setSelection(anchor, anchor)
+            return
+        }
+        val sel = ic.getSelectedText(0)?.toString()
+        if (anchor >= 0 && sel != null && sel.isNotEmpty()) {
+            if (sel == deletePreview) ic.commitText("", 1) else ic.setSelection(anchor, anchor)
+            return
+        }
+        // No preview (the cursor position was not known): delete the words before the cursor.
+        if (isComposing) endWord(ic, "", correct = false, deferOk = false)
+        val before = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: return
+        val offs = wordOffsets(before)
+        ic.deleteSurroundingText(offs[n.coerceIn(0, offs.size - 1)], 0)
+    }
+
+    /** offsets[k]: how many characters before the cursor the last k words take, each with the spaces after it. */
+    private fun wordOffsets(before: String): IntArray {
+        val out = ArrayList<Int>()
+        out += 0
+        var i = before.length
+        while (i > 0 && out.size <= MAX_DELETE_WORDS) {
+            while (i > 0 && before[i - 1].isWhitespace() && before[i - 1] != '\n') i--
+            if (i > 0 && before[i - 1] == '\n') {
+                // A line break is a stop of its own.
+                i--
+            } else if (i > 0 && isDeleteWordChar(before[i - 1])) {
+                while (i > 0 && isDeleteWordChar(before[i - 1])) i--
+            } else {
+                while (i > 0 && !before[i - 1].isWhitespace() && !isDeleteWordChar(before[i - 1])) i--
+            }
+            if (before.length - i == out.last()) break
+            out += before.length - i
+        }
+        return out.toIntArray()
+    }
+
+    private fun isDeleteWordChar(c: Char) = c.isLetterOrDigit() || c == '_' || c == '\'' || c == '’'
 
     fun enter() {
         val ic = connection() ?: return
@@ -1055,6 +1142,9 @@ class TextInputController(
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
+        /** Characters read before the cursor for deleting words by swiping from backspace. */
+        private const val DELETE_CHARS = 2000
+        private const val MAX_DELETE_WORDS = 40
         /** Characters read each side of the cursor to see whether a word is used elsewhere in the text. */
         private const val AROUND_CHARS = 4000
         /** Characters read before the cursor for the word before it. */

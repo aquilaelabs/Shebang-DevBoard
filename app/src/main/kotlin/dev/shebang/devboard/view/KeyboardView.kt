@@ -51,8 +51,12 @@ class KeyboardView(context: Context) : View(context) {
         /** The glide was abandoned (touch cancelled). */
         fun onGlideCancel()
         fun onSpaceLongPress()
-        /** Cursor drag along the space bar: +1 right, -1 left. */
-        fun onCursorMove(steps: Int)
+        /** Cursor drag along the space bar: +1 right, -1 left; with [select] (shift on) the selection grows. */
+        fun onCursorMove(steps: Int, select: Boolean)
+        /** Swiping left from backspace: [words] words before the cursor would go (0: none). */
+        fun onDeleteWordsPreview(words: Int) = Unit
+        /** The swipe from backspace ended: delete [words] words (0: nothing). */
+        fun onDeleteWords(words: Int) = Unit
         fun onShiftChanged(state: ShiftState)
         /** Whether a touch starting on a letter may become a glide right now (field and setting). */
         fun isGlideAllowed(): Boolean
@@ -130,6 +134,9 @@ class KeyboardView(context: Context) : View(context) {
     private var repeatInterval = 0L
     private var cursorDrag = false
     private var cursorDragAccum = 0f
+    /** Swiping left from backspace, and how many words that would delete. */
+    private var deleteDrag = false
+    private var deleteWords = 0
 
     // Glide path: interleaved x,y, with touch times.
     private val glidePoints = FloatArray(2 * MAX_GLIDE_POINTS)
@@ -358,6 +365,8 @@ class KeyboardView(context: Context) : View(context) {
                 repeatFired = false
                 cursorDrag = false
                 cursorDragAccum = 0f
+                deleteDrag = false
+                deleteWords = 0
                 gliding = false
                 glideCount = 0
                 glideLength = 0f
@@ -417,6 +426,23 @@ class KeyboardView(context: Context) : View(context) {
         val dx = x - pointerDownX[id]
         val dy = y - pointerDownY[id]
         val kw = g.letterKeyWidth
+        if (key.action == KeyAction.BACKSPACE) {
+            // Swiping left from backspace deletes whole words: one more for each step left, none if back.
+            if (!deleteDrag && !repeatFired && dx < -kw * 0.6f) {
+                deleteDrag = true
+                handler.removeCallbacks(repeatRunnable)
+                handler.removeCallbacks(longPressRunnable)
+                longPressPending = false
+            }
+            if (deleteDrag) {
+                val n = if (dx > -kw * 0.3f) 0 else 1 + ((-dx - kw * 0.6f) / (kw * 0.8f)).toInt().coerceAtLeast(0)
+                if (n != deleteWords) {
+                    deleteWords = n
+                    listener?.onDeleteWordsPreview(n)
+                }
+            }
+            return
+        }
         if (key.action == KeyAction.SPACE) {
             if (!cursorDrag && abs(dx) > kw * 0.6f) {
                 cursorDrag = true
@@ -430,7 +456,7 @@ class KeyboardView(context: Context) : View(context) {
                 val steps = (cursorDragAccum / stepPx).toInt()
                 if (steps != 0) {
                     cursorDragAccum -= steps * stepPx
-                    listener?.onCursorMove(steps)
+                    listener?.onCursorMove(steps, shiftState != ShiftState.OFF)
                 }
             }
             return
@@ -573,6 +599,7 @@ class KeyboardView(context: Context) : View(context) {
                 l?.onGlideEnd(x, y, t, trailingSpace)
             }
             wasActive && cursorDrag -> Unit
+            wasActive && deleteDrag -> l?.onDeleteWords(deleteWords)
             wasActive && repeatFired -> Unit
             key.action == KeyAction.SHIFT -> onShiftTap()
             else -> l?.onKeyTap(key, shiftState)
@@ -585,6 +612,8 @@ class KeyboardView(context: Context) : View(context) {
             gliding = false
             glideCount = 0
             cursorDrag = false
+            deleteDrag = false
+            deleteWords = 0
             repeatFired = false
             longPressPending = false
         }
@@ -604,6 +633,9 @@ class KeyboardView(context: Context) : View(context) {
 
     fun cancelAllTouches() {
         if (gliding) listener?.onGlideCancel()
+        if (deleteDrag) listener?.onDeleteWords(0)
+        deleteDrag = false
+        deleteWords = 0
         resetSpaceState()
         handler.removeCallbacks(longPressRunnable)
         handler.removeCallbacks(repeatRunnable)

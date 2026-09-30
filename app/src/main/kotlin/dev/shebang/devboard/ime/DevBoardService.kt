@@ -547,10 +547,22 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
     }
 
-    override fun onCursorMove(steps: Int) {
+    override fun onCursorMove(steps: Int, select: Boolean) {
         text.finishComposing()
         val code = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-        repeat(kotlin.math.abs(steps)) { KeySender.sendPlain(ic, code) }
+        // With shift on, shift+arrow grows the selection, as on a hardware keyboard.
+        val meta = if (select) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
+        repeat(kotlin.math.abs(steps)) { KeySender.send(ic, KeyEventPlan(code, meta)) }
+    }
+
+    override fun onDeleteWordsPreview(words: Int) {
+        feedback.keyPress()
+        text.previewDeleteWords(words)
+    }
+
+    override fun onDeleteWords(words: Int) {
+        text.deleteWords(words)
+        afterEdit()
     }
 
     override fun onShiftChanged(state: ShiftState) {

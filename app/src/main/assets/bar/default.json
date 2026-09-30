@@ -176,6 +176,23 @@
    "code": "F12"
   },
   {
+   "type": "key",
+   "label": "Undo",
+   "code": "Z",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "Redo",
+   "code": "Z",
+   "mods": [
+    "ctrl",
+    "shift"
+   ]
+  },
+  {
    "type": "snippet",
    "label": "sudo",
    "text": "sudo "

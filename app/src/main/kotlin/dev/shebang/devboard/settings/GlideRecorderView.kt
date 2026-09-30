@@ -99,7 +99,7 @@ class GlideRecorderView(
     override fun onKeyRepeat(key: Key) = Unit
     override fun onAlternate(key: Key, text: String) = Unit
     override fun onSpaceLongPress() = Unit
-    override fun onCursorMove(steps: Int) = Unit
+    override fun onCursorMove(steps: Int, select: Boolean) = Unit
     override fun onShiftChanged(state: ShiftState) = Unit
 
     companion object {
