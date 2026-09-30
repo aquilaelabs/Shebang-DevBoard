@@ -1,0 +1,35 @@
+package dev.shebang.devboard.settings
+
+enum class ThemeMode { SYSTEM, LIGHT, DARK }
+
+/** What the top strip shows in text mode. */
+enum class StripMode {
+    /** Suggestions while composing, the terminal bar otherwise. */
+    AUTO,
+    /** Always the terminal bar; suggestions are never shown. */
+    ALWAYS_BAR,
+    /** Both: bar above, suggestions below. */
+    TWO_ROWS,
+}
+
+/** Every user setting, with its default. Read on the main thread from a cached snapshot; never blocks. */
+data class Settings(
+    val theme: ThemeMode = ThemeMode.SYSTEM,
+    val dynamicColor: Boolean = true,
+    /** Multiplier on the base row height, 0.7..1.4. */
+    val heightScale: Float = 1.0f,
+    val numberRow: Boolean = false,
+    val keyPreview: Boolean = true,
+    val haptics: Boolean = true,
+    /** 1 = light, 2 = medium, 3 = strong. */
+    val hapticStrength: Int = 2,
+    val keySounds: Boolean = false,
+    val glide: Boolean = true,
+    val glideTrail: Boolean = true,
+    val autocorrect: Boolean = false,
+    val autoCaps: Boolean = true,
+    val doubleSpacePeriod: Boolean = true,
+    val stripMode: StripMode = StripMode.AUTO,
+    /** Terminal bar as JSON, or null for the bundled default. */
+    val barJson: String? = null,
+)

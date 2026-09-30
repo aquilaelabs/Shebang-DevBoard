@@ -1,0 +1,485 @@
+package dev.shebang.devboard.view
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.RectF
+import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
+import android.view.View
+import dev.shebang.devboard.layout.Key
+import dev.shebang.devboard.layout.KeyAction
+import dev.shebang.devboard.layout.KeyboardGeometry
+import kotlin.math.abs
+import kotlin.math.sqrt
+
+enum class ShiftState { OFF, ON, LOCKED }
+
+/**
+ * The keyboard: every key drawn on a Canvas, with its own multitouch handling.
+ *
+ * Touch paths are kept in primitive arrays and paints/rects are preallocated, so a keystroke allocates
+ * nothing on the main thread. Geometry is swapped in as a whole when the size, layout or variant changes.
+ */
+class KeyboardView(context: Context) : View(context) {
+
+    interface Listener {
+        /** Finger down on a key: feedback only. */
+        fun onKeyDown(key: Key)
+        /** A tap (or a click-after-hold of a non-repeating key). */
+        fun onKeyTap(key: Key, shift: ShiftState)
+        /** Hold-to-repeat tick. The tap on release is suppressed once this has fired. */
+        fun onKeyRepeat(key: Key)
+        /** Alternate chosen from the long-press popup. */
+        fun onAlternate(key: Key, text: String)
+        /** A glide finished; [points] is interleaved x,y with [count] points. */
+        fun onGlide(points: FloatArray, count: Int)
+        fun onSpaceLongPress()
+        /** Cursor drag along the space bar: +1 right, -1 left. */
+        fun onCursorMove(steps: Int)
+        fun onShiftChanged(state: ShiftState)
+        /** Whether a touch starting on a letter may become a glide right now (field and setting). */
+        fun isGlideAllowed(): Boolean
+    }
+
+    var listener: Listener? = null
+    var geometry: KeyboardGeometry? = null
+        private set
+    var theme: KeyboardTheme = KeyboardTheme.build(context, dev.shebang.devboard.settings.Settings())
+        set(value) {
+            field = value
+            popup.setTheme(value)
+            applyTheme()
+            invalidate()
+        }
+    var shiftState: ShiftState = ShiftState.OFF
+        private set
+    /** Label drawn on the enter key ("Go", "Search"...) or null for the return icon. */
+    var enterLabel: String? = null
+        set(value) {
+            field = value
+            invalidate()
+        }
+    var keyPreviewEnabled = true
+    var glideTrailEnabled = true
+
+    private val density = resources.displayMetrics.density
+    private val popup = KeyPopup(context)
+    private val handler = Handler(Looper.getMainLooper())
+
+    // Paints and scratch, allocated once.
+    private val bgPaint = Paint()
+    private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
+    private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT }
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val iconStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+    }
+    private val rect = RectF()
+    private val iconPath = Path()
+    private var radius = 8 * density
+    private var labelSize = 0f
+    private var hintSize = 0f
+    private var iconSize = 0f
+
+    // Per-pointer touch state (index = pointer id, capped at MAX_POINTERS).
+    private val pointerKey = arrayOfNulls<Key>(MAX_POINTERS)
+    private val pointerDownX = FloatArray(MAX_POINTERS)
+    private val pointerDownY = FloatArray(MAX_POINTERS)
+    private val pointerLastX = FloatArray(MAX_POINTERS)
+    private val pointerCancelled = BooleanArray(MAX_POINTERS)
+    /** Pressed keys are drawn highlighted; pressedCount avoids scanning when nothing is down. */
+    private var pressedCount = 0
+
+    // Long-press / repeat / drag apply to one pointer at a time.
+    private var activePointer = -1
+    private var longPressPending = false
+    private var repeatFired = false
+    private var repeatInterval = 0L
+    private var cursorDrag = false
+    private var cursorDragAccum = 0f
+
+    // Glide path: interleaved x,y.
+    private val glidePoints = FloatArray(2 * MAX_GLIDE_POINTS)
+    private var glideCount = 0
+    private var gliding = false
+    private var glideLength = 0f
+    private var lastShiftTapTime = 0L
+
+    private val longPressRunnable = Runnable { onLongPress() }
+    private val repeatRunnable = object : Runnable {
+        override fun run() {
+            val p = activePointer
+            if (p < 0) return
+            val key = pointerKey[p] ?: return
+            repeatFired = true
+            listener?.onKeyRepeat(key)
+            repeatInterval = (repeatInterval * REPEAT_ACCEL).toLong().coerceAtLeast(REPEAT_MIN_MS)
+            handler.postDelayed(this, repeatInterval)
+        }
+    }
+
+    init {
+        applyTheme()
+        isClickable = true
+    }
+
+    private fun applyTheme() {
+        bgPaint.color = theme.background
+        trailPaint.color = theme.trail
+        iconStrokePaint.strokeWidth = 1.8f * density
+    }
+
+    fun setGeometry(g: KeyboardGeometry) {
+        geometry = g
+        radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
+        labelSize = g.rowHeightPx * 0.42f
+        hintSize = g.rowHeightPx * 0.22f
+        iconSize = g.rowHeightPx * 0.44f
+        labelPaint.textSize = labelSize
+        hintPaint.textSize = hintSize
+        labelPaint.typeface = Typeface.DEFAULT
+        cancelAllTouches()
+        invalidate()
+    }
+
+    fun setShift(state: ShiftState, notify: Boolean = true) {
+        if (shiftState == state) return
+        shiftState = state
+        if (notify) listener?.onShiftChanged(state)
+        invalidate()
+    }
+
+    /** After a letter is typed with one-shot shift the keyboard returns to lowercase. Caps lock stays. */
+    fun releaseOneShotShift() {
+        if (shiftState == ShiftState.ON) setShift(ShiftState.OFF)
+    }
+
+    val isGliding: Boolean get() = gliding
+
+    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        val w = MeasureSpec.getSize(widthMeasureSpec)
+        val h = geometry?.heightPx ?: (4 * 52 * density).toInt()
+        setMeasuredDimension(w, h)
+    }
+
+    // ---- Drawing -------------------------------------------------------------------------------------
+
+    override fun onDraw(canvas: Canvas) {
+        val g = geometry ?: return
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
+        val keys = g.keys
+        val shifted = shiftState != ShiftState.OFF
+        for (i in keys.indices) drawKey(canvas, keys[i], shifted)
+        if (gliding && glideTrailEnabled && glideCount > 1) drawTrail(canvas)
+    }
+
+    private fun isPressed(key: Key): Boolean {
+        if (pressedCount == 0) return false
+        for (i in 0 until MAX_POINTERS) if (pointerKey[i] === key && !pointerCancelled[i]) return true
+        return false
+    }
+
+    private fun drawKey(canvas: Canvas, key: Key, shifted: Boolean) {
+        val pressed = isPressed(key)
+        val action = key.action
+        val accentKey = action == KeyAction.ENTER || (action == KeyAction.SHIFT && shiftState == ShiftState.LOCKED)
+        keyPaint.color = when {
+            pressed -> theme.keyPressed
+            accentKey -> theme.accent
+            key.def.functional -> theme.keyFunctional
+            else -> theme.key
+        }
+        rect.set(key.left, key.top, key.right, key.bottom)
+        canvas.drawRoundRect(rect, radius, radius, keyPaint)
+
+        val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
+        when (action) {
+            KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
+            KeyAction.ENTER -> {
+                val label = enterLabel
+                if (label == null) drawIcon(canvas, KeyIcons.enter, fg, false) else drawLabel(canvas, key, label, fg, 0.8f)
+            }
+            KeyAction.SHIFT -> drawIcon(canvas, KeyIcons.shift, fg, shiftState == ShiftState.OFF)
+            KeyAction.SPACE -> Unit
+            else -> {
+                val label = if (shifted) key.shiftedLabel else key.label
+                val scale = if (label.length > 1) 0.7f else 1f
+                drawLabel(canvas, key, label, fg, scale)
+                if (key.def.alternates.isNotEmpty() && key.letter != 0.toChar()) {
+                    hintPaint.color = theme.keyTextSecondary
+                    canvas.drawText(key.def.alternates[0], key.right - 5 * density, key.top + hintSize + 3 * density, hintPaint)
+                }
+            }
+        }
+    }
+
+    private fun drawLabel(canvas: Canvas, key: Key, label: String, color: Int, scale: Float) {
+        labelPaint.color = color
+        labelPaint.textSize = labelSize * scale
+        val baseline = key.centerY - (labelPaint.descent() + labelPaint.ascent()) / 2f
+        canvas.drawText(label, key.centerX, baseline, labelPaint)
+    }
+
+    private fun drawIcon(canvas: Canvas, icon: Path, color: Int, stroke: Boolean) {
+        KeyIcons.fit(icon, iconSize, rect, iconPath)
+        if (stroke) {
+            iconStrokePaint.color = color
+            canvas.drawPath(iconPath, iconStrokePaint)
+        } else {
+            iconPaint.color = color
+            canvas.drawPath(iconPath, iconPaint)
+        }
+    }
+
+    private fun drawTrail(canvas: Canvas) {
+        // Newest segments are wide and opaque, older ones fade out.
+        val n = glideCount
+        val visible = minOf(n, TRAIL_SEGMENTS)
+        val start = n - visible
+        val maxWidth = 7 * density
+        for (i in start + 1 until n) {
+            val t = (i - start).toFloat() / visible
+            trailPaint.alpha = (255 * t * t).toInt().coerceIn(0, 255)
+            trailPaint.strokeWidth = maxWidth * (0.3f + 0.7f * t)
+            canvas.drawLine(glidePoints[2 * i - 2], glidePoints[2 * i - 1], glidePoints[2 * i], glidePoints[2 * i + 1], trailPaint)
+        }
+    }
+
+    // ---- Touch ---------------------------------------------------------------------------------------
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
+    }
+
+    @Suppress("ClickableViewAccessibility") // Keys are drawn, not child views; taps are reported through the listener.
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val g = geometry ?: return false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+                val idx = event.actionIndex
+                val id = event.getPointerId(idx)
+                if (id >= MAX_POINTERS) return true
+                // A second finger commits the first key's tap immediately (fast typing).
+                if (activePointer >= 0 && activePointer != id && !gliding && !cursorDrag) finishPointer(activePointer, pointerLastX[activePointer], -1f, false)
+                val x = event.getX(idx)
+                val y = event.getY(idx)
+                val key = g.keyAt(x, y) ?: return true
+                pointerKey[id] = key
+                pointerDownX[id] = x
+                pointerDownY[id] = y
+                pointerLastX[id] = x
+                pointerCancelled[id] = false
+                pressedCount++
+                activePointer = id
+                longPressPending = true
+                repeatFired = false
+                cursorDrag = false
+                cursorDragAccum = 0f
+                gliding = false
+                glideCount = 0
+                glideLength = 0f
+                if (key.letter != 0.toChar()) {
+                    glidePoints[0] = x
+                    glidePoints[1] = y
+                    glideCount = 1
+                }
+                listener?.onKeyDown(key)
+                handler.removeCallbacks(longPressRunnable)
+                handler.removeCallbacks(repeatRunnable)
+                if (key.def.repeat) {
+                    repeatInterval = REPEAT_START_MS
+                    handler.postDelayed(repeatRunnable, REPEAT_DELAY_MS)
+                } else {
+                    handler.postDelayed(longPressRunnable, LONG_PRESS_MS)
+                }
+                if (keyPreviewEnabled && key.def.text != null && !key.def.functional) {
+                    popup.showPreview(this, key, if (shiftState != ShiftState.OFF) key.shiftedLabel else key.label)
+                }
+                invalidate()
+            }
+            MotionEvent.ACTION_MOVE -> {
+                for (i in 0 until event.pointerCount) {
+                    val id = event.getPointerId(i)
+                    if (id >= MAX_POINTERS || id != activePointer) continue
+                    val key = pointerKey[id] ?: continue
+                    val x = event.getX(i)
+                    val y = event.getY(i)
+                    handleMove(g, id, key, x, y)
+                    pointerLastX[id] = x
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+                val idx = event.actionIndex
+                val id = event.getPointerId(idx)
+                if (id < MAX_POINTERS) finishPointer(id, event.getX(idx), event.getY(idx), true)
+            }
+            MotionEvent.ACTION_CANCEL -> cancelAllTouches()
+        }
+        return true
+    }
+
+    private fun handleMove(g: KeyboardGeometry, id: Int, key: Key, x: Float, y: Float) {
+        if (popup.isAlternates) {
+            popup.updateSelection(x)
+            return
+        }
+        val dx = x - pointerDownX[id]
+        val dy = y - pointerDownY[id]
+        val kw = g.letterKeyWidth
+        if (key.action == KeyAction.SPACE) {
+            if (!cursorDrag && abs(dx) > kw * 0.6f) {
+                cursorDrag = true
+                cursorDragAccum = 0f
+                handler.removeCallbacks(longPressRunnable)
+                longPressPending = false
+            }
+            if (cursorDrag) {
+                cursorDragAccum += x - pointerLastX[id]
+                val stepPx = kw * 0.55f
+                val steps = (cursorDragAccum / stepPx).toInt()
+                if (steps != 0) {
+                    cursorDragAccum -= steps * stepPx
+                    listener?.onCursorMove(steps)
+                }
+            }
+            return
+        }
+        // Moving a third of a key is a slide, not a hold: drop the pending long-press.
+        if (longPressPending && (abs(dx) > kw * 0.35f || abs(dy) > kw * 0.35f)) {
+            handler.removeCallbacks(longPressRunnable)
+            longPressPending = false
+        }
+        if (key.letter == 0.toChar()) return
+        // Record the path while the finger is on a letter key start.
+        if (glideCount in 1 until MAX_GLIDE_POINTS) {
+            val px = glidePoints[2 * glideCount - 2]
+            val py = glidePoints[2 * glideCount - 1]
+            val ddx = x - px
+            val ddy = y - py
+            val d = sqrt(ddx * ddx + ddy * ddy)
+            if (d >= MIN_SAMPLE_PX * density) {
+                glidePoints[2 * glideCount] = x
+                glidePoints[2 * glideCount + 1] = y
+                glideCount++
+                glideLength += d
+            }
+        }
+        if (!gliding && glideLength > kw * 0.5f && listener?.isGlideAllowed() == true) {
+            val under = g.keyAt(x, y)
+            if (under != null && under !== key && under.letter != 0.toChar()) {
+                gliding = true
+                handler.removeCallbacks(longPressRunnable)
+                longPressPending = false
+                popup.dismiss()
+            }
+        }
+        if (gliding) invalidate()
+    }
+
+    private fun onLongPress() {
+        longPressPending = false
+        val p = activePointer
+        if (p < 0) return
+        val key = pointerKey[p] ?: return
+        when {
+            key.action == KeyAction.SPACE -> {
+                pointerCancelled[p] = true
+                listener?.onSpaceLongPress()
+            }
+            key.def.alternates.isNotEmpty() -> {
+                val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.def.alternates
+                popup.showAlternates(this, key, alts)
+                popup.updateSelection(pointerLastX[p])
+            }
+        }
+    }
+
+    private fun finishPointer(id: Int, x: Float, y: Float, fromUp: Boolean) {
+        val key = pointerKey[id] ?: return
+        val wasActive = id == activePointer
+        if (wasActive) {
+            handler.removeCallbacks(longPressRunnable)
+            handler.removeCallbacks(repeatRunnable)
+        }
+        val l = listener
+        when {
+            pointerCancelled[id] -> Unit
+            wasActive && popup.isAlternates -> popup.selectedAlternate()?.let { l?.onAlternate(key, it) }
+            wasActive && gliding -> {
+                if (glideCount >= 2) l?.onGlide(glidePoints, glideCount)
+            }
+            wasActive && cursorDrag -> Unit
+            wasActive && repeatFired -> Unit
+            key.action == KeyAction.SHIFT -> onShiftTap()
+            else -> l?.onKeyTap(key, shiftState)
+        }
+        popup.dismiss()
+        pointerKey[id] = null
+        if (pressedCount > 0) pressedCount--
+        if (wasActive) {
+            activePointer = -1
+            gliding = false
+            glideCount = 0
+            cursorDrag = false
+            repeatFired = false
+            longPressPending = false
+        }
+        invalidate()
+    }
+
+    private fun onShiftTap() {
+        val now = SystemClock.uptimeMillis()
+        val next = when (shiftState) {
+            ShiftState.OFF -> ShiftState.ON
+            ShiftState.ON -> if (now - lastShiftTapTime < DOUBLE_TAP_MS) ShiftState.LOCKED else ShiftState.OFF
+            ShiftState.LOCKED -> ShiftState.OFF
+        }
+        lastShiftTapTime = now
+        setShift(next)
+    }
+
+    fun cancelAllTouches() {
+        handler.removeCallbacks(longPressRunnable)
+        handler.removeCallbacks(repeatRunnable)
+        popup.dismiss()
+        for (i in 0 until MAX_POINTERS) pointerKey[i] = null
+        pressedCount = 0
+        activePointer = -1
+        gliding = false
+        glideCount = 0
+        cursorDrag = false
+        repeatFired = false
+        invalidate()
+    }
+
+    override fun onDetachedFromWindow() {
+        cancelAllTouches()
+        super.onDetachedFromWindow()
+    }
+
+    companion object {
+        private const val MAX_POINTERS = 10
+        private const val MAX_GLIDE_POINTS = 2048
+        private const val TRAIL_SEGMENTS = 60
+        private const val MIN_SAMPLE_PX = 2f
+        private const val LONG_PRESS_MS = 320L
+        private const val DOUBLE_TAP_MS = 350L
+        private const val REPEAT_DELAY_MS = 380L
+        private const val REPEAT_START_MS = 80L
+        private const val REPEAT_MIN_MS = 25L
+        private const val REPEAT_ACCEL = 0.85f
+    }
+}
