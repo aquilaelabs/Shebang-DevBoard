@@ -26,9 +26,12 @@
 - Glide reads real, imprecise swipes far better: tuned on a public set of a million real swipes, it picks the right word 89% of the time there, up from 81% (3cf59d0)
 - Swipe adaptation learns slowly, ignores sloppy glides and only takes so much each day, so one careless day cannot throw it off (3cf59d0)
 - A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (925a20f)
+- Suggestions while typing rank by how common words really are, so the likelier word comes first (ff7863d)
 
 ### Fixed
 
 - Glide can now produce apostrophe words (don't, it's), and it's, that's, let's and other 's contractions are in the word list (6383035)
 - Tapping inside a word and gliding no longer sometimes splits the word in two (dd5bef3)
 - Redoing a word no longer copies the capital of words like I or I'd onto the new word (3cf59d0)
+- Autocorrect fixes far more typos (89% of one-slip typos in testing, from 58%): it weighs all suggestions by how common they are and how likely the slip is, corrects before punctuation, restores missing apostrophes (dont, cant, youre), and backspace right after undoes it (ff7863d)
+- A lone i (and i'm, i'd, i'll, i've) is capitalised when the word ends (ff7863d)
