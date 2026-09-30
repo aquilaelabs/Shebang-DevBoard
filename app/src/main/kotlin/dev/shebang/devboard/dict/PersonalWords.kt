@@ -295,11 +295,11 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
 
         private val json = Json { ignoreUnknownKeys = true }
 
-        /** Words worth learning: 2 to 32 letters, apostrophes or inner hyphens, no digits or other symbols. */
+        /** Words worth learning: 2 to 32 letters, with apostrophes or inner hyphens or underscores ("max_retries"); no digits or other symbols. */
         fun isLearnable(word: String): Boolean {
             if (word.length !in 2..32) return false
             if (!word.first().isLetter() || !word.last().isLetter()) return false
-            return word.all { it.isLetter() || it == '\'' || it == '-' }
+            return word.all { it.isLetter() || it == '\'' || it == '-' || it == '_' }
         }
 
         /**

@@ -65,8 +65,8 @@ class PersonalLearningTest {
 
     @Test
     fun onlyWordsAreLearned() {
-        for (w in listOf("a", "x1", "abc123", "hunter2", "--", "http", "e-mail", "don't")) {
-            val expected = w in setOf("http", "e-mail", "don't")
+        for (w in listOf("a", "x1", "abc123", "hunter2", "--", "http", "e-mail", "don't", "max_retries", "_x")) {
+            val expected = w in setOf("http", "e-mail", "don't", "max_retries")
             assertEquals(w, expected, PersonalWords.isLearnable(w))
         }
         val p = PersonalWords(null)

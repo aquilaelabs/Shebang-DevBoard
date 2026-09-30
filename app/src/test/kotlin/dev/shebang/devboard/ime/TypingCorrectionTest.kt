@@ -126,6 +126,21 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun codeLikeWordsAreLeftAlone() {
+        type("call getUsr with max_retires and usr2 ")
+        assertEquals("call getUsr with max_retires and usr2 ", ic.toString())
+        // Underscores join a word: it was learned as one.
+        assert("max_retires" in learned)
+    }
+
+    @Test
+    fun aWordUsedElsewhereInTheTextIsLeftAlone() {
+        ic.commitText("ssh into kubctl first. ", 1)
+        type("then kubctl ")
+        assertEquals("ssh into kubctl first. then kubctl ", ic.toString())
+    }
+
+    @Test
     fun aRareWordTypedForAContractionGetsItsApostrophe() {
         type("i cant ")
         assertEquals("I can't ", ic.toString())

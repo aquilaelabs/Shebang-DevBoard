@@ -374,7 +374,8 @@ class TextInputController(
     private fun isWordChar(text: String): Boolean {
         if (text.length != 1) return false
         val c = text[0]
-        return c.isLetter() || (c == '\'' && word.isNotEmpty())
+        // Apostrophes and underscores join letters into one word ("don't", "max_retries").
+        return c.isLetter() || ((c == '\'' || c == '_') && word.isNotEmpty())
     }
 
     fun space() {
@@ -598,12 +599,19 @@ class TextInputController(
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
         val untouched = reopenedUnchanged
         reopened = null
-        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && typed.lowercase() !in keptAsTyped
+        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
             if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates)?.let { commit = it }
             else defer = deferOk && suggester != null
+            // A word that stands elsewhere in the text as typed is a name the user means (an identifier,
+            // a handle), not a slip.
+            if ((commit != typed || defer) && appearsInText(ic, typed)) {
+                commit = typed
+                defer = false
+            }
         }
         commit = pronounCase(commit)
         ic.beginBatchEdit()
@@ -638,6 +646,38 @@ class TextInputController(
                 }
             }
         }
+    }
+
+    /**
+     * Words autocorrect leaves alone because they look like code: a capital after the first letter
+     * ("getUser", but not "NASA" style capitals throughout, which are left alone anyway), a digit or an
+     * underscore.
+     */
+    private fun looksLikeCode(w: String): Boolean {
+        if (w.any { it.isDigit() || it == '_' }) return true
+        val inner = w.drop(1)
+        return inner.any { it.isUpperCase() } && inner.any { it.isLowerCase() }
+    }
+
+    /** Whether [w] stands as a whole word elsewhere in the text around the cursor (one read each side). */
+    private fun appearsInText(ic: InputConnection, w: String): Boolean {
+        val before = ic.getTextBeforeCursor(AROUND_CHARS, 0)?.toString() ?: ""
+        val after = ic.getTextAfterCursor(AROUND_CHARS, 0)?.toString() ?: ""
+        // The word being typed is the end of [before]: look at what precedes it.
+        val rest = if (before.endsWith(w)) before.dropLast(w.length) else before
+        return containsWord(rest, w) || containsWord(after, w)
+    }
+
+    private fun containsWord(text: String, w: String): Boolean {
+        var i = text.indexOf(w)
+        while (i >= 0) {
+            val beforeOk = i == 0 || !(text[i - 1].isLetterOrDigit() || text[i - 1] == '_')
+            val end = i + w.length
+            val afterOk = end == text.length || !(text[end].isLetterOrDigit() || text[end] == '_')
+            if (beforeOk && afterOk) return true
+            i = text.indexOf(w, i + 1)
+        }
+        return false
     }
 
     /** "i", "i'm", "i'd", "i'll" and "i've" with a capital, when auto-capitalisation is on. */
@@ -958,6 +998,8 @@ class TextInputController(
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
+        /** Characters read each side of the cursor to see whether a word is used elsewhere in the text. */
+        private const val AROUND_CHARS = 4000
         /** Characters read before the cursor for the word before it. */
         private const val CONTEXT_CHARS = 64
         /** Longest word looked at around the cursor. */
