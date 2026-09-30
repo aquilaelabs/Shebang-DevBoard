@@ -394,8 +394,10 @@ class TextInputController(
         ownEdit()
         lastActionWasSpace = false
         val glide = lastGlide
-        if (glide != null) {
-            // Backspace right after a glide removes everything that glide wrote, unlearned.
+        lastGlide = null
+        // Backspace right after a glide removes everything that glide wrote, unlearned: when it still stands
+        // right before the cursor (a quick tap elsewhere can outrun the cursor report).
+        if (glide != null && ic.getTextBeforeCursor(glide.text.length, 0)?.toString() == glide.text) {
             ic.deleteSurroundingText(glide.text.length, 0)
             repeat(minOf(glide.words, pending.size)) {
                 val w = pending.removeAt(pending.size - 1)
@@ -542,7 +544,9 @@ class TextInputController(
             return
         }
         ownEdit()
-        val glide = lastGlide
+        val glide = lastGlide?.takeIf { g ->
+            ic.getTextBeforeCursor(g.lastWord.length + g.after.length, 0)?.toString() == g.lastWord + g.after
+        }
         if (glide != null) {
             val tail = glide.lastWord + glide.after
             val replacement = chosen + glide.after
@@ -585,7 +589,44 @@ class TextInputController(
      */
     fun glideContext(dictionary: Dictionary, lm: NgramModel): GlideContext {
         val ic = connection() ?: return GlideContext(NgramModel.SENTENCE_START)
+        resolveTarget(ic)
         return GlideContext(GlideText.contextId(GlideText.contextWord(textBeforeTarget(ic)), dictionary, lm))
+    }
+
+    /**
+     * Decides what a glide starting now replaces, from the field as it is rather than from selection
+     * reports, which a quick tap can outrun: a cursor strictly inside a word (the keyboard's own edits never
+     * leave it there, so the user put it there) or one selected word. Anything else replaces nothing, and a
+     * stale underline goes first so the glide cannot land in it.
+     */
+    private fun resolveTarget(ic: InputConnection) {
+        if (!field.allowsComposing || isComposing) {
+            dropTarget()
+            return
+        }
+        val sel = ic.getSelectedText(0)?.toString()
+        if (!sel.isNullOrEmpty()) {
+            val t = target
+            if (t != null && t.selection && t.text == sel) return
+            dropTarget()
+            if (sel.all { isLetterInWord(it) } && sel.first().isLetter()) {
+                target = Target(sel, -1, 0, 0, selection = true, glided = recentMatch(sel), underlined = false)
+            }
+            return
+        }
+        val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: ""
+        val after = ic.getTextAfterCursor(MAX_WORD, 0) ?: ""
+        var b = 0
+        while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
+        var a = 0
+        while (a < after.length && isLetterInWord(after[a])) a++
+        val text = if (b > 0 && a > 0) before.substring(before.length - b) + after.substring(0, a) else ""
+        val t = target
+        if (t != null && !t.selection && t.before == b && t.after == a && t.text == text) return
+        dropTarget()
+        if (text.isNotEmpty() && text.first().isLetter()) {
+            target = Target(text, -1, b, a, selection = false, glided = recentMatch(text), underlined = false)
+        }
     }
 
     private fun caseNew(word: String, capitalize: Boolean) = if (capitalize) word.replaceFirstChar { it.uppercaseChar() } else word

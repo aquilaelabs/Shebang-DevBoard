@@ -166,6 +166,40 @@ class GlideCommitTest {
     }
 
     @Test
+    fun aQuickTapInsideAWordStillRedoesItInsteadOfSplittingIt() {
+        glide("hello")
+        glide("world")
+        // The tap comes so soon after the glide that its cursor report looks like the keyboard's own.
+        val old = ic.cursor
+        ic.setSelection(8, 8)
+        controller.onSelectionChanged(old, old, 8, 8, -1, -1)
+        assertNull(controller.targetText)
+        glide("would")
+        assertEquals("hello would", ic.toString())
+    }
+
+    @Test
+    fun aStaleTargetNeverCatchesAGlideAfterAQuickTapElsewhere() {
+        glide("hello")
+        glide("world")
+        userMovesCursor(2)
+        assertEquals("hello", controller.targetText)
+        // A quick second tap, into "world", outruns its report: the glide goes where the cursor is.
+        ic.setSelection(8, 8)
+        glide("would")
+        assertEquals("hello would", ic.toString())
+    }
+
+    @Test
+    fun backspaceAfterAQuickTapAwayDeletesOneCharacter() {
+        glide("hello")
+        glide("world")
+        ic.setSelection(5, 5)
+        controller.backspace()
+        assertEquals("hell world", ic.toString())
+    }
+
+    @Test
     fun aGlideRedoneRightAwayIsNeverLearned() {
         glide("hello")
         glide("world")
