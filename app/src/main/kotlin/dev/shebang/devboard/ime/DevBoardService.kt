@@ -18,6 +18,7 @@ import androidx.core.view.WindowInsetsCompat
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.GlideAdaptation
+import dev.shebang.devboard.glide.PathMatch
 import dev.shebang.devboard.glide.GlideLanguage
 import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideSession
@@ -117,6 +118,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         )
         feedback = Feedback(this)
         text = TextInputController({ currentInputConnection }, this, background, main, this)
+        // Identifiers from the text are scored against a glide on the current key layout.
+        text.identifierScorer = { stroke, letters -> geometry?.let { PathMatch.cost(glideModelFor(it), stroke, letters) } }
         settingsJob = scope.launch {
             SettingsRepository.get(this@DevBoardService).settings.collectLatest { applySettings(it) }
         }

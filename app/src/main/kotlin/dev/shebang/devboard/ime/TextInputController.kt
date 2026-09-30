@@ -74,6 +74,21 @@ class TextInputController(
     /** The keyboard shows code mode: brackets and quotes pair (when the setting is on). */
     var codeMode = false
 
+    /**
+     * How well a glide's stroke fits the keys of any letters (mean distance in key pitches, lower is better),
+     * for offering identifiers from the text; set by the service for the current key layout.
+     */
+    var identifierScorer: ((stroke: FloatArray, letters: String) -> Float?)? = null
+
+    /** Code-like identifiers in the text around the cursor, most used first, and when they were read. */
+    private var identifiers: List<String> = emptyList()
+    private var identifiersReadAt = Long.MIN_VALUE / 2
+
+    /** Words glided one after another, while nothing else has been done; and the joins offered for them. */
+    private var glideRun: List<String> = emptyList()
+    private class JoinOffer(val runText: String, val camel: String, val snake: String, val glide: Any)
+    private var joinOffer: JoinOffer? = null
+
     /** Milliseconds since boot; replaceable in tests. */
     var clock: () -> Long = { SystemClock.uptimeMillis() }
 
@@ -184,6 +199,10 @@ class TextInputController(
         keptAsTyped.clear()
         reopened = null
         reopenedGlide = null
+        identifiers = emptyList()
+        identifiersReadAt = Long.MIN_VALUE / 2
+        glideRun = emptyList()
+        joinOffer = null
         lastGlide = null
         target = null
         recent.clear()
@@ -372,6 +391,7 @@ class TextInputController(
             ) {
                 ic.commitText(" ", 1)
             }
+            if (word.isEmpty()) refreshIdentifiers(ic)
             word.append(text)
             ic.setComposingText(word, 1)
             ui.setComposing(true)
@@ -882,7 +902,10 @@ class TextInputController(
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
                 candidatesFor = typed
-                ui.showCandidates(arrangeForStrip(typed, result.take(3).map { it.word }))
+                // An identifier from the text that starts with what was typed leads.
+                val ids = identifiers.filter { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }.take(1)
+                val ranked = (ids + result.map { it.word }).distinctBy { it.lowercase() }.take(3)
+                ui.showCandidates(arrangeForStrip(typed, ranked))
             }
         }
     }
@@ -911,6 +934,23 @@ class TextInputController(
             return
         }
         ownEdit()
+        val join = joinOffer
+        if (join != null && join.glide === lastGlide && (chosen == join.camel || chosen == join.snake)) {
+            // The run of glided words becomes one name.
+            if (ic.getTextBeforeCursor(join.runText.length, 0)?.toString() == join.runText) {
+                ic.beginBatchEdit()
+                ic.deleteSurroundingText(join.runText.length, 0)
+                ic.commitText(chosen, 1)
+                ic.endBatchEdit()
+                pending.clear()
+                if (field.allowsLearning) learner.learnWord(chosen, null, false)
+            }
+            joinOffer = null
+            lastGlide = null
+            glideRun = emptyList()
+            clearCandidates()
+            return
+        }
         val glide = lastGlide?.takeIf { g ->
             ic.getTextBeforeCursor(g.lastWord.length + g.after.length, 0)?.toString() == g.lastWord + g.after
         }
@@ -1054,6 +1094,8 @@ class TextInputController(
         if (result.words.isEmpty()) return
         val ic = connection() ?: return
         dictionaryInUse = dictionary
+        val previousGlide = lastGlide
+        refreshIdentifiers(ic)
         lastAutocorrect = null
         if (isComposing) {
             if (target != null && reopenedUnchanged) {
@@ -1098,9 +1140,62 @@ class TextInputController(
         remember(fresh)
         pending.addAll(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
-        lastGlide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after)
-        ui.showCandidates(arrangeBestMiddle(alternatives))
+        val glide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after)
+        lastGlide = glide
+        // Words glided one after another make a run, which in code-like text can be joined into one name.
+        val chained = previousGlide != null && previousGlide.after.isEmpty() && sb.startsWith(" ")
+        glideRun = (if (chained) glideRun else emptyList()) + fresh.map { it.text }
+        var strip = arrangeBestMiddle(alternatives)
+        joinOffer = null
+        if (glideRun.size >= 2 && identifiers.isNotEmpty() && after.isEmpty()) {
+            val parts = glideRun.map { it.lowercase() }
+            val camel = parts[0] + parts.drop(1).joinToString("") { p -> p.replaceFirstChar { it.uppercaseChar() } }
+            val snake = parts.joinToString("_")
+            joinOffer = JoinOffer(glideRun.joinToString(" "), camel, snake, glide)
+            strip = listOf(camel, fresh.last().text, snake)
+        } else if (fresh.size == 1) {
+            identifierAlternative(result, fresh.last().text)?.let { id -> strip = listOf(id) + strip.drop(1) }
+        }
+        ui.showCandidates(strip)
         ui.setComposing(true)
+    }
+
+    /**
+     * An identifier from the text that fits the glide's stroke about as well as the word chosen (within
+     * [IDENTIFIER_MARGIN] of a key on average), for the strip; null when none does or no scorer is set.
+     */
+    private fun identifierAlternative(result: GlideResult, chosen: String): String? {
+        val score = identifierScorer ?: return null
+        val stroke = result.strokes.lastOrNull() ?: return null
+        if (identifiers.isEmpty()) return null
+        val own = score(stroke, chosen) ?: return null
+        var best: String? = null
+        var bestCost = own + IDENTIFIER_MARGIN
+        for (id in identifiers.take(MAX_IDENTIFIERS_SCORED)) {
+            val letters = id.filter { it.isLetter() }
+            if (letters.equals(chosen, ignoreCase = true)) continue
+            if (letters.length < chosen.length * 0.6 || letters.length > chosen.length * 1.8 + 2) continue
+            val c = score(stroke, letters) ?: continue
+            if (c < bestCost) {
+                bestCost = c
+                best = id
+            }
+        }
+        return best
+    }
+
+    /** Reads the code-like identifiers around the cursor, at most every few seconds. */
+    private fun refreshIdentifiers(ic: InputConnection) {
+        val now = clock()
+        if (now - identifiersReadAt < IDENTIFIERS_TTL_MS) return
+        identifiersReadAt = now
+        val text = (ic.getTextBeforeCursor(AROUND_CHARS, 0)?.toString() ?: "") + " " + (ic.getTextAfterCursor(AROUND_CHARS / 4, 0)?.toString() ?: "")
+        val counts = HashMap<String, Int>()
+        for (m in IDENTIFIER.findAll(text)) {
+            val t = m.value
+            if (looksLikeCode(t) && t.any { it.isLetter() }) counts[t] = (counts[t] ?: 0) + 1
+        }
+        identifiers = counts.entries.sortedByDescending { it.value }.map { it.key }.take(MAX_IDENTIFIERS)
     }
 
     private fun remember(words: List<GlidedWord>) {
@@ -1133,6 +1228,13 @@ class TextInputController(
 
     companion object {
         private const val DOUBLE_SPACE_MS = 600L
+        /** Identifiers: letters, digits and underscores, starting with a letter or underscore. */
+        private val IDENTIFIER = Regex("[A-Za-z_][A-Za-z0-9_]{2,}")
+        private const val MAX_IDENTIFIERS = 200
+        private const val MAX_IDENTIFIERS_SCORED = 60
+        private const val IDENTIFIERS_TTL_MS = 3000L
+        /** How much worse (mean key pitches) an identifier may fit a glide than the word chosen and still be offered. */
+        private const val IDENTIFIER_MARGIN = 0.1f
         /** Code mode's pairs: opening to closing. */
         private val PAIRS = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'', '`' to '`')
         private const val CLOSERS = ")]}"
