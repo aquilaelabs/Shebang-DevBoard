@@ -35,6 +35,8 @@ data class Settings(
     val autocorrect: Boolean = false,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,
+    /** In code mode, ( [ { and quotes are typed in pairs. */
+    val pairBrackets: Boolean = true,
     val stripMode: StripMode = StripMode.AUTO,
     /** Terminal bar as JSON, or null for the bundled default. */
     val barJson: String? = null,

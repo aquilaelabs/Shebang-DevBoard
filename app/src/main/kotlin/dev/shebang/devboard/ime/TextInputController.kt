@@ -71,6 +71,8 @@ class TextInputController(
         private set
     var settings: Settings = Settings()
     var suggester: Suggester? = null
+    /** The keyboard shows code mode: brackets and quotes pair (when the setting is on). */
+    var codeMode = false
 
     /** Milliseconds since boot; replaceable in tests. */
     var clock: () -> Long = { SystemClock.uptimeMillis() }
@@ -364,11 +366,53 @@ class TextInputController(
             return
         }
         if (isComposing) {
+            if (pairing && text.length == 1 && (text[0] in PAIRS || text[0] in CLOSERS)) {
+                // In code mode a bracket or quote ends the word, then pairs.
+                endWord(ic, "", correct = false, deferOk = false)
+                if (!typePaired(ic, text[0])) ic.commitText(text, 1)
+                return
+            }
             // Sentence punctuation ends a word as space does; anything else (a digit, a symbol) just follows it.
             endWord(ic, text, correct = text.length == 1 && text[0] in SENTENCE_PUNCTUATION, deferOk = true)
             return
         }
+        if (pairing && text.length == 1 && typePaired(ic, text[0])) return
         ic.commitText(text, 1)
+    }
+
+    private val pairing: Boolean get() = codeMode && settings.pairBrackets && !this.field.isTerminal
+
+    /**
+     * Code mode's pairs: an opening bracket brings its closing one with the cursor between; a closing
+     * bracket or quote typed just before the same character steps over it; a quote pairs when it starts
+     * something (not after a letter or digit, where it is an apostrophe or closes a string). True when done.
+     */
+    private fun typePaired(ic: InputConnection, c: Char): Boolean {
+        val next = ic.getTextAfterCursor(1, 0)?.firstOrNull()
+        val close = PAIRS[c]
+        if (c in CLOSERS || c in QUOTES) {
+            if (next == c) {
+                // Step over the closing character already there.
+                ic.beginBatchEdit()
+                ic.deleteSurroundingText(0, 1)
+                ic.commitText(c.toString(), 1)
+                ic.endBatchEdit()
+                return true
+            }
+            if (c in CLOSERS) return false
+        }
+        if (c in QUOTES) {
+            val prev = ic.getTextBeforeCursor(1, 0)?.firstOrNull()
+            if (prev != null && (prev.isLetterOrDigit() || prev == '_')) return false
+            // Before a word the quote is an opening one without a partner.
+            if (next != null && (next.isLetterOrDigit() || next == '_')) return false
+        }
+        val closing = close ?: return false
+        ic.beginBatchEdit()
+        ic.commitText(c.toString(), 1)
+        ic.commitText(closing.toString(), 0)
+        ic.endBatchEdit()
+        return true
     }
 
     private fun isWordChar(text: String): Boolean {
@@ -485,6 +529,15 @@ class TextInputController(
         if (field.isTerminal) {
             KeySender.sendPlain(ic, KeyEvent.KEYCODE_DEL)
             return
+        }
+        if (pairing) {
+            // Between an empty pair, backspace takes both.
+            val prev = ic.getTextBeforeCursor(1, 0)?.firstOrNull()
+            val next = ic.getTextAfterCursor(1, 0)?.firstOrNull()
+            if (prev != null && next != null && PAIRS[prev] == next && ic.getSelectedText(0).isNullOrEmpty()) {
+                ic.deleteSurroundingText(1, 1)
+                return
+            }
         }
         val selectedText = ic.getSelectedText(0)
         if (!selectedText.isNullOrEmpty()) {
@@ -993,6 +1046,10 @@ class TextInputController(
 
     companion object {
         private const val DOUBLE_SPACE_MS = 600L
+        /** Code mode's pairs: opening to closing. */
+        private val PAIRS = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'', '`' to '`')
+        private const val CLOSERS = ")]}"
+        private const val QUOTES = "\"'`"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
         private const val SENTENCE_PUNCTUATION = ".,!?;:)\"'"
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")

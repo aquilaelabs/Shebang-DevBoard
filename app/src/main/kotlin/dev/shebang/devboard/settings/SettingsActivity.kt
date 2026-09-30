@@ -165,6 +165,7 @@ fun SettingsScreen(
             item { SwitchRow("Autocorrect", "Fix the word when you press space", settings.autocorrect) { v -> update { it.copy(autocorrect = v) } } }
             item { SwitchRow("Auto-capitalize", "Shift at the start of sentences", settings.autoCaps) { v -> update { it.copy(autoCaps = v) } } }
             item { SwitchRow("Double-space period", "Two spaces insert \". \"", settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } } }
+            item { SwitchRow("Pair brackets and quotes", "In code mode, ( [ { and quotes come in pairs, and typing the closing one steps over it", settings.pairBrackets) { v -> update { it.copy(pairBrackets = v) } } }
 
             item { SectionHeader("Terminal bar") }
             item {

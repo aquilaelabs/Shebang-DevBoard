@@ -79,6 +79,10 @@ class FakeInputConnection(initial: String = "") : InputConnection {
         replaceComposing(t)
         composingStart = -1
         composingEnd = -1
+        // As Android: 1 puts the cursor after the text, 0 or less relative to its start.
+        val start = cursor - t.length
+        cursor = if (newCursorPosition > 0) (cursor + newCursorPosition - 1) else (start + newCursorPosition)
+        cursor = cursor.coerceIn(0, text.length)
         return true
     }
 

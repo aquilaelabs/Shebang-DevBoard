@@ -283,6 +283,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     private fun rebuildGeometry() {
+        text.codeMode = mode == Mode.CODE
         val k = keyboard ?: return
         val layout = currentLayout()
         val dm = resources.displayMetrics

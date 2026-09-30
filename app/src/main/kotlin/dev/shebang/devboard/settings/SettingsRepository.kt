@@ -45,6 +45,7 @@ class SettingsRepository(context: Context) {
             autocorrect = p[Keys.AUTOCORRECT] ?: d.autocorrect,
             autoCaps = p[Keys.AUTO_CAPS] ?: d.autoCaps,
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
+            pairBrackets = p[Keys.PAIR_BRACKETS] ?: d.pairBrackets,
             stripMode = p[Keys.STRIP_MODE]?.let { runCatching { StripMode.valueOf(it) }.getOrNull() } ?: d.stripMode,
             barJson = p[Keys.BAR_JSON],
         )
@@ -66,6 +67,7 @@ class SettingsRepository(context: Context) {
         p[Keys.AUTOCORRECT] = s.autocorrect
         p[Keys.AUTO_CAPS] = s.autoCaps
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
+        p[Keys.PAIR_BRACKETS] = s.pairBrackets
         p[Keys.STRIP_MODE] = s.stripMode.name
         if (s.barJson == null) p.remove(Keys.BAR_JSON) else p[Keys.BAR_JSON] = s.barJson
     }
@@ -86,6 +88,7 @@ class SettingsRepository(context: Context) {
         val AUTOCORRECT = booleanPreferencesKey("autocorrect")
         val AUTO_CAPS = booleanPreferencesKey("auto_caps")
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
+        val PAIR_BRACKETS = booleanPreferencesKey("pair_brackets")
         val STRIP_MODE = stringPreferencesKey("strip_mode")
         val BAR_JSON = stringPreferencesKey("bar_json")
     }
