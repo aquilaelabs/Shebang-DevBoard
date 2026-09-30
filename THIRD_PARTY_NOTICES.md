@@ -49,6 +49,16 @@ any associated documentation shall at all times remain with
 Princeton University and LICENSEE agrees to preserve same.
 ```
 
+### Tatoeba English sentences
+- Used for: `app/src/main/assets/dict/en_ngrams.bin` (word and word-pair counts, built by
+  `tools/build_ngrams.py`) and `app/src/test/resources/glide/heldout_sentences.tsv` (3,000 sentences, lowercased
+  and stripped of punctuation, held out of the counts for the glide benchmark; each line keeps its Tatoeba id).
+- Source: Tatoeba, <https://tatoeba.org>, per-language export `eng_sentences.tsv.bz2` downloaded 2026-09-30.
+- Licence: Creative Commons Attribution 2.0 France (CC BY 2.0 FR),
+  <https://creativecommons.org/licenses/by/2.0/fr/>. Changes: sentences were tokenised and lowercased and only
+  counts are shipped; counts involving "tom" were scaled down (see the README's Decisions). Tatoeba publishes a
+  subset of its sentences under CC0 as well.
+
 ## Icons
 
 ### Material Symbols / Material Design Icons (Google)
