@@ -23,6 +23,7 @@
 - Swipe left from backspace to delete whole words, drag the space bar with shift on to select, and Undo and Redo keys on the default terminal bar (04cb7b0)
 - Flick up on a key to type the character in its corner (Settings: Flick up for symbols) (04cb7b0)
 - The keyboard remembers text or code mode per app, and each app can have its own terminal bar (04cb7b0)
+- Code-aware words: identifiers already in the text are suggested as you type and offered after a glide, and words glided in a row can be joined as camelCase or snake_case (c5888d9)
 
 ### Changed
 
