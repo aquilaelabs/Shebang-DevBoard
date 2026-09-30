@@ -93,7 +93,7 @@ Layout of the keyboard in text mode: terminal bar or suggestions above four QWER
   5. Content (the main reading or working area): shift z x c v b n m backspace, across the middle, row 11 of 12
   6. Content (the main reading or working area): #! , space . enter, across the bottom, row 12 of 12
 Notes:
-  Rows are 52dp in portrait, 40dp in landscape, times the height setting. The bar and the suggestion strip are 44dp. Code mode swaps the four rows for five symbol rows at 86% row height with ABC / ? and arrows on the bottom row; the numeric pad is a 4-column grid. The keyboard pads for the navigation bar the IME window hosts on recent Android. With Preview glides on (the default), glided words wait in a preview row in the strip's place for 2 seconds after the last glide, or until anything else is typed, then go into the field; words in the field are never rewritten. Each staged word is a chip on the key colour; the selected one is filled with the accent; a glide in progress shows its words as italic chips outlined in the secondary text colour; the selected word's alternatives, or suggestions for letters typed to replace it, follow a thin divider as chips outlined in the accent. With Preview glides off, a glide in progress shows one bold line across the strip. With phrase gliding on, the space key lights up in the pressed colour once a dip counts as a word boundary.
+  Rows are 52dp in portrait, 40dp in landscape, times the height setting. The bar and the suggestion strip are 44dp. Code mode swaps the four rows for five symbol rows at 86% row height with ABC / ? and arrows on the bottom row; the numeric pad is a 4-column grid. The keyboard pads for the navigation bar the IME window hosts on recent Android. While a glide is in progress the strip shows one bold line across its width: the words the glide would write if the finger lifted now. A word the user taps inside (or selects) is underlined in the field, and the strip shows it in the middle slot with its alternatives either side; the next glide or a tapped alternative replaces it. With phrase gliding on, the space key lights up in the pressed colour once a dip counts as a word boundary.
 This page's own rules:
   keyboard-text/strip: strip, suggestion, bar (`bb design show keyboard-text/strip` reads it)
   keyboard-text/glide-preview: glide, preview, strip (`bb design show keyboard-text/glide-preview` reads it)
@@ -110,7 +110,7 @@ In Auto mode the bar is replaced by suggestions while a word is being composed a
 
 Applies to: glide, preview, strip
 
-Glided words stage in a preview row that replaces the strip (code mode keeps the bar) and go into the field 2 s after the last glide, or at once when anything else is typed or the field is left. Tap a staged word to select it (accent fill; the timer pauses): the next glide replaces it, letters typed replace it (space or a second tap confirms), or an outlined alternative chip replaces it; then glides append at the end again. A later glide may re-read words still in the row when the phrase reads better; words already in the field are never changed. With the row off, a glide in progress shows a single full-width bold line and after lift the strip returns to three slots: runner-up, chosen word (bold, middle), third.
+During a glide the suggestion strip shows a single full-width bold line (the words that lift would write). After lift it returns to three slots: runner-up, chosen word (bold, middle), third. Glided words go straight into the field; the keyboard never rewrites text on its own. To redo a word the user taps inside it or selects it: it is underlined (the field's composing underline) and the strip shows it in the middle slot with its alternatives either side; the next glide or a tapped alternative replaces it, keeping its capitals. A cursor at a word's edge targets nothing, so a glide there adds a word; space with a word targeted moves past it.
 
 ### the launcher setup screen with three steps and a test field (Android app)
 
@@ -132,7 +132,7 @@ Layout of the settings screen, the terminal-bar editor and personal words on a p
   1. Header (the band at the top): DevBoard settings, across the top, row 1 of 28
   2. List (rows of like things): Appearance: theme chips, dynamic colour, height slider, number row, key preview, across the middle, rows 2 to 6 of 28
   3. List (rows of like things): Feedback: haptics, strength chips, key sounds, across the middle, rows 7 to 9 of 28
-  4. List (rows of like things): Typing: glide, trail, phrase gliding, preview glides, refine previewed words, Record glides, across the middle, rows 10 to 13 of 28
+  4. List (rows of like things): Typing: glide, trail, phrase gliding, Record glides, across the middle, rows 10 to 13 of 28
   5. List (rows of like things): Learning: learn words I type, adapt glide to my swiping, Personal words, across the middle, rows 14 to 16 of 28
   6. List (rows of like things): Corrections: autocorrect, auto-capitalize, double-space period, across the middle, rows 17 to 18 of 28
   7. List (rows of like things): Terminal bar: strip behaviour chips, Edit terminal bar, across the middle, rows 19 to 20 of 28

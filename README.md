@@ -3,10 +3,10 @@
 An Android keyboard (IME) for developers, written in Kotlin.
 
 - **Text mode**: QWERTY with suggestions, long-press alternates and auto-capitalisation, and glide typing
-  that decodes while the finger moves: glided words wait in a preview row for two seconds, where a tap on a
-  word lets you glide it again, type it or pick an alternative; the word before is taken into account; the
-  keyboard learns your words and how you swipe, on the phone; and (optionally) one stroke can write several
-  words by dipping into the space bar between them.
+  that decodes while the finger moves: the strip shows the word before you lift; the word before is taken
+  into account; tap inside a word (or double-tap it) and glide to redo it; the keyboard learns your words
+  and how you swipe, on the phone; and (optionally) one stroke can write several words by dipping into the
+  space bar between them.
 - **Code mode** (`#!` key): every digit and printable ASCII symbol on one page, plus arrow keys. No shift,
   no long-press, no autocorrect.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
@@ -45,7 +45,7 @@ tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2
 
 | Package (`dev.shebang.devboard.`) | What lives there |
 |---|---|
-| `ime` | `DevBoardService` (the `InputMethodService`), `FieldInfo` (EditorInfo -> what the field allows), `TextInputController` (composing, suggestions, smart spacing, the glide preview row, what is learned when), `GlideText` (context word and casing), `LanguageLoader` and `LanguageBuilder` (background load and rebuilds with learned words), `SystemUserDictionary` (Android's personal dictionary), `KeyboardSizing`, `Feedback` |
+| `ime` | `DevBoardService` (the `InputMethodService`), `FieldInfo` (EditorInfo -> what the field allows), `TextInputController` (composing, suggestions, smart spacing, redoing a tapped word, what is learned when), `GlideText` (context word and casing), `LanguageLoader` and `LanguageBuilder` (background load and rebuilds with learned words), `SystemUserDictionary` (Android's personal dictionary), `KeyboardSizing`, `Feedback` |
 | `layout` | JSON models (`LayoutDef`, `KeyDef`, `BarItem`), `LayoutParser`, `KeyboardGeometry` (pixel positions computed at runtime), `KeyCodeNames` |
 | `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `TerminalBarView`, `SuggestionStripView`, `TopStripView`, `KeyboardTheme` |
 | `input` | `ModifierState` (sticky modifier state machine), `KeyEventMapper`/`CharKeyCodes` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
@@ -70,19 +70,21 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    letters is a chain of states a quarter key apart, and each point costs its distance from its state.
    Letter keys are cheaper where the finger slowed and the stretches between them where it cruised. Pruning
    uses the best word frequency below each node, and the work per point is bounded.
-3. **Live preview.** Every 40 ms the preview row shows the word (or words) the glide would write if the
-   finger lifted now, after the words already waiting there.
+3. **Live preview.** Every 40 ms the strip shows the word (or words) the glide would write if the finger
+   lifted now.
 4. **After lift.** The best 48 candidates are re-aligned exactly (dynamic time warping over the same model,
    with the gesture's final speed statistics) and scored with the bigram model given the word before them.
    The result is ready well within a millisecond on the JVM; the emulator logs 2 to 55 ms.
-5. **The preview row.** Glided words wait in a row above the keys for 2 seconds after the last glide, or
-   until anything else is typed, then go into the field, where they are final: the keyboard never rewrites
-   text already in the field. While they wait, the last four are decoded again with each new glide, and if
-   the best reading beats the row as it stands by a margin they change in the row: "if" becomes "of" once
-   "course" follows. Tap a waiting word to fix it: glide it again, type it (space or a second tap
-   confirms, with suggestions as chips), or tap an alternative; the next glide goes at the end again.
-   Each glide is decoded after the word before it, from the row or the field, with the bigram model mixed
-   with the user's own word pairs, against a stroke measured on keys shifted by the user's learned offsets.
+5. **Into the field, and redoing a word.** Glided words go straight into the field, with a space before them
+   after a word and a space after them before one; a letter typed right after a glide starts a new word.
+   To redo a word, tap inside it (or double-tap to select it, which also works for "a" and "I"): it is
+   underlined and the strip shows it with its alternatives (its own runners-up if it was glided lately,
+   suggestions otherwise). The next glide, or a tapped alternative, replaces it and keeps its capitals.
+   To add a word instead, tap between words (a cursor at a word's edge targets nothing), or press space
+   while a word is targeted, which moves past it. After the keyboard's own edits nothing is targeted, so
+   gliding on never replaces anything, and nothing else in the field is ever rewritten. Each glide is
+   decoded after the word before it, with the bigram model mixed with the user's own word pairs, against a
+   stroke measured on keys shifted by the user's learned offsets.
 6. **Phrase gliding** (setting, off by default). Dipping below the middle of the space bar, or resting on it
    for 150 ms, ends a word without lifting; the space key lights up when the dip counts. The travel down to
    and up from the space bar belongs to no letter, so a word may finish early and coast into the space bar,
@@ -101,7 +103,7 @@ moves as the keyboard does. `GlideBenchmarkTest` prints:
 | 3,679 words of 600 held-out sentences, top-1 | 73.7% | 93.9% alone, 96.3% with context (98.8% top-3) |
 | Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 94.5% / 99.5% |
 | Phrase strokes of 2-4 words with the travel to and from the space bar | | 94.2% (96.3% one stroke per word) |
-| Sentences glided word by word, each glide free to re-read the words still in the preview row | | 96.8% when glided, 97.5% at sentence end; 28 words fixed, 1 broken |
+| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 96.8% when glided, 97.5% at sentence end; 28 words fixed, 1 broken |
 | A swiper who lands 0.15 key right and 0.3 row low, before and after adapting on 250 glides (`GlideAdaptationTest`) | | 67.5% before, 89.3% after |
 
 These are synthetic strokes, and the decoder's timing assumptions are the simulator's too. On the simulator
@@ -127,8 +129,8 @@ its own, locally:
   context has been seen 5 times. Settings > Personal words lists them with a delete button each.
 - **How you swipe.** Where each kept glide passed each letter, relative to the key centre, moves that
   letter's key centre for decoding, shrunk toward the average lean of all your glides. A correction (a
-  word re-glided, retyped or swapped in the preview row) re-aligns the original stroke to the word you
-  meant and counts twice, when the stroke plausibly was that word. Reset in Settings > Personal words.
+  tapped word glided again, or swapped for an alternative) re-aligns the word's original stroke, when it
+  was glided lately, to the word you meant and counts twice, when the stroke plausibly was that word. Reset in Settings > Personal words.
 - **Android's personal dictionary.** Its words (English, or with no locale) join the vocabulary when the
   keyboard loads.
 
@@ -171,30 +173,30 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   simulator (`GlideTuningTest`); to be revisited on recorded glides.
 - **When nothing fits**: after the wider retry, the decoder falls back to the candidates the preview last
   showed rather than drop the gesture; one backspace removes the result.
-- **Glide preview row instead of rewriting the field** (changed at the user's request): glided words wait in
-  a row above the keys for 2 s after the last glide and go in at once on any other input, when the field is
-  left, or when the language is rebuilt. Text in the field is never rewritten: the earlier design rewrote up
-  to four glided words in place, which changed text the user had already seen go in. Re-reading moved into
-  the row: up to four waiting words, and the new reading must beat the row by 2.0 in cost. In the tuning
-  run, margins of 0.5 and 1.0 fixed 45 and 43 words but broke 4 and 3 correct ones; 2.0 fixed 37 and broke
-  none. Casing of a changed word follows the old one. Settings: Preview glides (on), Refine previewed words
-  (on). With the row off, glides go straight into the field and nothing is re-read.
-- **Fixing a word in the row**: a tap selects it and pauses the timer. The next glide replaces it, decoded
-  after the word before it with nothing re-read; letters typed replace it, with suggestions as chips and
-  autocorrect as when typing; an alternative chip replaces it. A replaced word is settled: later glides use
-  it as context but never re-read it. A typed word the dictionary lacks cuts the run: glides after it get
-  unknown context. Every replacement counts as a correction.
+- **Redoing a word in the field** (changed at the user's request, after a preview row was tried): the
+  keyboard never rewrites text on its own. An earlier design rewrote up to four glided words in place when
+  a later glide made another reading likelier, which changed text the user had already seen go in. A
+  preview row that held glided words for two seconds before they went in came next; it grew into a second
+  text field, and since Android cuts a field's connection before the keyboard hears the user tapped
+  another field, anything still in it was lost on a field switch unless it was mirrored into the field
+  anyway. Now glides go straight in and the user points at the word to redo: a cursor strictly inside a
+  word, or one selected word, placed by the user. Selection reports within 600 ms of the keyboard's own
+  edit are taken as its own, so the keyboard's cursor never targets. A cursor at a word's edge targets
+  nothing, because that is where a tap between words lands. The targeted word is underlined with a
+  composing region; the replacement is checked against the text around the cursor first, and goes in
+  with the old word's capitals. The last glide stays unlearned until the next edit, so a glide redone
+  right away is not learned as it was; the correction teaches the adaptation instead.
 - **Learned user dictionary** (out of scope for v1, added at the user's request): on the phone only, in
   `personal_words.json` in the app's private files, written atomically when the keyboard hides. A word is
-  learned when it is final (typed words on commit; glided words when they reach the field, or for a direct
-  glide when the next thing happens, so backspace and strip swaps are not learned as the wrong word).
+  learned when it is final (typed words on commit; a glide when the next edit happens, so backspace, a
+  strip swap or redoing it right away are not learned as the wrong word).
   Learnable: 2 to 32 letters with apostrophes or inner hyphens, nothing with digits. Never learned from
   password, number, email, URL, terminal or no-suggestion fields, or fields with
   `IME_FLAG_NO_PERSONALIZED_LEARNING`. New words join after 2 uses. At most 5,000 words and 20,000 pairs;
   the least used, weighted by a 60-day half-life, are evicted first. Capitals: "GitHub" and "NASA" keep
   theirs; "Tokyo" keeps its capital only when used mid-sentence. The vocabulary is rebuilt in the
   background when the keyboard hides after a new word became known (or 50 uses since the last build), and
-  the rebuilt model is swapped in only when no glide is in flight and the row is empty. Setting: Learn words
+  the rebuilt model is swapped in only when no glide is in flight. Setting: Learn words
   I type (on).
 - **Glide adaptation**: per-letter offsets in key pitches, a running mean of where kept glides passed each
   letter, capped at 50 observations per letter and 200 overall so it keeps following the user, shrunk
@@ -286,12 +288,14 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
       backspace right after a glide removes it; double space gives ". ". *(verified on the emulator)*
 - [x] Glide three words in a row ("always keyboard terminal"); the strip shows the word before lift.
       *(verified on the emulator)*
-- [ ] Glide a stroke between "if" and "of", then "course" within two seconds: the first word becomes "of" in
-      the preview row before lift; once words are in the field, no glide changes them.
-- [x] Preview row: a glided word waits above the keys and goes in two seconds later. Tap it, then glide
-      another word or type letters: it is replaced (typed letters show suggestion chips; space confirms), and
-      a suggestion chip replaces it too. *(verified on the emulator with injected touches; two words glided
-      within two seconds not checked, since injected strokes take about five seconds each)*
+- [x] Tap inside a glided word: it is underlined and the strip shows it with its runners-up; glide another
+      word and it is replaced, and the next glide goes at the end. Tap between two words and glide: a word
+      is added with spaces around it. *(verified on the emulator: "hello world", tap in "world", glide
+      "would", glide "again", tap between "hello" and "would", glide "big" gives "hello big would again")*
+- [x] Press space with a word targeted, then glide: a word is added after it. *(verified on the emulator:
+      tap in "big" of "hello big world", space, glide "bad" gives "hello big bad world")*
+- [ ] Double-tap a word to select it, then glide: it is replaced. *(unit-tested; injected taps arrive too far
+      apart to make a double-tap on the emulator)*
 - [x] A word typed twice ("kubectl") is glidable after the keyboard hides and reopens; a word added to
       Android's personal dictionary is glidable; Settings > Personal words lists learned words.
       *(verified on the emulator, except the Personal words screen)*
