@@ -122,24 +122,31 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 
 ## Manual checklist
 
-Termux (install from F-Droid; set `inputType` is `TYPE_NULL`):
-- [ ] `sleep 100`, then tap `^C` on the bar: the sleep stops with `^C` shown.
-- [ ] Tap `Ctrl` on the bar, then `c` on the main keyboard: same result.
-- [ ] Type `ls /u`, tap `Tab`: completes to `/usr/`.
-- [ ] Tap `↑` on the bar: previous command recalled; hold it: repeats.
+Emulator notes: an AVD reports a hardware keyboard, so run
+`adb shell settings put secure show_ime_with_hard_keyboard 1` or no soft keyboard appears; and
+`adb shell am force-stop dev.shebang.devboard` makes the system fall back to another keyboard, so select
+DevBoard again afterwards.
+
+Termux (install from F-Droid; its terminal uses `inputType` `TYPE_NULL`):
+- [x] `sleep 100`, then tap `^C` on the bar: the sleep stops with `^C` shown. *(verified on the API 36 emulator)*
+- [x] Tap `Ctrl` on the bar, then `c` on the main keyboard: same result. *(verified)*
+- [x] Type `slee`, tap `Tab`: completes to `sleep `. *(verified; note that Termux cannot complete paths under
+      `/` such as `/da`, whatever keyboard sends the Tab)*
+- [x] Tap `↑` on the bar: previous command recalled. *(verified)* Hold it: repeats.
 - [ ] In code mode: arrows move the cursor; `⌫` repeats when held; `|`, `~`, `>` type directly.
 - [ ] `Alt` then `.` on the bar/keyboard: last argument inserted (bash).
 
 Fields (the setup screen has a multiline test field; a browser form has the rest):
-- [ ] Plain text: suggestions appear while typing, tapping one replaces the word; glide writes a word;
-      backspace right after a glide removes it; double space gives ". ".
+- [x] Plain text: suggestions appear while typing, tapping one replaces the word; glide writes a word;
+      backspace right after a glide removes it; double space gives ". ". *(verified on the emulator)*
 - [ ] Password: no suggestions, no glide, no preview text left anywhere.
 - [ ] URL/email: `@` and `/` on the bottom row; no auto-capitalisation.
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
 - [ ] Multiline: Enter inserts a newline; a Search field shows "Search" and performs it.
 
 Layout:
-- [ ] Rotate to landscape: keys re-flow, glide still decodes (cache invalidated), popup positions right.
+- [x] Rotate to landscape: keys re-flow to the IME window's width (narrower than the display with a cutout),
+      glide still decodes (cache invalidated), popup positions right. *(verified on the emulator)*
 - [ ] Change keyboard height in settings: the keyboard resizes immediately; glide still decodes.
 - [ ] Number row on: a fifth row appears in text mode only.
 - [ ] Strip: Auto swaps bar and suggestions; Always bar never shows suggestions; Two rows shows both.

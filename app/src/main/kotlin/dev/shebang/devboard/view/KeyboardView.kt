@@ -44,6 +44,8 @@ class KeyboardView(context: Context) : View(context) {
         fun onShiftChanged(state: ShiftState)
         /** Whether a touch starting on a letter may become a glide right now (field and setting). */
         fun isGlideAllowed(): Boolean
+        /** The view was laid out at a width the current geometry was not built for. */
+        fun onKeyboardWidthChanged(widthPx: Int)
     }
 
     var listener: Listener? = null
@@ -167,6 +169,12 @@ class KeyboardView(context: Context) : View(context) {
     }
 
     val isGliding: Boolean get() = gliding
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        val g = geometry
+        if (w > 0 && (g == null || g.widthPx != w)) listener?.onKeyboardWidthChanged(w)
+    }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val w = MeasureSpec.getSize(widthMeasureSpec)
@@ -357,8 +365,8 @@ class KeyboardView(context: Context) : View(context) {
             }
             return
         }
-        // Moving a third of a key is a slide, not a hold: drop the pending long-press.
-        if (longPressPending && (abs(dx) > kw * 0.35f || abs(dy) > kw * 0.35f)) {
+        // Moving a fifth of a key is a slide, not a hold: drop the pending long-press.
+        if (longPressPending && (abs(dx) > kw * 0.2f || abs(dy) > kw * 0.2f)) {
             handler.removeCallbacks(longPressRunnable)
             longPressPending = false
         }

@@ -190,8 +190,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val rows = layout.rows.size + (if (numberRow && layout.numberRow != null) 1 else 0)
         val maxHeight = dm.heightPixels * (if (landscape) 0.6f else 0.5f)
         val height = (rows * baseRow * rowScale).coerceAtMost(maxHeight).toInt()
-        val width = dm.widthPixels
-        // The numeric pad is narrower than the screen; centre it by giving it the whole width anyway (4 wide units).
+        // The IME window can be narrower than the display (landscape cutout insets), so follow the view.
+        val width = if (k.width > 0) k.width else dm.widthPixels
         val g = KeyboardGeometry(
             layout = layout,
             variant = field.variant,
@@ -206,6 +206,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideModel = null
         k.setGeometry(g)
         k.requestLayout()
+        root?.let { ViewCompat.requestApplyInsets(it) }
         strip?.setCodeMode(mode == Mode.CODE)
     }
 
@@ -409,6 +410,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun isGlideAllowed(): Boolean = settings.glide && mode == Mode.TEXT && field.allowsGlide && glideDecoder != null
+
+    override fun onKeyboardWidthChanged(widthPx: Int) {
+        rebuildGeometry()
+    }
 
     private fun switchMode(m: Mode) {
         if (mode == m) return
