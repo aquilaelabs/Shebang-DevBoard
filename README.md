@@ -299,8 +299,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed with `tools:node="remove"`; no code here or in the
   Compose/DataStore dependencies registers a runtime receiver through `ContextCompat`. If a future dependency
   does, it will fail loudly on Android 12 and older and this removal must go.
-- **Theme colours**: Material 3 dynamic colour from `android.R.color.system_*` on Android 12+, an original
-  fallback palette otherwise. Light/dark follows the setting or the system.
+- **Theme colours**: the Wallpaper theme takes Material 3 dynamic colour from `android.R.color.system_*` on
+  Android 12+; every other theme is an original fixed palette (see Themes).
 - **A look of its own** (asked for by the user: it should not look like a copy of Gboard): the keys stay
   where they were, but each is a keycap, a face raised above an edge in a deeper shade that a press sinks
   onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a block cursor,
