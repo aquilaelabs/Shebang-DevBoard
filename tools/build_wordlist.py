@@ -3,10 +3,13 @@
 
 Usage: tools/build_wordlist.py /path/to/scowl-2020.12.07 [max_level]
 
-Output: one `word<TAB>tier` per line, sorted by word (binary-searchable).
+Output: one `word<TAB>tier` per line, sorted by lowercase form then spelling, the order the app
+searches in, so it can skip sorting at load time.
 The tier is the smallest SCOWL size level that contains the word (10 = most
 common, 60 = rare). Words with apostrophes are dropped except the contraction
-lists; possessives ("ability's") are noise for a keyboard.
+lists and the 's contractions of a closed set of pronouns and function words
+("it's", "that's", "let's"): SCOWL files those among the possessives, and
+possessives ("ability's") are noise for a keyboard.
 SCOWL is redistributable under its permissive notice (see THIRD_PARTY_NOTICES.md).
 """
 import os
@@ -16,6 +19,15 @@ LEVELS = [10, 20, 35, 40, 50, 60]
 # American English spelling; "english" lists are the shared core.
 DIALECTS = ["english", "american"]
 CATEGORIES = ["words", "upper", "contractions"]
+# Stems whose 's form is a contraction ("it is", "let us"), not a possessive.
+S_CONTRACTION_STEMS = {
+    "it", "he", "she", "that", "there", "here", "what", "who", "where", "when", "why", "how", "let",
+    "everyone", "everybody", "someone", "somebody", "nobody", "nothing", "something", "everything",
+}
+
+
+def is_s_contraction(word):
+    return word.endswith("'s") and word[:-2].lower() in S_CONTRACTION_STEMS
 
 
 def main():
@@ -38,7 +50,7 @@ def main():
                         w = line.strip()
                         if not w:
                             continue
-                        if "'" in w and cat != "contractions":
+                        if "'" in w and cat != "contractions" and not is_s_contraction(w):
                             continue
                         if cat == "upper" and level > 35:
                             continue  # proper nouns beyond the common set are noise
@@ -50,7 +62,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     out = os.path.join(out_dir, "en_words.txt")
     with open(out, "w", encoding="utf-8") as fh:
-        for w in sorted(words):
+        for w in sorted(words, key=lambda w: (w.lower(), w)):
             fh.write(f"{w}\t{words[w]}\n")
     print(f"wrote {len(words)} words to {out}")
 

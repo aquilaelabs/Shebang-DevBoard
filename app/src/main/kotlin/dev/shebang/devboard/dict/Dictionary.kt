@@ -59,6 +59,17 @@ class Dictionary(
 
     fun contains(word: String): Boolean = indexOf(word) >= 0
 
+    /** Index of the first entry whose lowercase form equals [lowerWord] (already lowercase), or -1. */
+    fun indexOfLower(lowerWord: String): Int {
+        var lo = 0
+        var hi = lower.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (lower[mid] < lowerWord) lo = mid + 1 else hi = mid
+        }
+        return if (lo < lower.size && lower[lo] == lowerWord) lo else -1
+    }
+
     /** Range [start, end) of entries starting with [prefix] (lowercase compare). */
     fun prefixRange(prefix: String): IntRange {
         val p = prefix.lowercase()
@@ -103,9 +114,21 @@ class Dictionary(
                 words.add(line.substring(0, tab))
                 tiers.add(line.substring(tab + 1).trim().toIntOrNull() ?: 60)
             }
-            // Sort by lowercase so binary search on `lower` is valid whatever the input order.
+            // Sort by lowercase so binary search on `lower` is valid whatever the input order. The bundled list
+            // is written in this order already, so the (slow, boxing) sort is skipped when it isn't needed.
             // Lowercase once up front; doing it inside the comparator allocates on every comparison.
             val lowered = Array(words.size) { words[it].lowercase() }
+            var sorted = true
+            for (i in 1 until words.size) {
+                val c = lowered[i - 1].compareTo(lowered[i])
+                if (c > 0 || (c == 0 && words[i - 1] > words[i])) {
+                    sorted = false
+                    break
+                }
+            }
+            if (sorted) {
+                return Dictionary(words.toTypedArray(), lowered, tiers.toIntArray())
+            }
             val order = words.indices.sortedWith(compareBy({ lowered[it] }, { words[it] }))
             val w = Array(order.size) { words[order[it]] }
             val l = Array(order.size) { lowered[order[it]] }
