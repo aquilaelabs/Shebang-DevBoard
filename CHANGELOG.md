@@ -18,6 +18,7 @@
 - Words in Android's personal dictionary can be glided and are suggested (15d883d)
 - Settings > Personal words > Undo recent learning goes back to how learned words and swipe adaptation stood at the start of any of the last 14 days (3cf59d0)
 - Twelve original themes (Night, Day, Phosphor, Amber, Deep Sea, Ember, Orchid, Forest, Paper, Glacier, Sand, High Contrast) plus Auto and Wallpaper, picked from swatches in Settings > Appearance; the setup and settings screens follow the theme (925a20f)
+- Backspacing back to a word reopens it: the strip offers what else it could be, and a pick or a glide replaces it (c3b3a8a)
 
 ### Changed
 
@@ -37,3 +38,4 @@
 - Autocorrect fixes far more typos (89% of one-slip typos in testing, from 58%): it weighs all suggestions by how common they are and how likely the slip is, corrects before punctuation, restores missing apostrophes (dont, cant, youre), and backspace right after undoes it (ff7863d)
 - A lone i (and i'm, i'd, i'll, i've) is capitalised when the word ends (ff7863d)
 - The setup screen has one settings button instead of two (ef17318)
+- Tapping a word in the suggestion strip gives the same feedback (vibration, click) as a key (c3b3a8a)
