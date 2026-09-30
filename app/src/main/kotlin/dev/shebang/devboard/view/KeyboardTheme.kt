@@ -6,9 +6,11 @@ import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import dev.shebang.devboard.settings.Settings
-import dev.shebang.devboard.settings.ThemeMode
 
-/** Colours for the keyboard. Built once per settings/configuration change; drawing reads plain ints. */
+/**
+ * Colours for the keyboard, from the theme setting ([Palettes]). Built once per settings/configuration
+ * change; drawing reads plain ints. The keycap edges (a deeper shade under each key's face) are derived.
+ */
 class KeyboardTheme(
     val isDark: Boolean,
     val background: Int,
@@ -26,18 +28,54 @@ class KeyboardTheme(
     val modifierActive: Int,
     val modifierLocked: Int,
 ) {
+    /** The keycap edge under a character key's face, a function key's, and the accent key's. */
+    val keyEdge: Int = edgeOf(key)
+    val keyFunctionalEdge: Int = edgeOf(keyFunctional)
+    val accentEdge: Int = edgeOf(accent)
+
+    private fun edgeOf(face: Int): Int {
+        // A deeper shade of the face: towards black, more so on light themes where a thin edge reads weaker.
+        val k = if (isDark) 0.45f else 0.22f
+        val r = ((face shr 16) and 0xFF) * (1 - k)
+        val g = ((face shr 8) and 0xFF) * (1 - k)
+        val b = (face and 0xFF) * (1 - k)
+        return (0xFF shl 24) or (r.toInt() shl 16) or (g.toInt() shl 8) or b.toInt()
+    }
+
     companion object {
-        fun resolveDark(context: Context, mode: ThemeMode): Boolean = when (mode) {
-            ThemeMode.LIGHT -> false
-            ThemeMode.DARK -> true
-            ThemeMode.SYSTEM -> (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+        fun systemIsDark(context: Context): Boolean =
+            (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+
+        /** The palette a theme id stands for now: Auto (and Wallpaper before Android 12) follow the system. */
+        fun paletteFor(context: Context, id: String): Palettes.Palette? = when (id) {
+            Palettes.AUTO -> Palettes.byId(if (systemIsDark(context)) Palettes.NIGHT else Palettes.DAY)
+            Palettes.WALLPAPER -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) null else paletteFor(context, Palettes.AUTO)
+            else -> Palettes.byId(id) ?: paletteFor(context, Palettes.AUTO)
         }
 
         fun build(context: Context, settings: Settings): KeyboardTheme {
-            val dark = resolveDark(context, settings.theme)
-            val dynamic = settings.dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-            return if (dynamic) dynamicTheme(context, dark) else staticTheme(dark)
+            val p = paletteFor(context, settings.palette)
+            if (p == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) return dynamicTheme(context, systemIsDark(context))
+            return fromPalette(p ?: Palettes.all.first())
         }
+
+        fun fromPalette(p: Palettes.Palette): KeyboardTheme = KeyboardTheme(
+            isDark = p.dark,
+            background = p.background.toInt(),
+            key = p.key.toInt(),
+            keyFunctional = p.keyFunctional.toInt(),
+            keyPressed = p.keyPressed.toInt(),
+            keyText = p.keyText.toInt(),
+            keyTextSecondary = p.keyTextSecondary.toInt(),
+            accent = p.accent.toInt(),
+            onAccent = p.onAccent.toInt(),
+            popup = p.popup.toInt(),
+            popupText = p.popupText.toInt(),
+            stripText = p.stripText.toInt(),
+            trail = p.accent.toInt(),
+            modifierActive = p.modifierActive.toInt(),
+            modifierLocked = p.modifierLocked.toInt(),
+        )
 
         private fun c(context: Context, id: Int): Int = ContextCompat.getColor(context, id)
 
@@ -78,40 +116,5 @@ class KeyboardTheme(
                 modifierLocked = c(context, android.R.color.system_accent1_300),
             )
         }
-
-        /** Original fallback palette (pre-Android 12 or dynamic colour off). */
-        private fun staticTheme(dark: Boolean): KeyboardTheme = if (dark) KeyboardTheme(
-            isDark = true,
-            background = 0xFF1B1F2A.toInt(),
-            key = 0xFF2E3440.toInt(),
-            keyFunctional = 0xFF252B36.toInt(),
-            keyPressed = 0xFF4A5366.toInt(),
-            keyText = 0xFFECEFF4.toInt(),
-            keyTextSecondary = 0xFF9AA3B5.toInt(),
-            accent = 0xFF7BE0A6.toInt(),
-            onAccent = 0xFF0B2A1A.toInt(),
-            popup = 0xFF3B4252.toInt(),
-            popupText = 0xFFECEFF4.toInt(),
-            stripText = 0xFFE5E9F0.toInt(),
-            trail = 0xFF7BE0A6.toInt(),
-            modifierActive = 0xFF3F5A4B.toInt(),
-            modifierLocked = 0xFF5FBF8A.toInt(),
-        ) else KeyboardTheme(
-            isDark = false,
-            background = 0xFFE6E9F0.toInt(),
-            key = 0xFFFFFFFF.toInt(),
-            keyFunctional = 0xFFCFD5E1.toInt(),
-            keyPressed = 0xFFB8C0D0.toInt(),
-            keyText = 0xFF1B1F2A.toInt(),
-            keyTextSecondary = 0xFF5B6475.toInt(),
-            accent = 0xFF1E8E5A.toInt(),
-            onAccent = 0xFFFFFFFF.toInt(),
-            popup = 0xFFFFFFFF.toInt(),
-            popupText = 0xFF1B1F2A.toInt(),
-            stripText = 0xFF2A2F3A.toInt(),
-            trail = 0xFF1E8E5A.toInt(),
-            modifierActive = 0xFFBFE8D2.toInt(),
-            modifierLocked = 0xFF57C48B.toInt(),
-        )
     }
 }

@@ -57,7 +57,7 @@ class SetupActivity : ComponentActivity() {
         val repo = SettingsRepository.get(this)
         setContent {
             val settings by repo.settings.collectAsStateWithLifecycle(initialValue = Settings())
-            DevBoardTheme(settings.theme, settings.dynamicColor) {
+            DevBoardTheme(settings.palette) {
                 SetupScreen(onOpenSettings = { startActivity(Intent(this, SettingsActivity::class.java)) })
             }
         }

@@ -30,8 +30,7 @@ class SettingsRepository(context: Context) {
     private fun fromPrefs(p: Preferences): Settings {
         val d = Settings()
         return Settings(
-            theme = p[Keys.THEME]?.let { runCatching { ThemeMode.valueOf(it) }.getOrNull() } ?: d.theme,
-            dynamicColor = p[Keys.DYNAMIC_COLOR] ?: d.dynamicColor,
+            palette = p[Keys.PALETTE] ?: d.palette,
             heightScale = (p[Keys.HEIGHT_SCALE] ?: d.heightScale).coerceIn(0.7f, 1.4f),
             numberRow = p[Keys.NUMBER_ROW] ?: d.numberRow,
             keyPreview = p[Keys.KEY_PREVIEW] ?: d.keyPreview,
@@ -52,8 +51,7 @@ class SettingsRepository(context: Context) {
     }
 
     private fun write(p: androidx.datastore.preferences.core.MutablePreferences, s: Settings) {
-        p[Keys.THEME] = s.theme.name
-        p[Keys.DYNAMIC_COLOR] = s.dynamicColor
+        p[Keys.PALETTE] = s.palette
         p[Keys.HEIGHT_SCALE] = s.heightScale
         p[Keys.NUMBER_ROW] = s.numberRow
         p[Keys.KEY_PREVIEW] = s.keyPreview
@@ -73,8 +71,7 @@ class SettingsRepository(context: Context) {
     }
 
     private object Keys {
-        val THEME = stringPreferencesKey("theme")
-        val DYNAMIC_COLOR = booleanPreferencesKey("dynamic_color")
+        val PALETTE = stringPreferencesKey("keyboard_theme")
         val HEIGHT_SCALE = floatPreferencesKey("height_scale")
         val NUMBER_ROW = booleanPreferencesKey("number_row")
         val KEY_PREVIEW = booleanPreferencesKey("key_preview")

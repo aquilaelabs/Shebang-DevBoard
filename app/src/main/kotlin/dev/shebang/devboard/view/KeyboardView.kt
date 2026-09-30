@@ -91,6 +91,8 @@ class KeyboardView(context: Context) : View(context) {
     // Paints and scratch, allocated once.
     private val bgPaint = Paint()
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val edgePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val cursorPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.CENTER }
     private val hintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { textAlign = Paint.Align.RIGHT }
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
@@ -109,6 +111,8 @@ class KeyboardView(context: Context) : View(context) {
     private var labelSize = 0f
     private var hintSize = 0f
     private var iconSize = 0f
+    /** Height of the keycap edge under each key's face. */
+    private var lip = 2 * density
 
     // Per-pointer touch state (index = pointer id, capped at MAX_POINTERS).
     private val pointerKey = arrayOfNulls<Key>(MAX_POINTERS)
@@ -173,6 +177,7 @@ class KeyboardView(context: Context) : View(context) {
         bgPaint.color = theme.background
         trailPaint.color = theme.trail
         iconStrokePaint.strokeWidth = 1.8f * density
+        cursorPaint.strokeWidth = 2.5f * density
     }
 
     fun setGeometry(g: KeyboardGeometry) {
@@ -182,6 +187,7 @@ class KeyboardView(context: Context) : View(context) {
         labelSize = g.rowHeightPx * 0.42f
         hintSize = g.rowHeightPx * 0.22f
         iconSize = g.rowHeightPx * 0.44f
+        lip = (g.rowHeightPx * 0.045f).coerceIn(1.5f * density, 3f * density)
         labelPaint.textSize = labelSize
         hintPaint.textSize = hintSize
         labelPaint.typeface = Typeface.DEFAULT
@@ -242,7 +248,19 @@ class KeyboardView(context: Context) : View(context) {
             key.def.functional -> theme.keyFunctional
             else -> theme.key
         }
+        // A keycap: the edge underneath, the face raised above it; a pressed key sinks onto its edge.
         rect.set(key.left, key.top, key.right, key.bottom)
+        if (!pressed) {
+            edgePaint.color = when {
+                accentKey -> theme.accentEdge
+                key.def.functional -> theme.keyFunctionalEdge
+                else -> theme.keyEdge
+            }
+            canvas.drawRoundRect(rect, radius, radius, edgePaint)
+            rect.bottom -= lip
+        } else {
+            rect.top += lip
+        }
         canvas.drawRoundRect(rect, radius, radius, keyPaint)
 
         val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
@@ -250,27 +268,34 @@ class KeyboardView(context: Context) : View(context) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
             KeyAction.ENTER -> {
                 val label = enterLabel
-                if (label == null) drawIcon(canvas, KeyIcons.enter, fg, false) else drawLabel(canvas, key, label, fg, 0.8f)
+                if (label == null) drawIcon(canvas, KeyIcons.enter, fg, false) else drawLabel(canvas, label, fg, 0.8f)
             }
-            KeyAction.SHIFT -> drawIcon(canvas, KeyIcons.shift, fg, shiftState == ShiftState.OFF)
-            KeyAction.SPACE -> Unit
+            KeyAction.SHIFT -> drawIcon(canvas, if (shiftState == ShiftState.OFF) KeyIcons.shift else KeyIcons.shiftOn, fg, false)
+            KeyAction.SPACE -> {
+                // A cursor mark on the space bar.
+                val w = minOf(rect.width() * 0.08f, 16 * density)
+                val y = rect.centerY() + labelSize * 0.28f
+                cursorPaint.color = theme.keyTextSecondary
+                canvas.drawLine(rect.centerX() - w / 2, y, rect.centerX() + w / 2, y, cursorPaint)
+            }
             else -> {
                 val label = if (shifted) key.shiftedLabel else key.label
                 val scale = if (label.length > 1) 0.7f else 1f
-                drawLabel(canvas, key, label, fg, scale)
+                drawLabel(canvas, label, fg, scale)
                 if (key.def.alternates.isNotEmpty() && key.letter != 0.toChar()) {
                     hintPaint.color = theme.keyTextSecondary
-                    canvas.drawText(key.def.alternates[0], key.right - 5 * density, key.top + hintSize + 3 * density, hintPaint)
+                    canvas.drawText(key.def.alternates[0], rect.right - 5 * density, rect.top + hintSize + 3 * density, hintPaint)
                 }
             }
         }
     }
 
-    private fun drawLabel(canvas: Canvas, key: Key, label: String, color: Int, scale: Float) {
+    /** A label centred on the key face in [rect]. */
+    private fun drawLabel(canvas: Canvas, label: String, color: Int, scale: Float) {
         labelPaint.color = color
         labelPaint.textSize = labelSize * scale
-        val baseline = key.centerY - (labelPaint.descent() + labelPaint.ascent()) / 2f
-        canvas.drawText(label, key.centerX, baseline, labelPaint)
+        val baseline = rect.centerY() - (labelPaint.descent() + labelPaint.ascent()) / 2f
+        canvas.drawText(label, rect.centerX(), baseline, labelPaint)
     }
 
     private fun drawIcon(canvas: Canvas, icon: Path, color: Int, stroke: Boolean) {

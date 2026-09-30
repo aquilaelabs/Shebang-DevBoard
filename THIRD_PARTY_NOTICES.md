@@ -94,13 +94,13 @@ SOFTWARE.
 ## Icons
 
 ### Material Symbols / Material Design Icons (Google)
-- Used for: the `backspace`, `keyboard_return` and `keyboard_hide` glyph paths in
-  `app/src/main/kotlin/dev/shebang/devboard/view/KeyIcons.kt`, and the Compose `material-icons-core`
-  set in the settings app.
+- Used for: the Compose `material-icons-core` set in the settings app (back arrow, delete, add, and the
+  like). The keyboard's own key glyphs are original (see below).
 - Source: https://github.com/google/material-design-icons
 - Licence: Apache License 2.0
 
-The shift arrow, the launcher icon ("#!") and all other artwork are original to this project.
+The key glyphs (backspace, return, shift), the launcher icon ("#!"), the theme palettes and names, and all
+other artwork are original to this project.
 
 ## Libraries (all Apache License 2.0)
 

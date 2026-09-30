@@ -72,7 +72,7 @@ class SettingsActivity : ComponentActivity() {
             var editingBar by remember { mutableStateOf(false) }
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
-            DevBoardTheme(settings.theme, settings.dynamicColor) {
+            DevBoardTheme(settings.palette) {
                 if (personalWords) {
                     BackHandler { personalWords = false }
                     PersonalWordsScreen(onBack = { personalWords = false })
@@ -121,10 +121,7 @@ fun SettingsScreen(
     }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
             item { SectionHeader("Appearance") }
-            item {
-                ChoiceRow("Theme", ThemeMode.entries.map { it to it.name.lowercase().replaceFirstChar(Char::uppercase) }, settings.theme) { v -> update { it.copy(theme = v) } }
-            }
-            item { SwitchRow("Dynamic color", "Use the wallpaper palette (Android 12+)", settings.dynamicColor) { v -> update { it.copy(dynamicColor = v) } } }
+            item { ThemePicker(settings.palette) { v -> update { it.copy(palette = v) } } }
             item {
                 SliderRow("Keyboard height", "${(settings.heightScale * 100).toInt()}%", settings.heightScale, 0.7f..1.4f, steps = 6) { v -> update { it.copy(heightScale = v) } }
             }

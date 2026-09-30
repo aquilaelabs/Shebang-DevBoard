@@ -129,7 +129,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private fun applySettings(s: Settings) {
         val heightChanged = s.heightScale != settings.heightScale || s.numberRow != settings.numberRow
-        val themeChanged = s.theme != settings.theme || s.dynamicColor != settings.dynamicColor || theme == null
+        val themeChanged = s.palette != settings.palette || theme == null
         val barChanged = s.barJson != settings.barJson || barConfig == null
         settings = s
         feedback.settings = s

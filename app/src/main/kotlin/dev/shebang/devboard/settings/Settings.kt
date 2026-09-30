@@ -1,7 +1,5 @@
 package dev.shebang.devboard.settings
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK }
-
 /** What the top strip shows in text mode. */
 enum class StripMode {
     /** Suggestions while composing, the terminal bar otherwise. */
@@ -14,8 +12,8 @@ enum class StripMode {
 
 /** Every user setting, with its default. Read on the main thread from a cached snapshot; never blocks. */
 data class Settings(
-    val theme: ThemeMode = ThemeMode.SYSTEM,
-    val dynamicColor: Boolean = true,
+    /** The keyboard's theme: an id from [dev.shebang.devboard.view.Palettes] ("auto" follows the system). */
+    val palette: String = "auto",
     /** Multiplier on the base row height, 0.7..1.4. */
     val heightScale: Float = 1.0f,
     val numberRow: Boolean = false,

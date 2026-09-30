@@ -6,22 +6,24 @@ import android.graphics.RectF
 import androidx.core.graphics.PathParser
 
 /**
- * Key glyphs as paths in a 24x24 box. Backspace and return are Material Symbols (Apache-2.0, see
- * THIRD_PARTY_NOTICES.md); the shift arrow is original. Scaled copies are built once per geometry.
+ * Key glyphs as paths in a 24x24 box, all original to this project, in a terminal idiom: backspace is a
+ * chevron erasing back toward a block cursor, return a bent arrow with an open chevron head, shift a caret
+ * that gains an underline while shift is on. Scaled copies are built once per geometry.
  */
 object KeyIcons {
-    private const val BACKSPACE =
-        "M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"
-    private const val RETURN = "M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z"
-    /** Original outline arrow: point up, shaft down. */
-    private const val SHIFT = "M12 3.5 L3.5 12 H8.5 V20.5 H15.5 V12 H20.5 Z"
-    private const val KEYBOARD_HIDE =
-        "M20 3H4c-1.1 0-1.99.9-1.99 2L2 15c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 3h2v2h-2V6zm0 3h2v2h-2V9zM8 6h2v2H8V6zm0 3h2v2H8V9zm-1 2H5V9h2v2zm0-3H5V6h2v2zm9 7H8v-2h8v2zm0-4h-2V9h2v2zm0-3h-2V6h2v2zm3 3h-2V9h2v2zm0-3h-2V6h2v2zM12 23l4-4H8l4 4z"
+    /** A left chevron and a block cursor after it. */
+    private const val BACKSPACE = "M11.3 6.3 L12.7 7.7 L8.4 12 L12.7 16.3 L11.3 17.7 L5.6 12 Z M14.5 8 H20 V16 H14.5 Z"
+    /** Down from the top right, then left, ending in an open chevron. */
+    private const val RETURN = "M19 4.5 H21 V15 H8.8 L11.9 18.1 L10.5 19.5 L5 14 L10.5 8.5 L11.9 9.9 L8.8 13 H19 Z"
+    /** A caret pointing up. */
+    private const val SHIFT = "M12 4.6 L20.1 12.7 L18.7 14.1 L12 7.4 L5.3 14.1 L3.9 12.7 Z"
+    /** The caret with a bar under it: shift is on. */
+    private const val SHIFT_ON = "$SHIFT M6.5 17.5 H17.5 V19.5 H6.5 Z"
 
     val backspace: Path = PathParser.createPathFromPathData(BACKSPACE)
     val enter: Path = PathParser.createPathFromPathData(RETURN)
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
-    val keyboardHide: Path = PathParser.createPathFromPathData(KEYBOARD_HIDE)
+    val shiftOn: Path = PathParser.createPathFromPathData(SHIFT_ON)
 
     private val matrix = Matrix()
 

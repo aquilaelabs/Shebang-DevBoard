@@ -17,10 +17,12 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 | `--key-functional` | `#252b36` | shift, backspace, mode, bar chips |
 | `--key-pressed` | `#4a5366` | a key while touched |
 | `--key-text` | `#eceff4` | key labels |
-| `--key-text-secondary` | `#9aa3b5` | long-press hints in key corners |
+| `--key-text-secondary` | `#9aa3b5` | long-press hints, the space bar's cursor mark |
 | `--accent` | `#7be0a6` | enter key, caps lock, glide trail, popup selection, snippets |
 | `--on-accent` | `#0b2a1a` | text on the accent |
 | `--popup` | `#3b4252` | key preview and alternates popup |
+| `--popup-text` | `#eceff4` | text in the popup |
+| `--strip-text` | `#e5e9f0` | suggestion strip words |
 | `--modifier-active` | `#3f5a4b` | one-shot sticky modifier chip |
 | `--modifier-locked` | `#5fbf8a` | locked sticky modifier chip |
 
@@ -33,12 +35,194 @@ Color comes only from these tokens, named once in the stylesheet. The app starts
 | `--key-functional` | `#cfd5e1` | shift, backspace, mode, bar chips |
 | `--key-pressed` | `#b8c0d0` | a key while touched |
 | `--key-text` | `#1b1f2a` | key labels |
-| `--key-text-secondary` | `#5b6475` | long-press hints |
-| `--accent` | `#1e8e5a` | enter key, caps lock, glide trail, popup selection |
+| `--key-text-secondary` | `#5b6475` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#1e8e5a` | enter key, caps lock, glide trail, popup selection, snippets |
 | `--on-accent` | `#ffffff` | text on the accent |
 | `--popup` | `#ffffff` | key preview and alternates popup |
+| `--popup-text` | `#1b1f2a` | text in the popup |
+| `--strip-text` | `#2a2f3a` | suggestion strip words |
 | `--modifier-active` | `#bfe8d2` | one-shot sticky modifier chip |
 | `--modifier-locked` | `#57c48b` | locked sticky modifier chip |
+
+### Phosphor (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#050a06` | keyboard and strip background |
+| `--key` | `#0f1a11` | character keys |
+| `--key-functional` | `#0a130c` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#1f3a24` | a key while touched |
+| `--key-text` | `#8cffa0` | key labels |
+| `--key-text-secondary` | `#3f8f4f` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#39ff6a` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#03140a` | text on the accent |
+| `--popup` | `#14261a` | key preview and alternates popup |
+| `--popup-text` | `#b8ffc4` | text in the popup |
+| `--strip-text` | `#8cffa0` | suggestion strip words |
+| `--modifier-active` | `#1e4a2a` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#2fd65a` | locked sticky modifier chip |
+
+### Amber (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#0f0a03` | keyboard and strip background |
+| `--key` | `#1e1507` | character keys |
+| `--key-functional` | `#170f05` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#3a2a10` | a key while touched |
+| `--key-text` | `#ffc266` | key labels |
+| `--key-text-secondary` | `#a4733a` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#ff9f1c` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#1f1200` | text on the accent |
+| `--popup` | `#2a1d0a` | key preview and alternates popup |
+| `--popup-text` | `#ffd699` | text in the popup |
+| `--strip-text` | `#ffc266` | suggestion strip words |
+| `--modifier-active` | `#4a3310` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#e08a12` | locked sticky modifier chip |
+
+### Deep Sea (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#0b1624` | keyboard and strip background |
+| `--key` | `#132338` | character keys |
+| `--key-functional` | `#0f1c2e` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#22395a` | a key while touched |
+| `--key-text` | `#dde8f5` | key labels |
+| `--key-text-secondary` | `#7d93ae` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#4fc3f7` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#04202e` | text on the accent |
+| `--popup` | `#1a2e48` | key preview and alternates popup |
+| `--popup-text` | `#dde8f5` | text in the popup |
+| `--strip-text` | `#d0ddee` | suggestion strip words |
+| `--modifier-active` | `#1d4260` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#3aa9da` | locked sticky modifier chip |
+
+### Ember (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#1a1110` | keyboard and strip background |
+| `--key` | `#2b1c19` | character keys |
+| `--key-functional` | `#221614` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#4a2e28` | a key while touched |
+| `--key-text` | `#f7e4dd` | key labels |
+| `--key-text-secondary` | `#b08a80` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#ff6b4a` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#2a0b04` | text on the accent |
+| `--popup` | `#36231f` | key preview and alternates popup |
+| `--popup-text` | `#f7e4dd` | text in the popup |
+| `--strip-text` | `#f0dad2` | suggestion strip words |
+| `--modifier-active` | `#5a2a1f` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#e85a3a` | locked sticky modifier chip |
+
+### Orchid (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#1a1422` | keyboard and strip background |
+| `--key` | `#2a2035` | character keys |
+| `--key-functional` | `#221a2c` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#43345a` | a key while touched |
+| `--key-text` | `#f0e7fa` | key labels |
+| `--key-text-secondary` | `#a493ba` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#d08bf2` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#2a0e38` | text on the accent |
+| `--popup` | `#332745` | key preview and alternates popup |
+| `--popup-text` | `#f0e7fa` | text in the popup |
+| `--strip-text` | `#e8ddf5` | suggestion strip words |
+| `--modifier-active` | `#4a335e` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#b774db` | locked sticky modifier chip |
+
+### Forest (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#121a15` | keyboard and strip background |
+| `--key` | `#1d2a22` | character keys |
+| `--key-functional` | `#17221b` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#314638` | a key while touched |
+| `--key-text` | `#e4efe6` | key labels |
+| `--key-text-secondary` | `#8fa696` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#a3d977` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#16240b` | text on the accent |
+| `--popup` | `#26372c` | key preview and alternates popup |
+| `--popup-text` | `#e4efe6` | text in the popup |
+| `--strip-text` | `#dce8de` | suggestion strip words |
+| `--modifier-active` | `#36502a` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#8bc25e` | locked sticky modifier chip |
+
+### Paper (light)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#ece6da` | keyboard and strip background |
+| `--key` | `#fbf8f1` | character keys |
+| `--key-functional` | `#ddd5c6` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#cfc5b3` | a key while touched |
+| `--key-text` | `#2b2622` | key labels |
+| `--key-text-secondary` | `#7a6f63` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#b8430e` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#fff7f0` | text on the accent |
+| `--popup` | `#fffdf8` | key preview and alternates popup |
+| `--popup-text` | `#2b2622` | text in the popup |
+| `--strip-text` | `#3a332c` | suggestion strip words |
+| `--modifier-active` | `#f1d2c2` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#d9683a` | locked sticky modifier chip |
+
+### Glacier (light)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#dce8ee` | keyboard and strip background |
+| `--key` | `#ffffff` | character keys |
+| `--key-functional` | `#c3d6df` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#afc7d3` | a key while touched |
+| `--key-text` | `#12303d` | key labels |
+| `--key-text-secondary` | `#587383` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#0077a8` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#ffffff` | text on the accent |
+| `--popup` | `#ffffff` | key preview and alternates popup |
+| `--popup-text` | `#12303d` | text in the popup |
+| `--strip-text` | `#1c3c4a` | suggestion strip words |
+| `--modifier-active` | `#bfe3f2` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#2a9ccc` | locked sticky modifier chip |
+
+### Sand (light)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#e9dfcb` | keyboard and strip background |
+| `--key` | `#f8f2e5` | character keys |
+| `--key-functional` | `#d8cbb2` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#c9ba9d` | a key while touched |
+| `--key-text` | `#3a2e1f` | key labels |
+| `--key-text-secondary` | `#857255` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#8a5a00` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#fff8ea` | text on the accent |
+| `--popup` | `#fffbf2` | key preview and alternates popup |
+| `--popup-text` | `#3a2e1f` | text in the popup |
+| `--strip-text` | `#45382a` | suggestion strip words |
+| `--modifier-active` | `#ebd6a8` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#b98524` | locked sticky modifier chip |
+
+### High Contrast (dark)
+
+| token | value | for |
+|---|---|---|
+| `--background` | `#000000` | keyboard and strip background |
+| `--key` | `#1a1a1a` | character keys |
+| `--key-functional` | `#0d0d0d` | shift, backspace, mode, bar chips |
+| `--key-pressed` | `#404040` | a key while touched |
+| `--key-text` | `#ffffff` | key labels |
+| `--key-text-secondary` | `#ffd600` | long-press hints, the space bar's cursor mark |
+| `--accent` | `#ffd600` | enter key, caps lock, glide trail, popup selection, snippets |
+| `--on-accent` | `#000000` | text on the accent |
+| `--popup` | `#1a1a1a` | key preview and alternates popup |
+| `--popup-text` | `#ffffff` | text in the popup |
+| `--strip-text` | `#ffffff` | suggestion strip words |
+| `--modifier-active` | `#5c4d00` | one-shot sticky modifier chip |
+| `--modifier-locked` | `#ffd600` | locked sticky modifier chip |
 
 ## Type
 
@@ -64,19 +248,19 @@ Each is one rule of the design, by name; a session is handed one on the turn it 
 
 Applies to: theme, color, palette
 
-On Android 12+ with the Dynamic color setting on, the keyboard takes its palette from android.R.color.system_neutral1/neutral2/accent1/accent2 instead of these tokens: neutral1 for surfaces, accent1 for the accent. These hex values are the fallback palette and the pre-12 look.
+Themes: Auto (the default) follows the system between Night and Day; Wallpaper takes the palette from android.R.color.system_neutral1/neutral2/accent1/accent2 on Android 12+ (neutral1 for surfaces, accent1 for the accent) and behaves like Auto before that; every other theme is one of these fixed palettes. The setup and settings screens wear the chosen theme too: its background, text, key colour for cards and accent, with status and navigation bar icons to match. Themes are picked in Settings > Appearance from a row of swatches, each a tiny keyboard in its colours.
 
 ### keys
 
 Applies to: app/src/main/kotlin/dev/shebang/devboard/view; key, keyboard
 
-Keys are flat rounded rectangles (radius 16% of the row height, clamped 4-12dp) separated by 5dp horizontal and 8dp vertical gaps, drawn on one Canvas. Character keys use `key`, function keys `key-functional`, enter and caps lock the accent. Letter keys show their first long-press alternate as a small hint in the top-right corner.
+Keys are keycaps: a rounded face (radius 16% of the row height, clamped 4-12dp) raised above an edge in a deeper shade of the face (45% toward black on dark themes, 22% on light), about 4.5% of the row height tall (1.5-3dp); a pressed key sinks onto its edge. Gaps: 5dp horizontal, 8dp vertical, one Canvas. Character keys use `key`, function keys `key-functional`, enter and caps lock the accent. Letter keys show their first long-press alternate as a small hint in the top-right corner. The space bar carries a short cursor mark (an underscore) in `key-text-secondary`.
 
 ### icons
 
 Applies to: icon
 
-Backspace and return glyphs are Material Symbols paths (Apache-2.0); the shift arrow and the #! launcher icon are original. No brand marks anywhere.
+Key glyphs are original, in a terminal idiom: backspace is a left chevron erasing toward a block cursor, return a bent arrow ending in an open chevron, shift a caret that gains an underline while shift is on (caps lock also fills the key with the accent). The #! launcher icon is original. The settings app uses Compose Material icons (Apache-2.0) for its own controls. No brand marks anywhere.
 
 ## Pages
 
@@ -130,7 +314,7 @@ Notes:
 Platform: an Android app: Material's shapes and elevation, 48dp touch targets, the app's sections as a bottom bar, and the system's back gesture respected.
 Layout of the settings screen, the terminal-bar editor and personal words on a phone frame (6 columns by 28 rows: the frame shows 12 of them, and the page scrolls), from the Settings template, numbered in drawing order (a later block draws over an earlier one where they overlap):
   1. Header (the band at the top): DevBoard settings, across the top, row 1 of 28
-  2. List (rows of like things): Appearance: theme chips, dynamic colour, height slider, number row, key preview, across the middle, rows 2 to 6 of 28
+  2. List (rows of like things): Appearance: theme swatches (Auto, Wallpaper, 12 themes), height slider, number row, key preview, across the middle, rows 2 to 6 of 28
   3. List (rows of like things): Feedback: haptics, strength chips, key sounds, across the middle, rows 7 to 9 of 28
   4. List (rows of like things): Typing: glide, trail, phrase gliding, Record glides, across the middle, rows 10 to 13 of 28
   5. List (rows of like things): Learning: learn words I type, adapt glide to my swiping, Personal words, across the middle, rows 14 to 16 of 28

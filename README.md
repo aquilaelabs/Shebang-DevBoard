@@ -301,8 +301,17 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   does, it will fail loudly on Android 12 and older and this removal must go.
 - **Theme colours**: Material 3 dynamic colour from `android.R.color.system_*` on Android 12+, an original
   fallback palette otherwise. Light/dark follows the setting or the system.
-- **Icons**: backspace and return are Material Symbols paths (Apache-2.0); the shift arrow and the `#!`
-  launcher icon are original vector art.
+- **A look of its own** (asked for by the user: it should not look like a copy of Gboard): the keys stay
+  where they were, but each is a keycap, a face raised above an edge in a deeper shade that a press sinks
+  onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a block cursor,
+  return a bent arrow with an open chevron head, shift a caret that gains an underline while on); and the
+  space bar carries a small cursor mark. The default is no longer the system's wallpaper colours (the look
+  the stock keyboard wears) but Auto, which follows the system between the original Night and Day.
+- **Themes**: Auto, Wallpaper (the system palette on Android 12+, Auto before) and twelve original palettes
+  with original names: Night, Day, Phosphor, Amber, Deep Sea, Ember, Orchid, Forest, Paper, Glacier, Sand,
+  High Contrast. Each is the same set of tokens (`Palettes`); keycap edges are derived from the key colours.
+  Settings > Appearance picks one from a row of swatches drawn in its own colours, and the setup and
+  settings screens wear it too. This replaces the System/Light/Dark choice and the Dynamic color switch.
 - **Sounds**: the system's own key-click effects via `AudioManager.playSoundEffect`; no bundled audio.
 - **Haptics**: `VibrationEffect.createOneShot` at 8/12/18 ms and amplitude 60/140/255 for light/medium/strong.
 - **Bar editor**: reorder with up/down buttons, remove, add key/modifier/snippet, import/export JSON through
