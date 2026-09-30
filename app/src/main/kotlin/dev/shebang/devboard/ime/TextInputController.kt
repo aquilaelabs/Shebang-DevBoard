@@ -85,6 +85,15 @@ class TextInputController(
     private var lastAutocorrect: Autocorrected? = null
     /** Words the user took back from autocorrect in this field (lowercase): typed again, they stay as typed. */
     private val keptAsTyped = HashSet<String>()
+
+    /**
+     * The word backspace walked back into and reopened as the composing word, while it stands unchanged: a
+     * glide or a strip pick replaces it (a correction), space leaves it as it was. [reopenedGlide] is the same
+     * word from the glides remembered, with its runners-up and stroke.
+     */
+    private var reopened: String? = null
+    private var reopenedGlide: GlidedWord? = null
+    private val reopenedUnchanged: Boolean get() = reopened != null && word.toString() == reopened
     private var suggestGeneration = 0
     private var lastSpaceTime = 0L
     private var lastActionWasSpace = false
@@ -161,6 +170,8 @@ class TextInputController(
         candidatesFor = ""
         lastAutocorrect = null
         keptAsTyped.clear()
+        reopened = null
+        reopenedGlide = null
         lastGlide = null
         target = null
         recent.clear()
@@ -186,6 +197,7 @@ class TextInputController(
             if (!insideComposing && !(newSelStart == newSelEnd && composingAtCursor())) {
                 connection()?.finishComposingText()
                 word.setLength(0)
+                reopened = null
                 clearCandidates()
             }
         }
@@ -482,6 +494,58 @@ class TextInputController(
         val before = ic.getTextBeforeCursor(2, 0)
         val n = if (before != null && before.length == 2 && Character.isSurrogatePair(before[0], before[1])) 2 else 1
         ic.deleteSurroundingText(n, 0)
+        reopenWordBeforeCursor(ic)
+    }
+
+    /**
+     * Backspace walked back to the end of a word (it removed the space or punctuation after it): the word
+     * becomes the composing word again, and the strip offers what else it could be (its runners-up if it was
+     * glided lately, suggestions for it otherwise). Typing goes on with it, backspace deletes its letters, and
+     * a glide or a strip pick replaces it.
+     */
+    private fun reopenWordBeforeCursor(ic: InputConnection) {
+        if (!field.allowsComposing || isComposing) return
+        val after = ic.getTextAfterCursor(1, 0)
+        if (!after.isNullOrEmpty() && (after[0].isLetterOrDigit() || isLetterInWord(after[0]))) return
+        val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: return
+        var b = 0
+        while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
+        if (b == 0 || b == MAX_WORD) return
+        // A word glued to digits or symbols before it ("x86") is not reopened.
+        if (b < before.length && before[before.length - 1 - b].isLetterOrDigit()) return
+        val text = before.substring(before.length - b)
+        if (!text.first().isLetter()) return
+        ownEdit()
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(b, 0)
+        ic.setComposingText(text, 1)
+        ic.endBatchEdit()
+        word.setLength(0)
+        word.append(text)
+        reopened = text
+        reopenedGlide = recentMatch(text)
+        ui.setComposing(true)
+        val g = reopenedGlide
+        val dictionary = dictionaryInUse
+        if (g != null && dictionary != null) {
+            val t = reopenedTarget(ic)
+            val alts = g.word.candidates.filter { it >= 0 && it != g.word.word }.take(2).map { caseFor(t, dictionary.words[it]) }
+            candidates = emptyList()
+            candidatesFor = ""
+            suggestGeneration++
+            ui.showCandidates(arrangeBestMiddle(listOf(text) + alts))
+        } else {
+            requestSuggestions()
+        }
+    }
+
+    /** The reopened composing word as a target, so a glide replaces it the way it replaces a tapped word. */
+    private fun reopenedTarget(ic: InputConnection): Target {
+        val text = word.toString()
+        val t = Target(text, -1, text.length, 0, selection = false, glided = reopenedGlide, underlined = true)
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS + text.length, 0) ?: ""
+        t.sentenceStart = GlideText.contextWord(before.subSequence(0, maxOf(0, before.length - text.length))) == GlideText.SENTENCE_START
+        return t
     }
 
     fun enter() {
@@ -531,7 +595,10 @@ class TextInputController(
     private fun endWord(ic: InputConnection, after: String, correct: Boolean, deferOk: Boolean) {
         val typed = word.toString()
         val context = learningContext(ic)
-        val canCorrect = correct && settings.autocorrect && field.allowsComposing && typed.lowercase() !in keptAsTyped
+        // A word backspace reopened and left as it was stays as it was, and is not learned twice.
+        val untouched = reopenedUnchanged
+        reopened = null
+        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && typed.lowercase() !in keptAsTyped
         var commit = typed
         var defer = false
         if (canCorrect) {
@@ -547,7 +614,7 @@ class TextInputController(
         clearCandidates()
         if (commit != pronounCase(typed)) lastAutocorrect = Autocorrected(typed, commit, after)
         if (!defer) {
-            learnAs(commit, context)
+            if (!untouched) learnAs(commit, context)
             return
         }
         val s = suggester ?: return
@@ -691,6 +758,15 @@ class TextInputController(
             return
         }
         if (isComposing) {
+            val g = reopenedGlide
+            val dictionary = dictionaryInUse
+            if (reopenedUnchanged && g != null && dictionary != null && !chosen.equals(word.toString(), ignoreCase = true)) {
+                // Another reading of a glided word picked after backspacing to it: a correction.
+                val idx = dictionary.indexOfLower(chosen.lowercase())
+                if (idx >= 0) learner.correction(g.stroke, idx, dictionary)
+                recent.remove(g)
+            }
+            reopened = null
             learnTyped(ic, chosen)
             ic.commitText("$chosen ", 1)
             word.setLength(0)
@@ -720,6 +796,11 @@ class TextInputController(
      * stale underline goes first so the glide cannot land in it.
      */
     private fun resolveTarget(ic: InputConnection) {
+        if (isComposing && reopenedUnchanged && field.allowsComposing) {
+            // A word backspace reopened: the glide redoes it.
+            target = reopenedTarget(ic)
+            return
+        }
         if (!field.allowsComposing || isComposing) {
             dropTarget()
             return
@@ -794,7 +875,15 @@ class TextInputController(
         val ic = connection() ?: return
         dictionaryInUse = dictionary
         lastAutocorrect = null
-        if (isComposing) endWord(ic, "", correct = true, deferOk = false)
+        if (isComposing) {
+            if (target != null && reopenedUnchanged) {
+                // The reopened word is the target: it is replaced below, not ended.
+                word.setLength(0)
+                reopened = null
+            } else {
+                endWord(ic, "", correct = true, deferOk = false)
+            }
+        }
         lastActionWasSpace = false
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
         target?.glided?.let { pending.remove(it) }

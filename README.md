@@ -288,6 +288,13 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   correctly typed word changed. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
   and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
   Autocorrect (off by default).
+- **Walking back with backspace**: when backspace removes the space or punctuation after a word, that word
+  becomes the composing word again (underlined) and the strip offers what else it could be: its runners-up
+  if it was glided lately, suggestions for it otherwise. A strip pick or a glide replaces it (a correction,
+  with the old stroke re-aligned when it was glided), typing goes on with it, and backspace deletes its
+  letters and then reopens the word before. Space leaves it as it was, without autocorrect or learning it
+  again. A word glued to digits or symbols before it ("x86") is not reopened. Tapping the strip gives the
+  same feedback as a key.
 - **The pronoun I**: "i", "i'm", "i'd", "i'll" and "i've" typed on their own get a capital as the word ends,
   with auto-capitalisation on, whether or not autocorrect is.
 - **Glide commit** adds a leading space unless at the field start or after whitespace or `( [ { <`; no

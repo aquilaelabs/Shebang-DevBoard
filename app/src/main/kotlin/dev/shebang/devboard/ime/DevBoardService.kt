@@ -229,7 +229,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         k.popup = p
         k.listener = this
         s.bar.listener = this
-        s.suggestions.onSuggestion = { word -> text.pickCandidate(word); afterEdit() }
+        s.suggestions.onSuggestion = { word ->
+            // Picking from the strip feels like a key press.
+            feedback.keyPress()
+            text.pickCandidate(word)
+            afterEdit()
+        }
         column.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         column.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.

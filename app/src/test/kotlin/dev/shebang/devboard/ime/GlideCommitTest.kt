@@ -286,6 +286,61 @@ class GlideCommitTest {
         assertTrue(corrections.isEmpty())
     }
 
+    // ---- Walking back with backspace -----------------------------------------------------------------
+
+    @Test
+    fun backspacingIntoAGlidedWordOffersItsRunnersUp() {
+        glide("hello")
+        glide("world", runnersUp = listOf("would", "wood"))
+        type(" ")
+        controller.backspace()
+        assertEquals("hello world", ic.toString())
+        assertEquals(listOf("would", "world", "wood"), strip)
+        controller.pickCandidate("would")
+        assertEquals("hello would ", ic.toString())
+        assertEquals(listOf(idx("would")), corrections.map { it.second })
+        assertTrue(corrections[0].first === strokes["world"])
+    }
+
+    @Test
+    fun aGlideRedoesAWordBackspaceReopened() {
+        glide("hello", capitalize = true)
+        glide("world")
+        type(" ")
+        controller.backspace()
+        glide("would")
+        assertEquals("Hello would", ic.toString())
+        assertEquals(listOf(idx("would")), corrections.map { it.second })
+        // And the next glide goes after it.
+        glide("again")
+        assertEquals("Hello would again", ic.toString())
+    }
+
+    @Test
+    fun backspaceWalksBackThroughWords() {
+        type("the quikc brown ")
+        controller.backspace()
+        assertEquals("the quikc brown", ic.toString())
+        repeat(5) { controller.backspace() }
+        assertEquals("the quikc ", ic.toString())
+        controller.backspace()
+        assertEquals("the quikc", ic.toString())
+        // "quikc" is the composing word again: typing corrects it in place.
+        repeat(2) { controller.backspace() }
+        type("ck ")
+        assertEquals("the quick ", ic.toString())
+    }
+
+    @Test
+    fun spaceAfterReopeningChangesNothing() {
+        type("hello world ")
+        val learnedBefore = learned.size
+        controller.backspace()
+        type(" ")
+        assertEquals("hello world ", ic.toString())
+        assertEquals(learnedBefore, learned.size)
+    }
+
     // ---- Adding a word -------------------------------------------------------------------------------
 
     @Test
