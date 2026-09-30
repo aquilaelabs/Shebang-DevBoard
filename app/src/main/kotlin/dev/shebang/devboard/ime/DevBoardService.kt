@@ -1,18 +1,32 @@
 package dev.shebang.devboard.ime
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.res.Configuration
 import android.inputmethodservice.InputMethodService
+import android.graphics.drawable.Icon
+import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.util.Size
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InlineSuggestionsRequest
+import android.view.inputmethod.InlineSuggestionsResponse
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
+import android.widget.inline.InlinePresentationSpec
+import androidx.annotation.RequiresApi
+import androidx.autofill.inline.UiVersions
+import androidx.autofill.inline.common.ImageViewStyle
+import androidx.autofill.inline.common.TextViewStyle
+import androidx.autofill.inline.common.ViewStyle
+import androidx.autofill.inline.v1.InlineSuggestionUi
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.shebang.devboard.dict.Dictionary
@@ -73,6 +87,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private var settings = Settings()
     private var theme: KeyboardTheme? = null
+    /** Counts autofill responses, so chips still inflating for an older one are dropped. */
+    private var autofillGeneration = 0
     private var barConfig: BarConfig? = null
     private lateinit var appProfiles: AppProfiles
     /** The app the current field belongs to (its package name), for its own mode and bar. */
@@ -364,6 +380,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        // The chips were for that field; the next one gets its own response.
+        autofillGeneration++
+        strip?.setAutofill(emptyList())
         text.finishComposing()
         persistLearning()
         keyboard?.cancelAllTouches()
@@ -380,6 +399,65 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
+
+    // ---- Autofill (Android 11+) ----------------------------------------------------------------------
+
+    /**
+     * Asks the autofill service (the user's password manager) for suggestions to show in the strip, drawn in
+     * the keyboard's colours at the strip's height. The system decides when there are any.
+     */
+    // Lint reads the style builders' public setters as their restricted generic base class's.
+    @SuppressLint("RestrictedApi")
+    @RequiresApi(Build.VERSION_CODES.R)
+    override fun onCreateInlineSuggestionsRequest(uiExtras: Bundle): InlineSuggestionsRequest? {
+        val t = theme ?: KeyboardTheme.build(this, settings)
+        val d = resources.displayMetrics.density
+        val pad = (10 * d).toInt()
+        val chip = ViewStyle.Builder()
+            .setBackground(Icon.createWithResource(this, dev.shebang.devboard.R.drawable.autofill_chip).setTint(t.keyFunctional))
+            .setPadding(pad, 0, pad, 0)
+            .build()
+        val style = InlineSuggestionUi.newStyleBuilder()
+            .setSingleIconChipStyle(chip)
+            .setChipStyle(chip)
+            .setTitleStyle(TextViewStyle.Builder().setTextColor(t.stripText).setTextSize(15f).build())
+            .setSubtitleStyle(TextViewStyle.Builder().setTextColor(t.keyTextSecondary).setTextSize(13f).build())
+            .setStartIconStyle(ImageViewStyle.Builder().setPadding(0, 0, (6 * d).toInt(), 0).build())
+            .build()
+        val styles = UiVersions.newStylesBuilder().addStyle(style).build()
+        val h = strip?.rowHeight ?: (44 * d).toInt()
+        val chipHeight = h - (8 * d).toInt()
+        val spec = InlinePresentationSpec.Builder(Size((48 * d).toInt(), chipHeight), Size(resources.displayMetrics.widthPixels, chipHeight))
+            .setStyle(styles)
+            .build()
+        return InlineSuggestionsRequest.Builder(listOf(spec)).setMaxSuggestionCount(MAX_AUTOFILL).build()
+    }
+
+    /** Puts the service's chips in the strip; an empty response clears them. */
+    @RequiresApi(Build.VERSION_CODES.R)
+    override fun onInlineSuggestionsResponse(response: InlineSuggestionsResponse): Boolean {
+        val suggestions = response.inlineSuggestions
+        val s = strip ?: return false
+        val generation = ++autofillGeneration
+        if (suggestions.isEmpty()) {
+            s.setAutofill(emptyList())
+            return true
+        }
+        val chipHeight = s.rowHeight - (8 * resources.displayMetrics.density).toInt()
+        // Pinned chips (the service's own entry points) go last, as the service expects them to stay put.
+        val ordered = suggestions.sortedBy { it.info.isPinned }
+        val views = arrayOfNulls<View>(ordered.size)
+        var remaining = ordered.size
+        ordered.forEachIndexed { i, suggestion ->
+            suggestion.inflate(this, Size(LinearLayout.LayoutParams.WRAP_CONTENT, chipHeight), mainExecutor) { v ->
+                // The chip is the service's surface; above the keyboard's window, or the strip's background hides it.
+                v?.setZOrderedOnTop(true)
+                views[i] = v
+                if (--remaining == 0 && generation == autofillGeneration) s.setAutofill(views.filterNotNull())
+            }
+        }
+        return true
+    }
 
     private val ic: InputConnection? get() = currentInputConnection
 
@@ -654,5 +732,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         /** Learned uses since the last build after which hiding the keyboard rebuilds the frequencies. */
         private const val REBUILD_AFTER_WORDS = 50
         private const val TAG = "DevBoard"
+        /** Autofill chips asked of the service at most. */
+        private const val MAX_AUTOFILL = 6
     }
 }

@@ -25,6 +25,7 @@
 - The keyboard remembers text or code mode per app, and each app can have its own terminal bar (04cb7b0)
 - Code-aware words: identifiers already in the text are suggested as you type and offered after a glide, and words glided in a row can be joined as camelCase or snake_case (c5888d9)
 - Next-word suggestions: after a space the strip offers the three words most likely to come next; tap one to write it and get the next three. Settings > Next-word suggestions turns them off (8e1d2ae)
+- Autofill in the strip (Android 11+): your password manager's suggestions show as chips above the keys, in the keyboard's colours; tap one to fill the form (61eb9d5)
 
 ### Changed
 

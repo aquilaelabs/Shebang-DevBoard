@@ -14,6 +14,8 @@ An Android keyboard (IME) for developers, written in Kotlin.
   `Ctrl` then `c` on the main keyboard send Ctrl+C.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no
   suggestions or glide; number/phone/date fields get a numeric pad; email/URL fields get `@` and `/`.
+- **Autofill in the strip** (Android 11+): the password manager's or autofill service's suggestions show as
+  chips in the strip, in the keyboard's colours; tapping one fills the form.
 - **On-device only**: the sole permission is `VIBRATE`. No network code, no analytics. What the keyboard
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
   deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
@@ -177,6 +179,16 @@ its own, locally:
   keyboard loads.
 
 ## Decisions
+
+- **Autofill chips** (R11): the strip asks the autofill service for inline suggestions, styled with the
+  bar-chip colour and strip text colours, and shows them in the bar's row (or the suggestions' in Auto mode)
+  while no word is composed, so the keyboard's height never changes. They show in password fields too: they
+  are the password manager's, drawn and filled by it, and the keyboard neither reads nor learns from them;
+  "no suggestions in password fields" is about the keyboard's own words. Each chip is a surface the service
+  draws: it keeps the size the platform gives it and goes into a row that is already visible, since a chip
+  attached while hidden gives up its surface for good. A known limit: the platform asks for the chip style
+  once per app screen, and if that happens before the keyboard's window has ever been shown in a fresh
+  keyboard process, it cannot draw the chips on that screen; the next screen has them.
 
 Ambiguities were resolved with the simplest sensible option; each is recorded here.
 
@@ -423,6 +435,8 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
       strokes; export through the file picker not exercised)*
 - [ ] Record a few hundred glides on the Pixel and run `RecordedGlidesTest`.
 - [ ] Password: no suggestions, no glide, no preview text left anywhere.
+- [x] Autofill (with a test autofill service on the emulator): chips in the strip in the keyboard's colours;
+  tapping one filled the username and password.
 - [ ] URL/email: `@` and `/` on the bottom row; no auto-capitalisation.
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
 - [ ] Multiline: Enter inserts a newline; a Search field shows "Search" and performs it.

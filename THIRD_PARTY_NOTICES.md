@@ -121,6 +121,7 @@ other artwork are original to this project.
 | AndroidX Lifecycle Runtime Compose | 2.10.0 | settings app |
 | Jetpack Compose (BOM 2026.06.01) incl. Material 3 | 1.11.x / 1.4.0 | settings app only |
 | AndroidX DataStore Preferences | 1.2.1 | settings storage |
+| AndroidX Autofill | 1.3.0 | the style autofill services read to draw their chips in the strip |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |
 
 ## Research
