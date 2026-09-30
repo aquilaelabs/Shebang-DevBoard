@@ -71,8 +71,12 @@ class SettingsActivity : ComponentActivity() {
             val scope = rememberCoroutineScope()
             var editingBar by remember { mutableStateOf(false) }
             var recording by remember { mutableStateOf(false) }
+            var personalWords by remember { mutableStateOf(false) }
             DevBoardTheme(settings.theme, settings.dynamicColor) {
-                if (recording) {
+                if (personalWords) {
+                    BackHandler { personalWords = false }
+                    PersonalWordsScreen(onBack = { personalWords = false })
+                } else if (recording) {
                     BackHandler { recording = false }
                     GlideRecorderScreen(settings = settings, onBack = { recording = false })
                 } else if (editingBar) {
@@ -90,6 +94,7 @@ class SettingsActivity : ComponentActivity() {
                         update = { f -> scope.launch { repo.update(f) } },
                         onEditBar = { editingBar = true },
                         onRecordGlides = { recording = true },
+                        onPersonalWords = { personalWords = true },
                         onBack = { finish() },
                     )
                 }
@@ -105,6 +110,7 @@ fun SettingsScreen(
     update: ((Settings) -> Settings) -> Unit,
     onEditBar: () -> Unit,
     onRecordGlides: () -> Unit,
+    onPersonalWords: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(topBar = {
@@ -141,7 +147,12 @@ fun SettingsScreen(
                 }
             }
             item {
-                SwitchRow("Fix earlier glided words", "Rewrite recent glided words when the next one makes their meaning clear", settings.reviseGlide, enabled = settings.glide) { v ->
+                SwitchRow("Preview glides", "Glided words wait in the row above the keys for 2 seconds. Tap one to glide or type it again.", settings.glidePreview, enabled = settings.glide) { v ->
+                    update { it.copy(glidePreview = v) }
+                }
+            }
+            item {
+                SwitchRow("Refine previewed words", "While glided words wait in the preview row, a later glide may change them when the phrase reads better. Words in the text field are never changed.", settings.reviseGlide, enabled = settings.glide && settings.glidePreview) { v ->
                     update { it.copy(reviseGlide = v) }
                 }
             }
@@ -152,6 +163,18 @@ fun SettingsScreen(
                     modifier = Modifier.clickable(onClick = onRecordGlides),
                 )
             }
+            item { SectionHeader("Learning") }
+            item { SwitchRow("Learn words I type", "Remember new words and the ones you use most, on this phone only", settings.learnWords) { v -> update { it.copy(learnWords = v) } } }
+            item { SwitchRow("Adapt glide to my swiping", "Learn how your glides lean off each key, most from the words you correct", settings.adaptGlide, enabled = settings.glide) { v -> update { it.copy(adaptGlide = v) } } }
+            item {
+                ListItem(
+                    headlineContent = { Text("Personal words") },
+                    supportingContent = { Text("Review or delete what was learned, or reset glide adaptation") },
+                    modifier = Modifier.clickable(onClick = onPersonalWords),
+                )
+            }
+
+            item { SectionHeader("Corrections") }
             item { SwitchRow("Autocorrect", "Fix the word when you press space", settings.autocorrect) { v -> update { it.copy(autocorrect = v) } } }
             item { SwitchRow("Auto-capitalize", "Shift at the start of sentences", settings.autoCaps) { v -> update { it.copy(autoCaps = v) } } }
             item { SwitchRow("Double-space period", "Two spaces insert \". \"", settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } } }

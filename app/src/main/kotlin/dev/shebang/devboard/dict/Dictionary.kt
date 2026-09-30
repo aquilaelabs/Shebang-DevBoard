@@ -88,6 +88,43 @@ class Dictionary(
         return start until lo
     }
 
+    /**
+     * This dictionary plus [extra] words (with their tiers) that it does not already hold, in search order.
+     * Used for learned and system user-dictionary words.
+     */
+    fun withExtraWords(extra: List<Pair<String, Int>>): Dictionary {
+        val add = extra.filter { indexOfLower(it.first.lowercase()) < 0 }
+            .distinctBy { it.first.lowercase() }
+            .sortedWith(compareBy({ it.first.lowercase() }, { it.first }))
+        if (add.isEmpty()) return this
+        val n = size + add.size
+        val w = arrayOfNulls<String>(n)
+        val l = arrayOfNulls<String>(n)
+        val t = IntArray(n)
+        var i = 0
+        var j = 0
+        for (k in 0 until n) {
+            val takeBase = j >= add.size || (i < size && run {
+                val a = add[j].first
+                val c = lower[i].compareTo(a.lowercase())
+                c < 0 || (c == 0 && words[i] <= a)
+            })
+            if (takeBase) {
+                w[k] = words[i]
+                l[k] = lower[i]
+                t[k] = tiers[i]
+                i++
+            } else {
+                w[k] = add[j].first
+                l[k] = add[j].first.lowercase()
+                t[k] = add[j].second
+                j++
+            }
+        }
+        @Suppress("UNCHECKED_CAST")
+        return Dictionary(w as Array<String>, l as Array<String>, t)
+    }
+
     /** Relative frequency weight for a tier; the ratio between tiers is what matters for ranking. */
     fun weight(index: Int): Double = tierWeight(tiers[index])
 

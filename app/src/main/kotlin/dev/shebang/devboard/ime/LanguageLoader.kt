@@ -4,46 +4,72 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import dev.shebang.devboard.dict.Dictionary
-import dev.shebang.devboard.dict.NgramModel
-import dev.shebang.devboard.glide.GlideLanguage
+import dev.shebang.devboard.dict.NgramData
+import dev.shebang.devboard.dict.PersonalSnapshot
+import dev.shebang.devboard.dict.PersonalWords
+import dev.shebang.devboard.dict.Suggester
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * Loads the word list, then the n-gram model and the glide trie, once, on a background thread. The keyboard
- * appears immediately; suggestions start when the dictionary arrives and glide when the language does.
- * Callbacks run on the loader thread.
+ * Loads the word list, then the n-gram data, the user's learned words and Android's user dictionary, and
+ * builds a [LanguageBundle], all on one background thread. The keyboard appears immediately: suggestions
+ * start when the word list arrives ([onDictionary]), glide when the bundle does ([onLanguage]). [rebuild]
+ * makes a new bundle when the personal vocabulary changed. Callbacks run on the loader thread.
  */
 class LanguageLoader(
     private val context: Context,
-    private val onDictionary: (Dictionary) -> Unit,
-    private val onGlideLanguage: (GlideLanguage) -> Unit,
+    private val personal: PersonalWords,
+    private val onDictionary: (Suggester) -> Unit,
+    private val onLanguage: (LanguageBundle) -> Unit,
 ) {
+    private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "devboard-language").apply { isDaemon = true } }
     private val started = AtomicBoolean(false)
+    private val rebuildQueued = AtomicBoolean(false)
+    private var base: Dictionary? = null
+    private var data: NgramData? = null
 
+    /** Settings that decide what the build includes, read on the loader thread. */
     @Volatile
-    var dictionary: Dictionary? = null
-        private set
-
-    @Volatile
-    var glide: GlideLanguage? = null
-        private set
+    var learnWords = true
 
     fun ensureLoading() {
         if (!started.compareAndSet(false, true)) return
-        Executors.newSingleThreadExecutor { r -> Thread(r, "devboard-language").apply { isDaemon = true } }.execute {
+        executor.execute {
             val t0 = SystemClock.elapsedRealtime()
             val dict = context.assets.open(DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }
-            dictionary = dict
+            base = dict
             val t1 = SystemClock.elapsedRealtime()
-            onDictionary(dict)
-            val lm = context.assets.open(NgramModel.ASSET).use { NgramModel.load(it, dict) }
-            val lang = GlideLanguage.build(dict, lm)
-            glide = lang
-            val t2 = SystemClock.elapsedRealtime()
-            Log.i(TAG, "dictionary ${dict.size} words in ${t1 - t0} ms; n-grams and trie (${lang.trie.nodeCount} nodes) in ${t2 - t1} ms")
-            onGlideLanguage(lang)
+            onDictionary(Suggester(dict))
+            data = context.assets.open(dev.shebang.devboard.dict.NgramModel.ASSET).use { NgramData.load(it) }
+            personal.load()
+            buildNow("load", t1)
+            Log.i(TAG, "dictionary ${dict.size} words in ${t1 - t0} ms")
         }
+    }
+
+    /** Builds a new bundle from the current learned words; coalesces requests made while one is queued. */
+    fun rebuild() {
+        if (!started.get()) return
+        if (!rebuildQueued.compareAndSet(false, true)) return
+        executor.execute {
+            rebuildQueued.set(false)
+            buildNow("rebuild", SystemClock.elapsedRealtime())
+        }
+    }
+
+    private fun buildNow(why: String, t0: Long) {
+        val b = base ?: return
+        val d = data ?: return
+        val vocab = personal.vocabularyVersion
+        val counts = personal.countsVersion
+        val snapshot = if (learnWords) personal.snapshot() else PersonalSnapshot.EMPTY
+        val system = SystemUserDictionary.read(context)
+        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts)
+        Log.i(TAG, "$why: ${bundle.dictionary.size} words (${bundle.dictionary.size - b.size} personal or system, " +
+            "${bundle.systemWords} from the system dictionary), trie ${bundle.glide.trie.nodeCount} nodes in " +
+            "${SystemClock.elapsedRealtime() - t0} ms")
+        onLanguage(bundle)
     }
 
     companion object {

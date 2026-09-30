@@ -22,10 +22,10 @@ class GlideSession(private val listener: Listener) {
         /** The decode if the finger lifted now. Main thread. */
         fun onGlidePreview(id: Int, result: GlideResult)
         /** The final decode, or null when no word fits. Main thread. */
-        fun onGlideResult(id: Int, result: GlideResult?, decodeMs: Float)
+        fun onGlideResult(id: Int, result: GlideResult?, decodeMs: Float, language: GlideLanguage)
     }
 
-    private class Start(val layout: KeyLayoutModel, val context: GlideContext, val id: Int, val phrase: Boolean)
+    private class Start(val layout: KeyLayoutModel, val context: GlideContext, val id: Int, val phrase: Boolean, val offsets: FloatArray?)
 
     /** Set once the language model has loaded; read on the decoder thread. */
     @Volatile
@@ -51,17 +51,22 @@ class GlideSession(private val listener: Listener) {
     // Decoder-thread state.
     private var decoder: StreamingGlideDecoder? = null
     private var decoderLanguage: GlideLanguage? = null
+    private var observer: StreamingGlideDecoder? = null
+    private var observerLanguage: GlideLanguage? = null
     private var activeId = -1
     private var lastPreviewMs = 0L
     private var lastPreviewKey = 0
 
     // ---- Main thread ---------------------------------------------------------------------------------
 
-    /** Starts a glide and returns its id. [phrase] when phrase gliding is on. */
-    fun start(layout: KeyLayoutModel, context: GlideContext, tMs: Long, phrase: Boolean): Int {
+    /**
+     * Starts a glide and returns its id. [phrase] when phrase gliding is on; [offsets] are the user's learned
+     * key offsets ([GlideAdaptation.offsets]) or null.
+     */
+    fun start(layout: KeyLayoutModel, context: GlideContext, tMs: Long, phrase: Boolean, offsets: FloatArray?): Int {
         val id = ++nextId
         val slot = id and 7
-        starts.set(slot, Start(layout, context, id, phrase))
+        starts.set(slot, Start(layout, context, id, phrase, offsets))
         push(START, slot.toFloat(), 0f, tMs)
         return id
     }
@@ -75,6 +80,25 @@ class GlideSession(private val listener: Listener) {
     fun end(x: Float, y: Float, tMs: Long) = push(END, x, y, tMs)
 
     fun cancel() = push(CANCEL, 0f, 0f, 0L)
+
+    /**
+     * A correction: [stroke] (from a result of [language]) was meant as [word]. Re-aligns it on the decoder
+     * thread and hands the observations to [onObserved] on the main thread (null if it cannot align).
+     */
+    fun observeCorrection(
+        language: GlideLanguage, layout: KeyLayoutModel, offsets: FloatArray?, stroke: FloatArray, word: Int,
+        onObserved: (FloatArray?) -> Unit,
+    ) {
+        worker.post {
+            // Its own decoder: re-aligning must not touch the state of a glide in progress.
+            val d = observer.takeIf { observerLanguage === language } ?: StreamingGlideDecoder(language).also {
+                observer = it
+                observerLanguage = language
+            }
+            val obs = d.observeWord(layout, offsets, stroke, word)
+            main.post { onObserved(obs) }
+        }
+    }
 
     fun release() {
         worker.removeCallbacksAndMessages(null)
@@ -116,7 +140,7 @@ class GlideSession(private val listener: Listener) {
                     decoder = it
                     decoderLanguage = lang
                 }
-                d.begin(s.layout, s.context, ts[i], s.phrase)
+                d.begin(s.layout, s.context, ts[i], s.phrase, s.offsets)
                 activeId = s.id
                 lastPreviewMs = 0L
                 lastPreviewKey = 0
@@ -143,7 +167,8 @@ class GlideSession(private val listener: Listener) {
                 val r = d.finish(trailingSpace)
                 val ms = (System.nanoTime() - t0) / 1e6f
                 activeId = -1
-                main.post { listener.onGlideResult(id, r, ms) }
+                val lang = decoderLanguage ?: return
+                main.post { listener.onGlideResult(id, r, ms, lang) }
             }
             CANCEL -> activeId = -1
         }

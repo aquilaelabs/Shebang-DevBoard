@@ -9,7 +9,18 @@ data class Suggestion(val word: String, val score: Double, val isCorrection: Boo
  * Ranks suggestions for a partially typed word: prefix completions first, then edit-distance corrections.
  * Pure function of the dictionary; safe to call from a background thread.
  */
-class Suggester(private val dict: Dictionary) {
+class Suggester(
+    private val dict: Dictionary,
+    /** How often the user has used each dictionary word (learned locally); null without personal data. */
+    private val personalCounts: IntArray? = null,
+) {
+    /** Tier weight, raised for words the user uses: 1 use x1.35, 10 uses x2.2. */
+    private fun weight(i: Int): Double {
+        val base = dict.weight(i)
+        val pc = personalCounts?.getOrNull(i) ?: 0
+        return if (pc > 0) base * (1.0 + 0.5 * kotlin.math.ln(1.0 + pc)) else base
+    }
+
 
     /**
      * @param typed the composing text (any case).
@@ -28,7 +39,7 @@ class Suggester(private val dict: Dictionary) {
             for (i in range.first until range.first + take) {
                 val extra = dict.lower[i].length - lower.length
                 val exact = extra == 0
-                val score = dict.weight(i) * (if (exact) 3.0 else 1.0 / (1.0 + 0.35 * extra))
+                val score = weight(i) * (if (exact) 3.0 else 1.0 / (1.0 + 0.35 * extra))
                 scored.add(Suggestion(matchCase(typed, dict.words[i]), score, false))
             }
             scored.sortByDescending { it.score }
@@ -48,7 +59,7 @@ class Suggester(private val dict: Dictionary) {
                 if (d < 0) continue
                 // A wrong first letter is a stronger signal of a different word.
                 val firstPenalty = if (w[0] != lower[0]) 0.5 else 1.0
-                val score = dict.weight(i) * firstPenalty / (1.0 + 1.5 * d)
+                val score = weight(i) * firstPenalty / (1.0 + 1.5 * d)
                 corrections.add(Suggestion(matchCase(typed, dict.words[i]), score, true))
             }
             corrections.sortByDescending { it.score }

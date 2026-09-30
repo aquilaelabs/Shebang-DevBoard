@@ -82,6 +82,13 @@ class GlideWord(
 class GlideResult(
     /** The new words: one dictionary index per word glided in this stroke. */
     val words: IntArray,
+    /** Per new word: its stroke, resampled, as x,y pairs in key pitches (for re-aligning after a correction). */
+    val strokes: List<FloatArray?>,
+    /**
+     * Per new word: where the stroke passed each letter relative to the key centre used, as triples
+     * (letter, du, dv) in key pitches; null when the word was not the stroke's own best reading.
+     */
+    val observations: List<FloatArray?>,
     /** The new words with their runners-up, for revision by later glides. */
     val entries: List<GlideWord>,
     /** Ranked candidates for the last new word, the chosen one first. */
@@ -117,6 +124,9 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     private val lm = lang.lm
 
     // ---- Geometry ------------------------------------------------------------------------------------
+    /** Key centres in pitches: [baseU]/[baseV] from the geometry, [keyU]/[keyV] moved by the user's offsets. */
+    private val baseU = FloatArray(26)
+    private val baseV = FloatArray(26)
     private val keyU = FloatArray(26)
     private val keyV = FloatArray(26)
     private val hasKey = BooleanArray(26)
@@ -181,6 +191,9 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     private val segWords = Array(maxSeg) { IntArray(64) }
     private val segCost = Array(maxSeg) { FloatArray(64) }
     private val segCount = IntArray(maxSeg)
+    private val segStroke = arrayOfNulls<FloatArray>(maxSeg)
+    private val segObs = arrayOfNulls<FloatArray>(maxSeg)
+    private val segObsWord = IntArray(maxSeg)
     private var segments = 0
     /** The first [historyCount] segments are earlier glides, [historyWord] as they stand in the text. */
     private var historyCount = 0
@@ -217,8 +230,10 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         if (pitchY <= 0f) pitchY = layout.keyHeight
         for (c in 0..25) {
             hasKey[c] = !layout.centerX[c].isNaN()
-            keyU[c] = if (hasKey[c]) layout.centerX[c] / pitchX else 0f
-            keyV[c] = if (hasKey[c]) layout.centerY[c] / pitchY else 0f
+            baseU[c] = if (hasKey[c]) layout.centerX[c] / pitchX else 0f
+            baseV[c] = if (hasKey[c]) layout.centerY[c] / pitchY else 0f
+            keyU[c] = baseU[c]
+            keyV[c] = baseV[c]
         }
         subCount[LexiconTrie.ROOT] = 1
         for (node in 1 until trie.nodeCount) {
@@ -241,8 +256,9 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     }
 
     /** Starts a glide. [startMs] is the touch-down time; [phrase] when phrase gliding is on. */
-    fun begin(layout: KeyLayoutModel, context: GlideContext, startMs: Long, phrase: Boolean = false) {
+    fun begin(layout: KeyLayoutModel, context: GlideContext, startMs: Long, phrase: Boolean = false, offsets: FloatArray? = null) {
         setGeometry(layout)
+        applyOffsets(offsets)
         this.startMs = startMs
         this.phrase = phrase
         leadIn = false
@@ -279,10 +295,20 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
                 }
             }
             segCount[s] = k
+            segStroke[s] = null
+            segObs[s] = null
             historyWord[historyCount++] = e.word
             segments++
         }
         resetSegment()
+    }
+
+    /** Moves key centres by the user's offsets (26 horizontal then 26 vertical, in pitches), or back to base. */
+    private fun applyOffsets(offsets: FloatArray?) {
+        for (c in 0..25) {
+            keyU[c] = baseU[c] + (offsets?.getOrNull(c) ?: 0f)
+            keyV[c] = baseV[c] + (offsets?.getOrNull(26 + c) ?: 0f)
+        }
     }
 
     private fun resetSegment() {
@@ -721,6 +747,10 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
             segCost[s][c] = candCost[c]
         }
         segCount[s] = candCount
+        segStroke[s] = FloatArray(2 * n) { if (it % 2 == 0) pu[it / 2] else pv[it / 2] }
+        // Where the stroke passed each letter of its best reading, for adaptation (not after coasting).
+        segObs[s] = if (coasted) null else observe(candNode[0])
+        segObsWord[s] = candWord[0]
         return true
     }
 
@@ -728,14 +758,15 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
      * Exact alignment cost of the current segment's points against the word ending at [node], with the same
      * approach ([leadIn]) and coasting ([coasted]) allowances as the beam.
      */
-    private fun align(node: Int, coasted: Boolean): Float {
+    /** Lays out the states of the word ending at [node] in path order; returns how many. */
+    private fun buildStates(node: Int): Int {
         var depth = 0
         var x = node
         while (x != LexiconTrie.ROOT && depth < pathNodes.size) {
             pathNodes[depth++] = x
             x = trie.parent[x]
         }
-        // States in path order: first letter's vertex, then each later segment's chain.
+        // First letter's vertex, then each later segment's chain.
         var s = 0
         for (d in depth - 1 downTo 0) {
             val nd = pathNodes[d]
@@ -748,7 +779,11 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
                 s++
             }
         }
-        val states = s
+        return s
+    }
+
+    private fun align(node: Int, coasted: Boolean): Float {
+        val states = buildStates(node)
         if (states == 0) return Float.MAX_VALUE
         val inf = Float.MAX_VALUE / 4
         var prev = dtwA
@@ -796,6 +831,127 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
             missing++
         }
         return result
+    }
+
+    // ---- Where the stroke passed each letter (adaptation) ----------------------------------------------
+
+    private val backMoves = ByteArray(1 shl 18)
+    private val obsSumU = FloatArray(4096)
+    private val obsSumV = FloatArray(4096)
+    private val obsCount = IntArray(4096)
+
+    /**
+     * Aligns the current points with the word ending at [node] and returns, per letter, the mean offset of the
+     * points aligned to its key from the key centre used: triples (letter, du, dv). Null if it cannot align.
+     */
+    private fun observe(node: Int): FloatArray? {
+        val states = buildStates(node)
+        if (states == 0 || n < 2 || n.toLong() * states > backMoves.size) return null
+        val inf = Float.MAX_VALUE / 4
+        var prev = dtwA
+        var next = dtwB
+        for (k in 0 until states) prev[k] = inf
+        run {
+            val c = trie.letter[stateNode[0]].toInt()
+            val du = pu[0] - keyU[c]
+            val dv = pv[0] - keyV[c]
+            prev[0] = (du * du + dv * dv) * invTwoSigS2
+        }
+        for (i in 1 until n) {
+            val ev = vertexEvidence(i)
+            val mt = midTurnPenalty(i)
+            for (k in 0 until states) {
+                var best = prev[k] + params.stayCost
+                var move = 0
+                if (k >= 1 && prev[k - 1] < best) {
+                    best = prev[k - 1]
+                    move = 1
+                }
+                if (k >= 2 && !stateVertex[k - 1] && prev[k - 2] + params.skipCost < best) {
+                    best = prev[k - 2] + params.skipCost
+                    move = 2
+                }
+                if (k == 0 && leadIn && i <= params.leadInLimit && params.leadInCost * i < best) {
+                    best = params.leadInCost * i
+                    move = 3
+                }
+                backMoves[i * states + k] = move.toByte()
+                next[k] = if (best >= inf) inf else best + emission(stateNode[k], stateSub[k], pu[i], pv[i], ev, mt)
+            }
+            val t = prev
+            prev = next
+            next = t
+        }
+        if (prev[states - 1] >= inf / 2) return null
+        for (k in 0 until states) {
+            obsSumU[k] = 0f
+            obsSumV[k] = 0f
+            obsCount[k] = 0
+        }
+        var k = states - 1
+        var i = n - 1
+        while (i >= 0) {
+            if (stateVertex[k] || k == 0) {
+                obsSumU[k] += pu[i]
+                obsSumV[k] += pv[i]
+                obsCount[k]++
+            }
+            if (i == 0) break
+            when (backMoves[i * states + k].toInt()) {
+                1 -> k -= 1
+                2 -> k -= 2
+                3 -> break
+            }
+            i--
+        }
+        var letters = 0
+        for (s in 0 until states) if ((stateVertex[s] || s == 0) && obsCount[s] > 0) letters++
+        val out = FloatArray(3 * letters)
+        var o = 0
+        for (s in 0 until states) {
+            if (!(stateVertex[s] || s == 0) || obsCount[s] == 0) continue
+            val c = trie.letter[stateNode[s]].toInt()
+            out[o++] = c.toFloat()
+            out[o++] = obsSumU[s] / obsCount[s] - keyU[c]
+            out[o++] = obsSumV[s] / obsCount[s] - keyV[c]
+        }
+        return out
+    }
+
+    /**
+     * Re-aligns an earlier [stroke] (from [GlideResult.strokes]) with [word], for learning from a correction:
+     * the stroke was meant as [word]. Uses the geometry and offsets given. Returns observations or null.
+     */
+    fun observeWord(layout: KeyLayoutModel, offsets: FloatArray?, stroke: FloatArray, word: Int): FloatArray? {
+        setGeometry(layout)
+        applyOffsets(offsets)
+        val seq = IntArray(64)
+        val len = LexiconTrie.keySequence(lang.dictionary.lower[word], seq)
+        if (len < 2) return null
+        var node = LexiconTrie.ROOT
+        for (q in 0 until len) {
+            var next = -1
+            for (e in trie.childStart[node] until trie.childEnd[node]) {
+                if (trie.letter[trie.children[e]].toInt() == seq[q]) next = trie.children[e]
+            }
+            if (next < 0) return null
+            node = next
+        }
+        val count = minOf(stroke.size / 2, cap)
+        for (i in 0 until count) {
+            pu[i] = stroke[2 * i]
+            pv[i] = stroke[2 * i + 1]
+            pz[i] = 0f
+            pturn[i] = 0f
+        }
+        val saved = n
+        val savedLeadIn = leadIn
+        n = count
+        leadIn = false
+        val out = observe(node)
+        n = saved
+        leadIn = savedLeadIn
+        return out
     }
 
     // ---- Joint decoding across words -------------------------------------------------------------------
@@ -894,6 +1050,11 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         val history = IntArray(historyCount) { segWords[it][path[it]] }
         val newCount = count - historyCount
         val words = IntArray(newCount) { segWords[historyCount + it][path[historyCount + it]] }
+        val strokes = List(newCount) { segStroke[historyCount + it] }
+        val observations = List(newCount) { i ->
+            val s = historyCount + i
+            if (segObsWord[s] == words[i]) segObs[s] else null
+        }
         val entries = List(newCount) { i ->
             val s = historyCount + i
             GlideWord(words[i], segWords[s].copyOf(segCount[s]), segCost[s].copyOf(segCount[s]))
@@ -904,7 +1065,7 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         val k = segCount[last]
         val order = (0 until k).sortedBy { segCost[last][it] + params.lmWeight * lm.cost(segWords[last][it], lastCtx) }
         val alternatives = IntArray(minOf(5, k)) { segWords[last][order[it]] }
-        return GlideResult(words, entries, alternatives, history, firstRevised, totalPoints)
+        return GlideResult(words, strokes, observations, entries, alternatives, history, firstRevised, totalPoints)
     }
 
     /** Ends the current word and starts the next one in the same stroke (phrase gliding). */

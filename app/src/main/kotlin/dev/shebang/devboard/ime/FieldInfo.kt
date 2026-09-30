@@ -17,12 +17,16 @@ data class FieldInfo(
     /** Enter inserts a newline rather than performing the action. */
     val enterIsNewline: Boolean,
     val inputType: Int,
+    /** The app asked for no personalised learning (IME_FLAG_NO_PERSONALIZED_LEARNING, e.g. incognito tabs). */
+    val noPersonalizedLearning: Boolean = false,
 ) {
     val isNumeric: Boolean get() = variant == FieldVariant.NUMBER || variant == FieldVariant.PHONE || variant == FieldVariant.DATE
 
     /** Composing text, suggestions and autocorrect. */
     val allowsComposing: Boolean get() = !isTerminal && !isPassword && !noSuggestions && !isNumeric
     val allowsGlide: Boolean get() = allowsComposing
+    /** Words typed here may be learned: ordinary text fields that did not ask for no learning. */
+    val allowsLearning: Boolean get() = allowsComposing && variant == FieldVariant.PLAIN && !noPersonalizedLearning
     val allowsAutoCaps: Boolean get() = !isTerminal && !isPassword && !isNumeric
     /** Enter should be sent as a KeyEvent (terminals, and fields without an action). */
     val enterIsKeyEvent: Boolean
@@ -81,6 +85,7 @@ data class FieldInfo(
                 editorAction = action,
                 enterIsNewline = enterIsNewline,
                 inputType = inputType,
+                noPersonalizedLearning = (imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0,
             )
         }
     }

@@ -30,6 +30,12 @@ data class Settings(
     val phraseGlide: Boolean = false,
     /** Let a new glide rewrite the recent glided words when it makes another reading more likely. */
     val reviseGlide: Boolean = true,
+    /** Glided words wait in a row above the keys for a moment, where they can be tapped and corrected. */
+    val glidePreview: Boolean = true,
+    /** Learn words typed or glided in ordinary text fields, on this device only. */
+    val learnWords: Boolean = true,
+    /** Adapt glide to where this user's strokes actually pass the keys. */
+    val adaptGlide: Boolean = true,
     val autocorrect: Boolean = false,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,
