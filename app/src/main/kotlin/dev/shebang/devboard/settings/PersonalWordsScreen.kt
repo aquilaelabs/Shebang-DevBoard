@@ -3,6 +3,7 @@ package dev.shebang.devboard.settings
 import android.content.ActivityNotFoundException
 import android.content.Intent
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -57,6 +58,9 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     var corrections by remember { mutableIntStateOf(0) }
     var confirmClear by remember { mutableStateOf(false) }
     var confirmReset by remember { mutableStateOf(false) }
+    var restoreDays by remember { mutableStateOf<List<Int>>(emptyList()) }
+    var choosingDay by remember { mutableStateOf(false) }
+    var confirmDay by remember { mutableStateOf<Int?>(null) }
 
     fun refresh() {
         scope.launch {
@@ -65,6 +69,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 adaptation.load()
                 Triple(personal.list(), adaptation.glides, adaptation.corrections)
             }
+            restoreDays = withContext(Dispatchers.IO) { (personal.restoreDays() + adaptation.restoreDays()).distinct().sortedDescending() }
             words = w
             glides = g
             corrections = c
@@ -108,6 +113,40 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     },
                     modifier = Modifier.clickable { confirmReset = true },
                 )
+            }
+            item {
+                val today = (System.currentTimeMillis() / 86_400_000L).toInt()
+                ListItem(
+                    headlineContent = { Text("Undo recent learning") },
+                    supportingContent = {
+                        Text(
+                            if (restoreDays.isEmpty()) "Nothing to undo yet. The keyboard keeps where things stood at the start of each of the last ${PersonalWords.KEEP_DAYS} days."
+                            else "Go back to how learned words and swipe adaptation stood at the start of a recent day, if a sloppy day taught the keyboard the wrong things."
+                        )
+                    },
+                    modifier = Modifier.clickable(enabled = restoreDays.isNotEmpty()) { choosingDay = true },
+                )
+                if (choosingDay) {
+                    AlertDialog(
+                        onDismissRequest = { choosingDay = false },
+                        title = { Text("Go back to the start of") },
+                        text = {
+                            Column {
+                                for (d in restoreDays) {
+                                    ListItem(
+                                        headlineContent = { Text(dayLabel(d, today)) },
+                                        modifier = Modifier.clickable {
+                                            choosingDay = false
+                                            confirmDay = d
+                                        },
+                                    )
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = { TextButton(onClick = { choosingDay = false }) { Text("Cancel") } },
+                    )
+                }
             }
             item {
                 ListItem(
@@ -163,6 +202,24 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
         )
     }
+    confirmDay?.let { day ->
+        val today = (System.currentTimeMillis() / 86_400_000L).toInt()
+        AlertDialog(
+            onDismissRequest = { confirmDay = null },
+            title = { Text("Go back to ${dayLabel(day, today).replaceFirstChar { it.lowercase() }}?") },
+            text = { Text("Words and swipe habits learned since then are forgotten. Words you deleted stay deleted.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDay = null
+                    change {
+                        personal.restore(day)
+                        adaptation.restore(day)
+                    }
+                }) { Text("Go back") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDay = null }) { Text("Cancel") } },
+        )
+    }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
@@ -175,3 +232,12 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
 }
 
 private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
+
+/** "Today", "Yesterday", or the weekday and date of a day (days since 1970, UTC). */
+private fun dayLabel(day: Int, today: Int): String = when (day) {
+    today -> "Today"
+    today - 1 -> "Yesterday"
+    else -> java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.getDefault())
+        .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
+        .format(java.util.Date(day * 86_400_000L))
+}

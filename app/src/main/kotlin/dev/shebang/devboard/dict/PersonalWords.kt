@@ -36,7 +36,9 @@ class PersonalSnapshot(
  *
  * A word missing from the dictionary becomes a word after [NEW_WORD_THRESHOLD] uses, so one typo is not
  * learned. The vocabulary is bounded: past [MAX_WORDS] words or [MAX_PAIRS] pairs, the least used (with
- * older use counting less) are forgotten. Thread-safe.
+ * older use counting less) are forgotten. Before the first word learned each day, the vocabulary as it stood
+ * is kept beside the file for [KEEP_DAYS] days, so a bad day can be undone with [restore]; deleting a word
+ * deletes it from those copies too. Thread-safe.
  */
 class PersonalWords(private val file: File?, private val today: () -> Int = { (System.currentTimeMillis() / 86_400_000L).toInt() }) {
 
@@ -68,16 +70,45 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     var countsVersion = 0
         private set
 
+    /** The day of the copy kept before today's learning, once it is taken. */
+    private var snapshotDay = Int.MIN_VALUE
+
     @Synchronized
     fun load() {
         if (loaded) return
         loaded = true
         val f = file ?: return
         if (!f.exists()) return
-        val stored = runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull() ?: return
+        val stored = read(f) ?: return
+        apply(stored)
+    }
+
+    private fun read(f: File): Stored? = runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull()
+
+    private fun apply(stored: Stored) {
+        words.clear()
+        pairs.clear()
         for (s in stored.words) words[s.w] = Entry(s.d, s.c, s.t, s.k)
         for (s in stored.pairs) pairs[PersonalSnapshot.pairKey(s.p, s.w)] = PairEntry(s.c, s.t)
         total = stored.total
+    }
+
+    private fun stored() = Stored(
+        words = words.map { (w, e) -> StoredWord(w, e.display, e.count, e.lastDay, e.known) },
+        pairs = pairs.map { (k, e) ->
+            val cut = k.indexOf('\u0001')
+            StoredPair(k.substring(0, cut), k.substring(cut + 1), e.count, e.lastDay)
+        },
+        total = total,
+    )
+
+    private fun write(f: File, stored: Stored) {
+        val tmp = File(f.parentFile, f.name + ".tmp")
+        tmp.writeText(json.encodeToString(Stored.serializer(), stored))
+        if (!tmp.renameTo(f)) {
+            f.delete()
+            tmp.renameTo(f)
+        }
     }
 
     /** Writes the vocabulary if it changed. Call off the main thread. */
@@ -85,21 +116,71 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     fun save() {
         val f = file ?: return
         if (!dirty) return
-        val stored = Stored(
-            words = words.map { (w, e) -> StoredWord(w, e.display, e.count, e.lastDay, e.known) },
-            pairs = pairs.map { (k, e) ->
-                val cut = k.indexOf('\u0001')
-                StoredPair(k.substring(0, cut), k.substring(cut + 1), e.count, e.lastDay)
-            },
-            total = total,
-        )
-        val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), stored))
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            tmp.renameTo(f)
-        }
+        write(f, stored())
         dirty = false
+    }
+
+    // ---- Going back to an earlier day ----------------------------------------------------------------
+
+    private fun snapshotFile(day: Int): File? = file?.let { File(it.parentFile, it.name.removeSuffix(".json") + ".day-" + day + ".json") }
+
+    private fun snapshotDays(): List<Int> {
+        val f = file ?: return emptyList()
+        val prefix = f.name.removeSuffix(".json") + ".day-"
+        return f.parentFile?.listFiles()?.mapNotNull { g ->
+            if (g.name.startsWith(prefix) && g.name.endsWith(".json")) g.name.removePrefix(prefix).removeSuffix(".json").toIntOrNull() else null
+        }.orEmpty()
+    }
+
+    /** Before the first word learned on [day]: keep the vocabulary as it stood, and forget copies past [KEEP_DAYS]. */
+    private fun snapshotBefore(day: Int) {
+        if (day == snapshotDay) return
+        snapshotDay = day
+        val snap = snapshotFile(day) ?: return
+        if (!snap.exists()) runCatching { write(snap, stored()) }
+        for (d in snapshotDays()) if (d <= day - KEEP_DAYS) snapshotFile(d)?.delete()
+    }
+
+    /** Days (days since 1970, UTC) whose starting vocabulary can be gone back to, newest first. */
+    @Synchronized
+    fun restoreDays(): List<Int> = snapshotDays().sortedDescending()
+
+    /**
+     * Goes back to the vocabulary as it stood at the start of [day] (or the nearest kept day before it;
+     * empty if it predates every copy). Copies after it are dropped.
+     */
+    @Synchronized
+    fun restore(day: Int) {
+        load()
+        val d = snapshotDays().filter { it <= day }.maxOrNull()
+        val stored = d?.let { snapshotFile(it) }?.let { read(it) }
+        if (stored != null) apply(stored) else apply(Stored())
+        for (later in snapshotDays()) if (d == null || later > d) snapshotFile(later)?.delete()
+        snapshotDay = Int.MIN_VALUE
+        dirty = true
+        vocabularyVersion++
+        countsVersion++
+    }
+
+    /** Removes [lower] from every kept copy, so going back never brings a deleted word back. */
+    private fun scrubSnapshots(lower: String?) {
+        for (d in snapshotDays()) {
+            val f = snapshotFile(d) ?: continue
+            if (lower == null) {
+                f.delete()
+                continue
+            }
+            val st = read(f) ?: continue
+            if (st.words.none { it.w == lower }) continue
+            val removed = st.words.first { it.w == lower }.c
+            runCatching {
+                write(f, st.copy(
+                    words = st.words.filter { it.w != lower },
+                    pairs = st.pairs.filter { it.p != lower && it.w != lower },
+                    total = maxOf(0, st.total - removed),
+                ))
+            }
+        }
     }
 
     /**
@@ -113,6 +194,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         load()
         val lower = word.lowercase()
         val day = today()
+        snapshotBefore(day)
         val e = words[lower]
         if (e == null) {
             val known = inDictionary(lower)
@@ -150,6 +232,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         val e = words.remove(lower) ?: return
         total = maxOf(0, total - e.count)
         pairs.keys.removeAll { it.startsWith(lower + "\u0001") || it.endsWith("\u0001" + lower) }
+        scrubSnapshots(lower)
         dirty = true
         vocabularyVersion++
         countsVersion++
@@ -161,6 +244,9 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         words.clear()
         pairs.clear()
         total = 0
+        // Deleting everything deletes the kept copies too.
+        scrubSnapshots(null)
+        snapshotDay = Int.MIN_VALUE
         dirty = true
         vocabularyVersion++
         countsVersion++
@@ -200,6 +286,8 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
 
     companion object {
         const val NEW_WORD_THRESHOLD = 2
+        /** Days of starting vocabularies kept for going back. */
+        const val KEEP_DAYS = 14
         const val MAX_WORDS = 5000
         const val MAX_PAIRS = 20000
         private const val HALF_LIFE_DAYS = 60.0

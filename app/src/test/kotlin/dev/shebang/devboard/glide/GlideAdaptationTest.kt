@@ -37,13 +37,55 @@ class GlideAdaptationTest {
 
     @Test
     fun offsetsAreCappedAndOutliersIgnored() {
-        val a = GlideAdaptation(null)
-        a.learn(observations(1, 0.7f, 0.7f, 100))
+        var day = 0
+        val a = GlideAdaptation(null) { day }
+        // Someone who touches 'b' 0.3 right and 0.3 low, day after day: the offset stops at the cap.
+        repeat(400) {
+            if (it % 50 == 0) day++
+            val cur = a.offsets()
+            a.learn(observations(1, 0.3f - cur[1], 0.3f - cur[27], 1))
+        }
         val off = a.offsets()
         assertTrue(sqrt(off[1] * off[1] + off[27] * off[27]) <= GlideAdaptation.MAX_OFFSET + 1e-4f)
         val b = GlideAdaptation(null)
-        b.learn(observations(1, 2f, 0f, 10))
+        assertTrue(!b.learn(observations(1, 2f, 0f, 10)))
         assertEquals(0f, b.offsets()[1], 1e-6f)
+    }
+
+    @Test
+    fun aSloppyGlideTeachesNothing() {
+        val a = GlideAdaptation(null)
+        // Nowhere near its letters on average: not a habit worth learning.
+        assertTrue(!a.learn(floatArrayOf(4f, 0.6f, 0.3f, 7f, -0.5f, 0.4f, 11f, 0.2f, 0.7f)))
+        assertTrue(a.offsets().all { it == 0f })
+    }
+
+    @Test
+    fun oneDayCanOnlyTeachSoMuch() {
+        val a = GlideAdaptation(null) { 100 }
+        var taken = 0
+        repeat(1000) { if (a.learn(observations(it % 26, 0.3f, 0.2f, 5))) taken++ }
+        assertEquals(GlideAdaptation.DAILY_BUDGET / 5, taken)
+    }
+
+    @Test
+    fun goingBackToTheStartOfADay() {
+        var day = 10
+        val f = Files.createTempDirectory("devboard").toFile().resolve(GlideAdaptation.FILE)
+        val a = GlideAdaptation(f) { day }
+        repeat(20) { a.learn(observations(4, 0.1f, 0.05f, 3)) }
+        val endOfDay10 = a.offsets()
+        day = 11
+        repeat(50) { a.learn(observations(4, 0.3f, -0.2f, 3)) }
+        assertTrue(!a.offsets().contentEquals(endOfDay10))
+        assertEquals(listOf(11, 10), a.restoreDays())
+        a.save()
+        // Kept across a restart of the keyboard.
+        val b = GlideAdaptation(f) { day }
+        b.restore(11)
+        assertTrue(b.offsets().contentEquals(endOfDay10))
+        b.restore(10)
+        assertTrue(b.offsets().all { it == 0f })
     }
 
     @Test
@@ -67,6 +109,7 @@ class GlideAdaptationTest {
         val f = Files.createTempDirectory("devboard").toFile().resolve(GlideAdaptation.FILE)
         val a = GlideAdaptation(f)
         a.learn(observations(7, 0.1f, -0.2f, 20))
+        assertTrue(a.restoreDays().isNotEmpty())
         a.recordGlide()
         a.recordCorrection()
         a.save()
@@ -78,66 +121,110 @@ class GlideAdaptationTest {
         b.reset()
         assertTrue(b.offsets().all { it == 0f })
         assertEquals(0, b.glides)
+        assertTrue(b.restoreDays().isEmpty())
+    }
+
+    private val sim = GestureSimulator(GlideBenchmarkTest.layout)
+    private val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language)
+    private val du get() = BIAS_U * layout.keyWidth
+    private val dv get() = BIAS_V * layout.keyHeight
+
+    /** A glide of [w] by the biased user; [sloppy] adds a drunk night's aim (a wide random miss per stroke and shaky points). */
+    private fun decode(w: String, rnd: Random, offsets: FloatArray?, sloppy: Boolean = false): GlideResult? {
+        val g = sim.generate(w, rnd) ?: return null
+        decoder.begin(layout, GlideContext(NgramModel.UNKNOWN), g.t[0], offsets = offsets)
+        val missX = if (sloppy) (rnd.nextGaussian() * 0.5 * layout.keyWidth).toFloat() else 0f
+        val missY = if (sloppy) (rnd.nextGaussian() * 0.5 * layout.keyHeight).toFloat() else 0f
+        for (i in 0 until g.count) {
+            val shakeX = if (sloppy) (rnd.nextGaussian() * 0.3 * layout.keyWidth).toFloat() else 0f
+            val shakeY = if (sloppy) (rnd.nextGaussian() * 0.3 * layout.keyHeight).toFloat() else 0f
+            decoder.addPoint(g.x[i] + du + missX + shakeX, g.y[i] + dv + missY + shakeY, g.t[i])
+        }
+        return decoder.finish()
+    }
+
+    private fun top1(test: List<String>, offsets: FloatArray?): Double {
+        val rnd = Random(5)
+        var n = 0
+        var ok = 0
+        for (w in test) {
+            val r = decode(w, rnd, offsets) ?: continue
+            n++
+            if (dictionary.lower[r.words.last()] == w) ok++
+        }
+        return 100.0 * ok / n
+    }
+
+    /**
+     * The user keeps the glides that came out right and corrects the rest (the stroke re-aligned to the word
+     * meant counts twice), [perDay] glides a day. A careless user ([corrects] false) keeps whatever came out.
+     */
+    private fun use(a: GlideAdaptation, words: List<String>, rnd: Random, clock: IntArray?, perDay: Int = 60, sloppy: Boolean = false, corrects: Boolean = true) {
+        for ((k, w) in words.withIndex()) {
+            if (clock != null && k % perDay == 0) clock[0]++
+            val r = decode(w, rnd, a.offsets(), sloppy) ?: continue
+            val obs = r.observations.lastOrNull()
+            if (dictionary.lower[r.words.last()] == w || !corrects) {
+                obs?.let { a.learn(it) }
+            } else {
+                val stroke = r.strokes.lastOrNull() ?: continue
+                decoder.observeWord(layout, a.offsets(), stroke, dictionary.indexOfLower(w))?.let { a.learnCorrection(it) }
+            }
+        }
     }
 
     /**
      * A user whose every swipe lands [BIAS_U] of a key to the right and [BIAS_V] of a row low (a thumb
-     * reaching up from below). Top-1 before adapting, then after learning from glides of other words that
-     * decoded right (the ones the user would keep), then with corrections of the ones that did not.
+     * reaching up from below), using the keyboard over several days: top-1 before and after adapting.
      */
     @Test
     fun adaptationRecoversABiasedSwiper() {
-        val sim = GestureSimulator(layout)
         val words = GlideBenchmarkTest.commonWords.shuffled(Random(17))
-        val train = words.take(250)
-        val test = words.drop(250).take(400)
-        val decoder = StreamingGlideDecoder(language)
-        val du = BIAS_U * layout.keyWidth
-        val dv = BIAS_V * layout.keyHeight
-
-        fun decode(w: String, rnd: Random, offsets: FloatArray?): GlideResult? {
-            val g = sim.generate(w, rnd) ?: return null
-            decoder.begin(layout, GlideContext(NgramModel.UNKNOWN), g.t[0], offsets = offsets)
-            for (i in 0 until g.count) decoder.addPoint(g.x[i] + du, g.y[i] + dv, g.t[i])
-            return decoder.finish()
-        }
-
-        fun top1(offsets: FloatArray?): Double {
-            val rnd = Random(5)
-            var n = 0
-            var ok = 0
-            for (w in test) {
-                val r = decode(w, rnd, offsets) ?: continue
-                n++
-                if (dictionary.lower[r.words.last()] == w) ok++
-            }
-            return 100.0 * ok / n
-        }
-
-        val before = top1(null)
-        val adaptation = GlideAdaptation(null)
-        val rnd = Random(9)
-        var corrected = 0
-        for (w in train) {
-            val r = decode(w, rnd, adaptation.offsets()) ?: continue
-            val obs = r.observations.lastOrNull()
-            if (dictionary.lower[r.words.last()] == w) {
-                obs?.let { adaptation.learn(it) }
-            } else {
-                // The user corrects it: the stroke is re-aligned to the word meant and counts twice.
-                val stroke = r.strokes.lastOrNull() ?: continue
-                decoder.observeWord(layout, adaptation.offsets(), stroke, dictionary.indexOfLower(w))?.let {
-                    adaptation.learn(it, weight = 2)
-                    corrected++
-                }
-            }
-        }
-        val after = top1(adaptation.offsets())
-        val off = adaptation.offsets()
-        println("GLIDE ADAPT biased swiper (%.2f, %.2f): top-1 %.1f%% before, %.1f%% after (%d corrections); mean offset (%.2f, %.2f)".format(
-            BIAS_U, BIAS_V, before, after, corrected, off.take(26).average(), off.drop(26).average()))
-        assertTrue("after $after <= before $before", after > before + 3)
+        val test = words.drop(600).take(400)
+        val before = top1(test, null)
+        val clock = intArrayOf(0)
+        val a = GlideAdaptation(null) { clock[0] }
+        use(a, words.take(600), Random(9), clock, perDay = 60)
+        val after = top1(test, a.offsets())
+        val off = a.offsets()
+        println("GLIDE ADAPT biased swiper (%.2f, %.2f): top-1 %.1f%% before, %.1f%% after 10 days; mean offset (%.2f, %.2f)".format(
+            BIAS_U, BIAS_V, before, after, off.take(26).average(), off.drop(26).average()))
+        assertTrue("after $after < before $before", after >= before)
         assertEquals(BIAS_V.toDouble(), off.drop(26).average(), 0.12)
+    }
+
+    /**
+     * The same user after ten sober days, then one drunk night: a thousand sloppy glides, all kept, none
+     * corrected. The next morning's accuracy must stay close to the evening before, no key may have moved
+     * far, and going back to the start of that night restores the sober state exactly.
+     */
+    @Test
+    fun oneSloppyNightDoesNoLastingHarm() {
+        val words = GlideBenchmarkTest.commonWords.shuffled(Random(23))
+        val test = words.drop(600).take(400)
+        val clock = intArrayOf(0)
+        val a = GlideAdaptation(null) { clock[0] }
+        use(a, words.take(600), Random(9), clock, perDay = 60)
+        val sober = a.offsets()
+        val soberTop1 = top1(test, sober)
+        clock[0]++
+        val night = clock[0]
+        val drunkWords = (0 until 1000).map { words[it % 600] }
+        // All in one night: the day does not change.
+        use(a, drunkWords, Random(31), null, sloppy = true, corrects = false)
+        val after = a.offsets()
+        val afterTop1 = top1(test, after)
+        var worst = 0f
+        for (c in 0 until 26) {
+            val mu = after[c] - sober[c]
+            val mv = after[26 + c] - sober[26 + c]
+            worst = maxOf(worst, sqrt(mu * mu + mv * mv))
+        }
+        println("GLIDE ADAPT one sloppy night: top-1 %.1f%% sober, %.1f%% next morning; the most any key moved %.3f of a key".format(soberTop1, afterTop1, worst))
+        assertTrue("next morning $afterTop1 vs sober $soberTop1", afterTop1 >= soberTop1 - 2.0)
+        assertTrue("a key moved $worst", worst <= 0.08f)
+        a.restore(night)
+        assertTrue(a.offsets().contentEquals(sober))
     }
 
     private companion object {

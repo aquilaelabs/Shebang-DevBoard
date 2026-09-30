@@ -95,6 +95,43 @@ class PersonalLearningTest {
     }
 
     @Test
+    fun aBadDayCanBeUndone() {
+        var day = 20_000
+        val f = tempFile()
+        val p = PersonalWords(f) { day }
+        repeat(2) { p.learn("kubectl", null, false, inDictionary) }
+        p.save()
+        day++
+        // A sloppy night: the same typo three times, and the real word counted wrong.
+        repeat(3) { p.learn("teh", null, false, inDictionary) }
+        p.learn("kubectl", "teh", false, inDictionary)
+        assertTrue(p.list().any { it.lower == "teh" && it.known })
+        assertEquals(listOf(day, day - 1), p.restoreDays())
+        val v = p.vocabularyVersion
+        p.restore(day)
+        assertEquals(listOf("kubectl"), p.list().map { it.lower })
+        assertEquals(2, p.list().single().count)
+        assertTrue(p.vocabularyVersion > v)
+        // Days after the one gone back to are gone; the day itself stays.
+        assertEquals(listOf(day, day - 1), p.restoreDays())
+    }
+
+    @Test
+    fun deletingAWordDeletesItFromTheKeptDaysToo() {
+        var day = 20_000
+        val f = tempFile()
+        val p = PersonalWords(f) { day }
+        repeat(2) { p.learn("zorblax", null, false, inDictionary) }
+        day++
+        p.learn("pods", null, false, inDictionary)
+        p.delete("zorblax")
+        p.restore(day)
+        assertTrue(p.list().none { it.lower == "zorblax" })
+        p.clear()
+        assertTrue(p.restoreDays().isEmpty())
+    }
+
+    @Test
     fun evictsTheLeastUsedOnceFull() {
         var day = 0
         val p = PersonalWords(null) { day }
