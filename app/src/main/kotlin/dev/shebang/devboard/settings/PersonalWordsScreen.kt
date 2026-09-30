@@ -94,8 +94,8 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             item {
                 Text(
                     "Learned on this phone from what you type and glide, and never sent anywhere. Nothing is learned in " +
-                        "password, number, terminal or no-suggestion fields, or where an app asks for no learning. A new " +
-                        "word is glidable after you use it twice.",
+                        "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
+                        "no learning. A new word is glidable after you use it twice.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
@@ -104,7 +104,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 ListItem(
                     headlineContent = { Text("Reset glide adaptation") },
                     supportingContent = {
-                        Text("Learned from $glides glides and $corrections corrections. Resetting forgets how your swipes lean off each key.")
+                        Text("Learned from ${plural(glides, "glide")} and ${plural(corrections, "correction")}. Resetting forgets how your swipes lean off each key.")
                     },
                     modifier = Modifier.clickable { confirmReset = true },
                 )
@@ -131,7 +131,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     item {
                         ListItem(
                             headlineContent = { Text("Delete all learned words") },
-                            supportingContent = { Text("${list.size} words") },
+                            supportingContent = { Text(plural(list.size, "word")) },
                             modifier = Modifier.clickable { confirmClear = true },
                         )
                     }
@@ -139,7 +139,8 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                         ListItem(
                             headlineContent = { Text(w.display) },
                             supportingContent = {
-                                Text(if (w.known) "Used ${w.count} times" else "Used ${w.count} times · new word, glidable after 2")
+                                val used = if (w.count == 1) "Used once" else "Used ${w.count} times"
+                                Text(if (w.known) used else "$used · new word, glidable after 2 uses")
                             },
                             trailingContent = {
                                 IconButton(onClick = { change { personal.delete(w.lower) } }) {
@@ -172,3 +173,5 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
         )
     }
 }
+
+private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
