@@ -18,15 +18,18 @@ import java.util.concurrent.Executor
 /**
  * Text-mode editing: composing words, suggestions, autocorrect, double-space period, and everything glided.
  *
- * Glided words first wait in a preview row above the keys ("staged") for [STAGING_MS] after the last glide,
- * or until anything else is typed; there a word can be tapped and glided again, or swapped for an
- * alternative, or retyped letter by letter, and a later glide may re-read the staged words when the phrase as a whole reads better. Each
- * glide is decoded with the word before it as context. Once words are in the field they are final: nothing
- * rewrites text the user can already see in the field. Words are learned once they are final: typed words
- * when committed, glided words when they reach the field (the [Learner] decides what it keeps).
+ * Glides and typing go straight into the field. To redo a word, the user taps it: when the user (not the
+ * keyboard) puts the cursor inside a word, or selects one word (double tap), that word is the target. It is
+ * underlined, the strip shows it with its alternatives, and the next glide or a tapped alternative replaces
+ * it, keeping its capitals; that counts as a correction. Space while a word is targeted moves past it so the
+ * next glide adds a word instead. A cursor at a word's edge (where a tap between words lands) targets
+ * nothing, so a glide there adds a word, with spaces around it as needed. Typing letters is ordinary typing.
+ * After the keyboard's own edits nothing is targeted, so gliding on never replaces anything by surprise.
+ * Nothing else in the field is rewritten.
  *
- * Everything field-aware goes through [field]; terminals and password fields never compose, never glide
- * and never teach the keyboard anything.
+ * Words are learned once they are final: typed words when committed, a glide when the next thing happens
+ * (backspace right after it, or a swap from the strip, happen first). Everything field-aware goes through
+ * [field]; terminals and password fields never compose, never glide and never teach the keyboard anything.
  */
 class TextInputController(
     private val connection: () -> InputConnection?,
@@ -39,13 +42,6 @@ class TextInputController(
         /** Words for the strip, best first; empty clears it. */
         fun showCandidates(words: List<String>)
         fun setComposing(composing: Boolean)
-
-        /**
-         * The preview row: staged [words], the [selected] one highlighted (or -1), the words from
-         * [previewStart] for [previewCount] drawn as a glide still in progress, and [alternatives] for the
-         * selected word. Empty [words] hides the row.
-         */
-        fun showStaging(words: List<String>, selected: Int, previewStart: Int, previewCount: Int, alternatives: List<String>) = Unit
     }
 
     /** What the keyboard learns from; implementations apply the user's settings. */
@@ -55,8 +51,8 @@ class TextInputController(
         /** Where a kept glide passed its letters ([GlideResult.observations]). */
         fun learnGlide(observations: FloatArray)
         /**
-         * A glided word was corrected to [word] (dictionary index of [dictionary], or -1 for a retyped word it
-         * lacks), by re-gliding, picking an alternative or retyping it; [stroke] is the original stroke.
+         * A word was corrected to [word] (dictionary index of [dictionary]) by gliding over it or picking an
+         * alternative; [stroke] is its own earlier stroke when it was glided recently, for re-aligning.
          */
         fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary)
 
@@ -74,6 +70,9 @@ class TextInputController(
     var settings: Settings = Settings()
     var suggester: Suggester? = null
 
+    /** Milliseconds since boot; replaceable in tests. */
+    var clock: () -> Long = { SystemClock.uptimeMillis() }
+
     private val word = StringBuilder(32)
     private var candidates: List<Suggestion> = emptyList()
     private var suggestGeneration = 0
@@ -82,13 +81,14 @@ class TextInputController(
 
     /** The most recent glide, while it is the last thing typed: backspace removes it, the strip swaps its last word. */
     private class GlideCommit(
-        /** The glide's own text as inserted, without the leading space, with the trailing space if any. */
+        /** The glide's own text as inserted, without the leading space, with any space after it. */
         var text: String,
         var lastWord: String,
         val alternatives: List<String>,
         val alternativeWords: IntArray,
         val words: Int,
-        val trailingSpace: Boolean,
+        /** Text after the last word that belongs to the glide (a space), which a strip swap keeps. */
+        val after: String,
     )
     private var lastGlide: GlideCommit? = null
 
@@ -105,25 +105,37 @@ class TextInputController(
         val stroke: FloatArray?,
     )
 
-    /**
-     * The last glide committed straight to the field (preview row off), not yet learned: backspace can still
-     * remove it and the strip can still swap its last word. Anything else settles it. Never rewritten.
-     */
+    /** The last glide, not yet learned: backspace can still remove it and the strip can still swap its last word. */
     private val pending = ArrayList<GlidedWord>()
 
-    /** Glided words not yet in the field, shown in the preview row. */
-    private val staged = ArrayList<GlidedWord>()
-    private var selected = -1
-    private var stagedTrailingSpace = false
-    private var stagingDictionary: Dictionary? = null
-    /** Letters typed while a staged word is selected: its replacement, shown in its place until confirmed. */
-    private val retype = StringBuilder()
-    private var retypeCandidates: List<Suggestion> = emptyList()
-    private var retypeGeneration = 0
-    private val flushRunnable = Runnable { flushStaging() }
+    /** Words glided in this field lately, newest last: a tapped word found here has its runners-up and stroke. */
+    private val recent = ArrayDeque<GlidedWord>()
+    private var dictionaryInUse: Dictionary? = null
+
+    /**
+     * The word the user pointed at. [at] is the cursor (or selection start) where it was found, -1 when not
+     * known; [before] of its letters lie before the cursor and [after] after it, or it is the selection
+     * ([selection]). [glided] is the same word from [recent], when there is one.
+     */
+    private class Target(
+        val text: String,
+        val at: Int,
+        val before: Int,
+        val after: Int,
+        val selection: Boolean,
+        val glided: GlidedWord?,
+        val underlined: Boolean,
+    )
+    private var target: Target? = null
+    private var targetGeneration = 0
+
+    /** When the keyboard last changed the field: selection reports soon after are its own, not the user's. */
+    private var lastOwnEdit = Long.MIN_VALUE / 2
 
     val isComposing: Boolean get() = word.isNotEmpty()
-    val hasStaging: Boolean get() = staged.isNotEmpty()
+
+    /** The targeted word (a glide or a strip pick will replace it), for tests and diagnostics. */
+    val targetText: String? get() = target?.text
 
     fun startInput(field: FieldInfo) {
         this.field = field
@@ -134,31 +146,42 @@ class TextInputController(
         word.setLength(0)
         candidates = emptyList()
         lastGlide = null
-        staged.clear()
-        selected = -1
-        main.removeCallbacks(flushRunnable)
+        target = null
+        recent.clear()
         settle()
         lastActionWasSpace = false
         ui.showCandidates(emptyList())
-        ui.showStaging(emptyList(), -1, 0, 0, emptyList())
         ui.setComposing(false)
     }
 
-    /** Cursor moved (by the user or another app): stop composing but leave the text as it is. */
-    fun onSelectionChanged(newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+    private fun ownEdit() {
+        lastOwnEdit = clock()
+    }
+
+    /**
+     * The selection changed. Reports right after the keyboard's own edits are its own. Anything else is the
+     * user (or the app) moving the cursor: composing stops, and a word the cursor is now inside, or a single
+     * selected word, becomes the target. The last glide stays unlearned until the next edit, which may redo it.
+     */
+    fun onSelectionChanged(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         if (isComposing) {
             val insideComposing = newSelStart == newSelEnd && newSelStart == candidatesEnd && candidatesStart >= 0
-            // A report can lag our own edits: the preview row goes in and a word starts composing in one go,
-            // and the insert's report arrives after. Ask the field whether the word still ends at the cursor.
+            // A report can lag the keyboard's own edits: ask the field whether the word still ends at the cursor.
             if (!insideComposing && !(newSelStart == newSelEnd && composingAtCursor())) {
                 connection()?.finishComposingText()
                 word.setLength(0)
                 clearCandidates()
             }
-        } else if (lastGlide != null && newSelStart != newSelEnd) {
+        }
+        if (clock() - lastOwnEdit < OWN_EDIT_MS) return
+        if (newSelStart == oldSelStart && newSelEnd == oldSelEnd) return
+        if (lastGlide != null) {
             lastGlide = null
             clearCandidates()
         }
+        // The last glide is not settled yet: the user may be pointing at it to redo it.
+        dropTarget()
+        findTarget(newSelStart, newSelEnd)
     }
 
     private fun composingAtCursor(): Boolean {
@@ -167,21 +190,119 @@ class TextInputController(
         return ic.getTextBeforeCursor(word.length, 0)?.toString() == word.toString()
     }
 
+    // ---- The targeted word ---------------------------------------------------------------------------
+
+    private fun findTarget(selStart: Int, selEnd: Int) {
+        if (!field.allowsComposing || isComposing) return
+        val ic = connection() ?: return
+        if (selEnd > selStart) {
+            val sel = ic.getSelectedText(0)?.toString() ?: return
+            if (sel.isEmpty() || !sel.all { isLetterInWord(it) } || !sel.first().isLetter()) return
+            setTarget(Target(sel, selStart, 0, 0, selection = true, glided = recentMatch(sel), underlined = false))
+            return
+        }
+        val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: return
+        val after = ic.getTextAfterCursor(MAX_WORD, 0) ?: ""
+        var b = 0
+        while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
+        var a = 0
+        while (a < after.length && isLetterInWord(after[a])) a++
+        // Only a cursor inside a word targets it: at a word's edge (where a tap between words lands) the user
+        // may be adding a word, so nothing is targeted.
+        if (b == 0 || a == 0) return
+        val text = before.substring(before.length - b) + after.substring(0, a)
+        if (!text.first().isLetter()) return
+        val underlined = selStart >= 0 && ic.setComposingRegion(selStart - b, selStart + a)
+        if (underlined) ownEdit()
+        setTarget(Target(text, selStart, b, a, selection = false, glided = recentMatch(text), underlined = underlined))
+    }
+
+    private fun isLetterInWord(c: Char) = c.isLetter() || c == '\'' || c == '’'
+
+    private fun recentMatch(text: String): GlidedWord? = recent.lastOrNull { it.text.equals(text, ignoreCase = true) }
+
+    /** Shows the target in the middle of the strip with its alternatives: its own runners-up if it was glided, else suggestions. */
+    private fun setTarget(t: Target) {
+        target = t
+        val gen = ++targetGeneration
+        val dictionary = dictionaryInUse
+        val glided = t.glided
+        if (glided != null && dictionary != null) {
+            val alts = glided.word.candidates.filter { it >= 0 && it != glided.word.word }.take(2).map { GlideText.matchCase(t.text, dictionary.words[it]) }
+            showTarget(t, alts)
+            return
+        }
+        showTarget(t, emptyList())
+        val s = suggester ?: return
+        background.execute {
+            val found = s.suggest(t.text.lowercase(), 3).map { Suggester.matchCase(t.text, it.word) }.filter { !it.equals(t.text, ignoreCase = true) }.take(2)
+            main.post { if (gen == targetGeneration && target === t) showTarget(t, found) }
+        }
+    }
+
+    private fun showTarget(t: Target, alternatives: List<String>) {
+        ui.showCandidates(arrangeBestMiddle(listOf(t.text) + alternatives))
+        // The strip shows words (not the terminal bar) while a word is targeted.
+        ui.setComposing(true)
+    }
+
+    /** The target is no longer wanted: remove its underline (the text stays as it is). */
+    private fun dropTarget() {
+        val t = target ?: return
+        target = null
+        targetGeneration++
+        if (t.underlined) {
+            connection()?.finishComposingText()
+            ownEdit()
+        }
+        ui.showCandidates(emptyList())
+        ui.setComposing(isComposing)
+    }
+
+    /** Replaces the target with [replacement] (its capitals kept); true when it was still there to replace. */
+    private fun replaceTarget(t: Target, replacement: String): Boolean {
+        val ic = connection() ?: return false
+        ownEdit()
+        target = null
+        targetGeneration++
+        ic.beginBatchEdit()
+        if (t.underlined) ic.finishComposingText()
+        val ok = if (t.selection) {
+            ic.getSelectedText(0)?.toString() == t.text
+        } else {
+            val before = ic.getTextBeforeCursor(t.before, 0)?.toString() ?: ""
+            val after = ic.getTextAfterCursor(t.after, 0)?.toString() ?: ""
+            before + after == t.text
+        }
+        if (ok) {
+            if (!t.selection) ic.deleteSurroundingText(t.before, t.after)
+            ic.commitText(GlideText.matchCase(t.text, replacement), 1)
+        }
+        ic.endBatchEdit()
+        return ok
+    }
+
+    /** Text before the target's first letter (or before the cursor when nothing is targeted), for context. */
+    private fun textBeforeTarget(ic: InputConnection): CharSequence {
+        val t = target
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS + (t?.before ?: 0), 0) ?: ""
+        return if (t != null && !t.selection) before.subSequence(0, maxOf(0, before.length - t.before)) else before
+    }
+
     // ---- Typing --------------------------------------------------------------------------------------
 
     fun typeText(text: String) {
         val ic = connection() ?: return
-        if (selected in staged.indices && isRetypeChar(text)) {
-            retypeStaged(text)
-            return
-        }
-        flushStaging()
+        dropTarget()
+        ownEdit()
         lastActionWasSpace = false
-        settle()
         val glideBefore = lastGlide
+        settle()
         lastGlide = null
         if (glideBefore != null) clearCandidates()
         if (field.allowsComposing && isWordChar(text)) {
+            // A letter right after a glide starts a new word, as a glide right after typing does.
+            if (glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty()) ic.commitText(" ", 1)
             word.append(text)
             ic.setComposingText(word, 1)
             ui.setComposing(true)
@@ -201,15 +322,15 @@ class TextInputController(
 
     fun space() {
         val ic = connection() ?: return
-        // Space after retyping a staged word confirms the replacement; the row stays up.
-        if (retype.isNotEmpty() && selected in staged.indices) {
-            confirmRetype()
+        val t = target
+        if (t != null) {
+            skipPastTarget(ic, t)
             return
         }
-        flushStaging()
+        ownEdit()
         lastGlide?.let { lastGlide = null; clearCandidates() }
         settle()
-        val now = SystemClock.uptimeMillis()
+        val now = clock()
         if (isComposing) {
             val typed = word.toString()
             var commit = typed
@@ -234,6 +355,31 @@ class TextInputController(
         lastSpaceTime = now
     }
 
+    /**
+     * Space with a word targeted: the cursor goes after the word (and after the space behind it, adding one
+     * if there is none), so the next glide adds a word there instead of replacing this one.
+     */
+    private fun skipPastTarget(ic: InputConnection, t: Target) {
+        dropTarget()
+        ownEdit()
+        val toEnd = if (t.selection) t.text.length else t.after
+        val base = t.at
+        val after = ic.getTextAfterCursor(t.after + 1, 0)?.toString() ?: ""
+        val spaceFollows = if (t.selection) {
+            val beyond = ic.getTextAfterCursor(1, 0)?.toString() ?: ""
+            beyond.startsWith(" ")
+        } else {
+            after.length > t.after && after[t.after] == ' '
+        }
+        val dest = toEnd + if (spaceFollows) 1 else 0
+        if (base >= 0) {
+            ic.setSelection(base + dest, base + dest)
+        } else {
+            repeat(dest) { KeySender.sendPlain(ic, KeyEvent.KEYCODE_DPAD_RIGHT) }
+        }
+        if (!spaceFollows) ic.commitText(" ", 1)
+    }
+
     /** True when the two characters before the cursor are a word character then a space. */
     private fun endsSentenceWord(ic: InputConnection): Boolean {
         val before = ic.getTextBeforeCursor(2, 0) ?: return false
@@ -244,30 +390,17 @@ class TextInputController(
 
     fun backspace() {
         val ic = connection() ?: return
+        dropTarget()
+        ownEdit()
         lastActionWasSpace = false
-        if (retype.isNotEmpty() && selected in staged.indices) {
-            // Retyping a staged word: delete the last letter typed; with none left the word shows again.
-            retype.setLength(retype.length - 1)
-            requestRetypeSuggestions()
-            renderStaging()
-            return
-        }
-        if (staged.isNotEmpty()) {
-            // In the preview row: remove the selected word, or the last one. Nothing reaches the field.
-            val i = if (selected >= 0) selected else staged.size - 1
-            staged.removeAt(i)
-            relink(i)
-            selected = -1
-            if (staged.isEmpty()) stagedTrailingSpace = false
-            scheduleFlush()
-            renderStaging()
-            return
-        }
         val glide = lastGlide
         if (glide != null) {
-            // Backspace right after a glide removes everything that glide wrote.
+            // Backspace right after a glide removes everything that glide wrote, unlearned.
             ic.deleteSurroundingText(glide.text.length, 0)
-            repeat(minOf(glide.words, pending.size)) { pending.removeAt(pending.size - 1) }
+            repeat(minOf(glide.words, pending.size)) {
+                val w = pending.removeAt(pending.size - 1)
+                recent.remove(w)
+            }
             lastGlide = null
             clearCandidates()
             return
@@ -302,7 +435,8 @@ class TextInputController(
 
     fun enter() {
         val ic = connection() ?: return
-        flushStaging()
+        dropTarget()
+        ownEdit()
         lastActionWasSpace = false
         lastGlide = null
         settle()
@@ -316,10 +450,11 @@ class TextInputController(
         }
     }
 
-    /** Commits the composing word and any staged glide so a KeyEvent or snippet lands after them. */
+    /** Commits the composing word so a KeyEvent or snippet lands after it; drops the target. */
     fun finishComposing() {
         val ic = connection() ?: return
-        flushStaging()
+        dropTarget()
+        ownEdit()
         if (isComposing) learnTyped(ic, word.toString())
         finishComposing(ic)
         lastGlide = null
@@ -347,7 +482,7 @@ class TextInputController(
 
     // ---- Learning glided words ------------------------------------------------------------------------
 
-    /** The last direct glide can no longer be undone or swapped: learn its words. */
+    /** The last glide can no longer be undone or swapped: learn its words. */
     private fun settle() {
         for (w in pending) retire(w)
         pending.clear()
@@ -366,7 +501,7 @@ class TextInputController(
         candidates = emptyList()
         suggestGeneration++
         ui.showCandidates(emptyList())
-        ui.setComposing(isComposing || staged.isNotEmpty())
+        ui.setComposing(isComposing)
     }
 
     private fun requestSuggestions() {
@@ -383,24 +518,45 @@ class TextInputController(
         }
     }
 
-    /** Picks a strip candidate: replaces the composing word, or swaps the glide's last word. */
+    /** Picks a strip word: replaces the targeted word, the composing word, or the last glide's last word. */
     fun pickCandidate(chosen: String) {
         val ic = connection() ?: return
+        val t = target
+        if (t != null) {
+            if (chosen.equals(t.text, ignoreCase = true)) {
+                dropTarget()
+                return
+            }
+            val dictionary = dictionaryInUse
+            val prev = previousOf(textBeforeTarget(ic))
+            // A word being redone is not learned as it was; the rest of the last glide is final now.
+            t.glided?.let { pending.remove(it) }
+            settle()
+            if (replaceTarget(t, chosen)) {
+                val idx = dictionary?.indexOfLower(chosen.lowercase()) ?: -1
+                if (dictionary != null && idx >= 0) learner.correction(t.glided?.stroke, idx, dictionary)
+                t.glided?.let { recent.remove(it) }
+                if (field.allowsLearning) learner.learnWord(GlideText.matchCase(t.text, chosen), prev.first, prev.second)
+            }
+            clearCandidates()
+            return
+        }
+        ownEdit()
         val glide = lastGlide
         if (glide != null) {
-            val tail = glide.lastWord + if (glide.trailingSpace) " " else ""
-            val replacement = chosen + if (glide.trailingSpace) " " else ""
+            val tail = glide.lastWord + glide.after
+            val replacement = chosen + glide.after
             ic.beginBatchEdit()
             ic.deleteSurroundingText(tail.length, 0)
             ic.commitText(replacement, 1)
             ic.endBatchEdit()
             glide.text = glide.text.dropLast(tail.length) + replacement
             glide.lastWord = chosen
-            // A word picked by hand is settled: later glides use it as context but never rewrite it.
+            // A word picked by hand is a correction; it is learned as picked, and its stroke not trusted.
             val idx = glide.alternatives.indexOf(chosen)
             val last = pending.lastOrNull()
             if (last != null && idx >= 0) {
-                val dictionary = stagingDictionary
+                val dictionary = dictionaryInUse
                 if (dictionary != null && glide.alternativeWords[idx] != last.word.word) {
                     learner.correction(last.stroke, glide.alternativeWords[idx], dictionary)
                 }
@@ -416,110 +572,34 @@ class TextInputController(
             word.setLength(0)
             clearCandidates()
             lastActionWasSpace = true
-            lastSpaceTime = SystemClock.uptimeMillis()
+            lastSpaceTime = clock()
         }
     }
 
-    // ---- Glide: context ------------------------------------------------------------------------------
+    // ---- Glide ---------------------------------------------------------------------------------------
 
     /**
-     * Context for a glide that is starting: the word before it, read from the field or the preview row, so the
-     * decoder weighs what is likely to come next (the base word pairs mixed with the user's own) against the
-     * stroke. When a staged word is selected, the glide replaces it and its context is the word before it.
-     * Otherwise, with [revise], the staged words go along too: they are not in the field yet, so a later glide
-     * may re-read them. Words in the field are never passed for revision. One InputConnection read.
+     * Context for a glide that is starting: the word before it (before the targeted word, when one is
+     * targeted), so the decoder weighs what is likely to come next, the base word pairs mixed with the user's
+     * own, against the stroke. One InputConnection read.
      */
-    fun glideContext(dictionary: Dictionary, lm: NgramModel, revise: Boolean): GlideContext {
+    fun glideContext(dictionary: Dictionary, lm: NgramModel): GlideContext {
         val ic = connection() ?: return GlideContext(NgramModel.SENTENCE_START)
-        val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: ""
-        val fieldWord = GlideText.contextWord(before)
-        if (selected in staged.indices) {
-            val prev = if (selected > 0) staged[selected - 1].text.lowercase() else fieldWord
-            return GlideContext(GlideText.contextId(prev, dictionary, lm))
-        }
-        if (!revise || staged.isEmpty()) {
-            val last = staged.lastOrNull()?.text?.lowercase() ?: fieldWord
-            return GlideContext(GlideText.contextId(last, dictionary, lm))
-        }
-        // A retyped word the dictionary lacks cannot be re-read: the run starts after it, with unknown context.
-        val cut = staged.indexOfLast { it.word.word < 0 }
-        if (cut == staged.size - 1) return GlideContext(NgramModel.UNKNOWN)
-        val base = if (cut >= 0) NgramModel.UNKNOWN else GlideText.contextId(fieldWord, dictionary, lm)
-        return GlideContext(base, staged.subList(cut + 1, staged.size).map { it.word })
+        return GlideContext(GlideText.contextId(GlideText.contextWord(textBeforeTarget(ic)), dictionary, lm))
     }
 
     private fun caseNew(word: String, capitalize: Boolean) = if (capitalize) word.replaceFirstChar { it.uppercaseChar() } else word
 
-    // ---- Glide: preview while the finger moves -------------------------------------------------------
-
-    /** Words the strip shows while the finger is still gliding, when the preview row is off. */
+    /** Words the strip shows while the finger is still gliding. */
     fun previewText(result: GlideResult, dictionary: Dictionary, capitalize: Boolean): String {
+        val t = target
         val sb = StringBuilder()
         for ((i, w) in result.words.withIndex()) {
             if (i > 0) sb.append(' ')
-            sb.append(caseNew(dictionary.words[w], i == 0 && capitalize))
+            val text = dictionary.words[w]
+            sb.append(if (i == 0 && t != null) GlideText.matchCase(t.text, text) else caseNew(text, i == 0 && capitalize))
         }
         return sb.toString()
-    }
-
-    /**
-     * Shows a glide in progress in the preview row: the staged words (with any re-reading it would make), and
-     * its words in place of the selected word or after the others. False when the preview row is off.
-     */
-    fun previewStaging(result: GlideResult, dictionary: Dictionary, capitalize: Boolean): Boolean {
-        if (!settings.glidePreview) return false
-        val texts = staged.map { it.text }.toMutableList()
-        val sel = selected
-        if (sel < 0) {
-            // Re-readings the decode would make to staged words (the decoder saw the last of them).
-            if (result.firstRevised >= 0 && result.history.size <= staged.size) {
-                val off = staged.size - result.history.size
-                for (h in result.firstRevised until result.history.size) {
-                    texts[off + h] = GlideText.matchCase(texts[off + h], dictionary.words[result.history[h]])
-                }
-            }
-        }
-        val words = result.words.mapIndexed { i, w -> caseNew(dictionary.words[w], i == 0 && capitalize && sel < 0) }
-        val start: Int
-        if (sel in texts.indices) {
-            val old = texts.removeAt(sel)
-            texts.addAll(sel, words.mapIndexed { i, w -> if (i == 0) GlideText.matchCase(old, w) else w })
-            start = sel
-        } else {
-            start = texts.size
-            texts.addAll(words)
-        }
-        ui.showStaging(texts, -1, start, words.size, emptyList())
-        return true
-    }
-
-    // ---- Glide: commit -------------------------------------------------------------------------------
-
-    /**
-     * Takes a decoded glide. With the preview row on, its words are staged (replacing the selected word, if
-     * one is selected: a correction), and staged words the decoder re-read change in the row; otherwise they
-     * go straight into the field. Words already in the field are never rewritten.
-     */
-    fun commitGlide(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean) {
-        if (result.words.isEmpty()) return
-        stagingDictionary = dictionary
-        if (settings.glidePreview) stageGlide(result, dictionary, capitalize, trailingSpace) else commitGlideToField(result, dictionary, capitalize, trailingSpace)
-    }
-
-    /** The word before the glide's first new word, for learning, and whether that word begins a sentence. */
-    private fun firstPrevious(): Pair<String?, Boolean> {
-        val prev = staged.lastOrNull()?.text ?: return fieldPrevious()
-        return prev.lowercase() to false
-    }
-
-    /** The word before the cursor in the field, for learning, and whether the cursor is at a sentence start. */
-    private fun fieldPrevious(): Pair<String?, Boolean> {
-        val before = connection()?.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return null to true
-        return when (val w = GlideText.contextWord(before)) {
-            GlideText.SENTENCE_START -> null to true
-            "" -> null to false
-            else -> w to false
-        }
     }
 
     private fun newWords(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, previous: Pair<String?, Boolean>): List<GlidedWord> {
@@ -534,255 +614,74 @@ class TextInputController(
         }
     }
 
-    private fun stageGlide(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean) {
-        finishComposingForGlide()
-        lastActionWasSpace = false
-        val sel = selected
-        if (sel in staged.indices) {
-            // A correction: the selected word is replaced by what was glided now.
-            val old = staged[sel]
-            val prev = if (sel > 0) staged[sel - 1].text.lowercase() to false else fieldPrevious()
-            val fresh = newWords(result, dictionary, false, prev)
-            if (fresh.first().word.word != old.word.word) learner.correction(old.stroke, fresh.first().word.word, dictionary)
-            // Keep the casing the replaced word had (a capital at a sentence start stays).
-            fresh.first().text = GlideText.matchCase(old.text, fresh.first().text)
-            staged.removeAt(sel)
-            staged.addAll(sel, fresh)
-            relink(sel + fresh.size)
-            selected = -1
-            clearRetype()
-        } else {
-            reviseStaged(result, dictionary)
-            staged.addAll(newWords(result, dictionary, capitalize, firstPrevious()))
-            stagedTrailingSpace = trailingSpace
-        }
-        scheduleFlush()
-        renderStaging()
+    private fun previousOf(before: CharSequence): Pair<String?, Boolean> = when (val w = GlideText.contextWord(before)) {
+        GlideText.SENTENCE_START -> null to true
+        "" -> null to false
+        else -> w to false
     }
 
-    private fun finishComposingForGlide() {
+    /**
+     * Takes a decoded glide: it replaces the targeted word (a correction), or goes in at the cursor with a
+     * space before it after a word, and a space after it before one.
+     */
+    fun commitGlide(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean) {
+        if (result.words.isEmpty()) return
         val ic = connection() ?: return
-        if (isComposing) {
-            learnTyped(ic, word.toString())
-        }
+        dictionaryInUse = dictionary
+        if (isComposing) learnTyped(ic, word.toString())
         finishComposing(ic)
-    }
-
-    /** Staged words the decoder re-read (it saw the last of them, oldest first) change in the row. */
-    private fun reviseStaged(result: GlideResult, dictionary: Dictionary) {
-        if (result.firstRevised < 0 || result.history.size > staged.size) return
-        val off = staged.size - result.history.size
-        for (h in result.firstRevised until result.history.size) {
-            val e = staged[off + h]
-            val w = result.history[h]
-            if (w != e.word.word) {
-                e.text = GlideText.matchCase(e.text, dictionary.words[w])
-                e.word = e.word.revisedTo(w)
-                e.observations = null
+        lastActionWasSpace = false
+        // A word being redone is not learned as it was; the rest of the glide before this one is final now.
+        target?.glided?.let { pending.remove(it) }
+        settle()
+        ownEdit()
+        val t = target
+        if (t != null) {
+            val fresh = newWords(result, dictionary, false, previousOf(textBeforeTarget(ic)))
+            fresh.first().text = GlideText.matchCase(t.text, fresh.first().text)
+            val text = fresh.joinToString(" ") { it.text }
+            if (replaceTarget(t, text)) {
+                val first = fresh.first()
+                if (!first.text.equals(t.text, ignoreCase = true)) learner.correction(t.glided?.stroke, first.word.word, dictionary)
+                t.glided?.let { recent.remove(it) }
+                remember(fresh)
+                pending.addAll(fresh)
+                val alternatives = result.alternatives.map { GlideText.matchCase(t.text, dictionary.words[it]) }
+                lastGlide = GlideCommit(text, fresh.last().text, alternatives, result.alternatives, fresh.size, "")
+                ui.showCandidates(arrangeBestMiddle(alternatives))
+                ui.setComposing(true)
+                return
             }
         }
-    }
-
-    /** Commits a decoded glide straight into the field (preview row off). */
-    private fun commitGlideToField(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean) {
-        val ic = connection() ?: return
-        finishComposingForGlide()
-        lastActionWasSpace = false
-        // The glide before this one is final now.
-        settle()
-        val fresh = newWords(result, dictionary, capitalize, firstPrevious())
-        val ownText = fresh.joinToString(" ") { it.text } + if (trailingSpace) " " else ""
+        val fresh = newWords(result, dictionary, capitalize, previousOf(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: ""))
+        // Gliding in front of a word keeps them apart; a dip into the space bar adds one anyway.
+        val after = if (trailingSpace || needsTrailingSpace(ic)) " " else ""
+        val ownText = fresh.joinToString(" ") { it.text } + after
         val sb = StringBuilder()
         if (needsLeadingSpace(ic)) sb.append(' ')
         sb.append(ownText)
         ic.commitText(sb, 1)
+        remember(fresh)
         pending.addAll(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
-        lastGlide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, trailingSpace)
+        lastGlide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after)
         ui.showCandidates(arrangeBestMiddle(alternatives))
         ui.setComposing(true)
     }
 
-    // ---- Glide: the preview row ----------------------------------------------------------------------
-
-    private fun scheduleFlush() {
-        main.removeCallbacks(flushRunnable)
-        // While a word is selected for correction, nothing is inserted.
-        if (selected < 0 && staged.isNotEmpty()) main.postDelayed(flushRunnable, STAGING_MS)
-    }
-
-    private fun stagedAlternatives(e: GlidedWord): List<Int> = e.word.candidates.filter { it != e.word.word }.take(3)
-
-    private fun renderStaging() {
-        val dictionary = stagingDictionary
-        val retyping = retype.isNotEmpty() && selected in staged.indices
-        val alternatives = when {
-            retyping -> retypeChips()
-            selected in staged.indices && dictionary != null -> {
-                val e = staged[selected]
-                stagedAlternatives(e).map { GlideText.matchCase(e.text, dictionary.words[it]) }
-            }
-            else -> emptyList()
-        }
-        val texts = staged.map { it.text }.toMutableList()
-        if (retyping) texts[selected] = retype.toString()
-        ui.showStaging(texts, selected, 0, 0, alternatives)
-        ui.setComposing(staged.isNotEmpty() || isComposing)
-    }
-
-    /**
-     * Tapping a staged word selects it (the next glide, or letters typed, replace it); tapping it again
-     * deselects it, or confirms the letters typed for it.
-     */
-    fun selectStaged(index: Int) {
-        if (index !in staged.indices) return
-        if (retype.isNotEmpty() && selected in staged.indices) {
-            val was = selected
-            confirmRetype()
-            if (index == was) return
-        }
-        clearRetype()
-        selected = if (selected == index) -1 else index
-        scheduleFlush()
-        renderStaging()
-    }
-
-    /** Tapping one of the selected word's alternatives replaces it: a correction. */
-    fun pickStagedAlternative(index: Int) {
-        val dictionary = stagingDictionary ?: return
-        if (selected !in staged.indices) return
-        if (retype.isNotEmpty()) {
-            retypeChips().getOrNull(index)?.let { replaceStaged(selected, it) }
-            return
-        }
-        val e = staged[selected]
-        val w = stagedAlternatives(e).getOrNull(index) ?: return
-        learner.correction(e.stroke, w, dictionary)
-        e.text = GlideText.matchCase(e.text, dictionary.words[w])
-        e.word = e.word.lockedAs(w)
-        e.observations = null
-        selected = -1
-        scheduleFlush()
-        renderStaging()
-    }
-
-    // ---- Glide: retyping a staged word ---------------------------------------------------------------
-
-    private fun isRetypeChar(text: String): Boolean {
-        if (text.length != 1 || !field.allowsComposing) return false
-        val c = text[0]
-        return c.isLetter() || (c == '\'' && retype.isNotEmpty())
-    }
-
-    private fun retypeStaged(text: String) {
-        retype.append(text)
-        main.removeCallbacks(flushRunnable)
-        requestRetypeSuggestions()
-        renderStaging()
-    }
-
-    private fun requestRetypeSuggestions() {
-        val gen = ++retypeGeneration
-        retypeCandidates = emptyList()
-        val s = suggester ?: return
-        val typed = retype.toString()
-        if (typed.isEmpty()) return
-        background.execute {
-            val result = s.suggest(typed, 3)
-            main.post {
-                if (gen != retypeGeneration) return@post
-                retypeCandidates = result
-                renderStaging()
-            }
+    private fun remember(words: List<GlidedWord>) {
+        for (w in words) {
+            recent.addLast(w)
+            if (recent.size > MAX_RECENT) recent.removeFirst()
         }
     }
 
-    /** Suggestions for the letters typed so far, cased like the word they replace; the typed letters are the word itself. */
-    private fun retypeChips(): List<String> {
-        val typed = retype.toString()
-        return retypeCandidates.map { Suggester.matchCase(typed, it.word) }.filter { it != typed }.take(3)
-    }
-
-    private fun clearRetype() {
-        retype.setLength(0)
-        retypeCandidates = emptyList()
-        retypeGeneration++
-    }
-
-    /** Space or a second tap: the letters typed replace the selected word (autocorrected like typing). */
-    private fun confirmRetype() {
-        if (retype.isEmpty() || selected !in staged.indices) {
-            clearRetype()
-            return
-        }
-        var typed = retype.toString()
-        if (settings.autocorrect) suggester?.autocorrectFrom(typed, retypeCandidates)?.let { typed = Suggester.matchCase(typed, it) }
-        replaceStaged(selected, typed)
-    }
-
-    /** Replaces staged word [i] with a typed word: a correction, settled so later glides never re-read it. */
-    private fun replaceStaged(i: Int, typed: String) {
-        val old = staged[i]
-        val text = if (old.text.firstOrNull()?.isUpperCase() == true && typed.first().isLowerCase()) typed.replaceFirstChar { it.uppercaseChar() } else typed
-        val dictionary = stagingDictionary
-        val idx = dictionary?.indexOfLower(text.lowercase()) ?: -1
-        if (dictionary != null && idx != old.word.word) learner.correction(old.stroke, idx, dictionary)
-        val word = GlideWord(idx, intArrayOf(idx), floatArrayOf(0f), locked = true)
-        staged[i] = GlidedWord(text, word, old.previous, old.sentenceStart, null, old.stroke)
-        relink(i + 1)
-        clearRetype()
-        selected = -1
-        scheduleFlush()
-        renderStaging()
-    }
-
-    /** The word before staged word [i] changed (replaced or removed): learn it after the word now before it. */
-    private fun relink(i: Int) {
-        if (i !in staged.indices) return
-        val (prev, start) = if (i == 0) fieldPrevious() else staged[i - 1].text.lowercase() to false
-        staged[i].previous = prev
-        staged[i].sentenceStart = start
-    }
-
-    /** Glided words currently in the preview row, for tests and diagnostics. */
-    val stagedWords: List<String> get() = staged.map { it.text }
-
-    /**
-     * Puts the staged words into the field, where they are final and are learned. Runs when the preview time
-     * is up and before anything else is typed.
-     */
-    fun flushStaging() {
-        main.removeCallbacks(flushRunnable)
-        // Letters typed for a selected word count: they replace it before the row goes into the field.
-        if (retype.isNotEmpty()) confirmRetype()
-        clearRetype()
-        if (staged.isEmpty()) return
-        val ic = connection()
-        if (ic != null) {
-            if (isComposing) learnTyped(ic, word.toString())
-            finishComposing(ic)
-            settle()
-            val sb = StringBuilder()
-            if (needsLeadingSpace(ic)) sb.append(' ')
-            sb.append(staged.joinToString(" ") { it.text })
-            if (stagedTrailingSpace) sb.append(' ')
-            ic.commitText(sb, 1)
-            for (w in staged) retire(w)
-        }
-        staged.clear()
-        selected = -1
-        stagedTrailingSpace = false
-        lastGlide = null
-        ui.showStaging(emptyList(), -1, 0, 0, emptyList())
-        ui.showCandidates(emptyList())
-        ui.setComposing(isComposing)
-    }
-
-    /** The language was rebuilt: dictionary indices changed, so staged and pending words are settled. */
+    /** The language was rebuilt: dictionary indices changed, so remembered glides and the target go. */
     fun onLanguageChanged() {
-        flushStaging()
+        dropTarget()
         settle()
         lastGlide = null
+        recent.clear()
     }
 
     /** No space at the field start, after whitespace or a newline, or after an opening bracket. */
@@ -792,12 +691,22 @@ class TextInputController(
         return !GlideText.atWordStart(before, 1)
     }
 
+    /** A space after the glide when a word follows the cursor directly. */
+    private fun needsTrailingSpace(ic: InputConnection): Boolean {
+        val after = ic.getTextAfterCursor(1, 0)
+        return !after.isNullOrEmpty() && after[0].isLetterOrDigit()
+    }
+
     companion object {
         private const val DOUBLE_SPACE_MS = 600L
-        /** Glided words wait this long in the preview row after the last glide. */
-        const val STAGING_MS = 2000L
+        /** Selection reports this soon after the keyboard's own edit are taken as its own. */
+        const val OWN_EDIT_MS = 600L
         /** Characters read before the cursor for the word before it. */
         private const val CONTEXT_CHARS = 64
+        /** Longest word looked at around the cursor. */
+        private const val MAX_WORD = 48
+        /** Glided words remembered for redoing. */
+        private const val MAX_RECENT = 32
 
         /** Strip order for glide alternatives: runner-up left, best in the middle, third right. */
         fun arrangeBestMiddle(ranked: List<String>): List<String> = when (ranked.size) {

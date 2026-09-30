@@ -43,7 +43,6 @@ import dev.shebang.devboard.view.KeyPopup
 import dev.shebang.devboard.view.KeyboardTheme
 import dev.shebang.devboard.view.KeyboardView
 import dev.shebang.devboard.view.ShiftState
-import dev.shebang.devboard.view.StagingStripView
 import dev.shebang.devboard.view.TerminalBarView
 import dev.shebang.devboard.view.TopStripView
 import kotlinx.coroutines.CoroutineScope
@@ -56,7 +55,7 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui,
-    GlideSession.Listener, TextInputController.Learner, StagingStripView.Listener {
+    GlideSession.Listener, TextInputController.Learner {
 
     private enum class Mode { TEXT, CODE }
 
@@ -155,7 +154,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     /** A new bundle is ready: use it now if that is safe, otherwise as soon as it is. */
     private fun offerBundle(b: LanguageBundle) {
-        if (glideId >= 0 || text.hasStaging) pendingBundle = b else applyBundle(b)
+        if (glideId >= 0) pendingBundle = b else applyBundle(b)
     }
 
     private fun applyBundle(b: LanguageBundle) {
@@ -165,13 +164,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideSession.language = b.glide
         glideLanguage = b.glide
         text.suggester = b.suggester
-        // Dictionary positions changed: recent glided words stop being revisable (they are learned now).
+        // Dictionary positions changed: remembered glides and the targeted word go.
         if (!first) text.onLanguageChanged()
     }
 
     private fun applyPendingBundle() {
         val b = pendingBundle ?: return
-        if (glideId < 0 && !text.hasStaging) applyBundle(b)
+        if (glideId < 0) applyBundle(b)
     }
 
     /** Saves what was learned and rebuilds the vocabulary if it changed. Runs when the keyboard hides. */
@@ -231,7 +230,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         k.listener = this
         s.bar.listener = this
         s.suggestions.onSuggestion = { word -> text.pickCandidate(word); afterEdit() }
-        s.staging.listener = this
         column.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         column.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
@@ -337,8 +335,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        // Staged glides go into the field before it goes away.
-        text.flushStaging()
         text.finishComposing()
         persistLearning()
         keyboard?.cancelAllTouches()
@@ -349,7 +345,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        text.onSelectionChanged(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        text.onSelectionChanged(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         // Mid-word the caps mode cannot change; asking the editor (an IPC) is only worth it at a boundary.
         if (!text.isComposing) updateAutoCaps()
     }
@@ -481,7 +477,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val g = geometry ?: return
         val lang = glideLanguage ?: return
         if (!isGlideAllowed() || count == 0) return
-        val context = text.glideContext(lang.dictionary, lang.lm, settings.reviseGlide)
+        val context = text.glideContext(lang.dictionary, lang.lm)
         glideCapitalize = keyboard?.shiftState != ShiftState.OFF
         glideTrailingSpace = false
         val offsets = if (settings.adaptGlide) adaptation.offsets() else null
@@ -489,7 +485,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         for (i in 0 until count) glideSession.point(points[2 * i], points[2 * i + 1], times[i])
         background.execute { adaptation.recordGlide() }
         strip?.setComposing(true)
-        if (!settings.glidePreview) strip?.suggestions?.showPreview("")
+        strip?.suggestions?.showPreview("")
     }
 
     override fun onGlidePoint(x: Float, y: Float, t: Long) {
@@ -512,17 +508,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideSession.cancel()
         glideId = -1
         showCandidates(emptyList())
-        setComposing(text.isComposing || text.hasStaging)
-        text.selectStaged(-1)
+        setComposing(text.isComposing)
         applyPendingBundle()
     }
 
     override fun onGlidePreview(id: Int, result: GlideResult) {
         if (id != glideId || keyboard?.isGliding != true) return
         val lang = glideLanguage ?: return
-        if (!text.previewStaging(result, lang.dictionary, glideCapitalize)) {
-            strip?.suggestions?.showPreview(text.previewText(result, lang.dictionary, glideCapitalize))
-        }
+        strip?.suggestions?.showPreview(text.previewText(result, lang.dictionary, glideCapitalize))
     }
 
     override fun onGlideResult(id: Int, result: GlideResult?, decodeMs: Float, language: GlideLanguage) {
@@ -531,8 +524,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         Log.d(TAG, "glide decoded in %.1f ms after lift".format(decodeMs))
         if (result == null) {
             showCandidates(emptyList())
-            text.selectStaged(-1)
-            setComposing(text.isComposing || text.hasStaging)
+            setComposing(text.isComposing)
             applyPendingBundle()
             return
         }
@@ -543,18 +535,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (autoShifted) autoShifted = false
         afterEdit()
         applyPendingBundle()
-    }
-
-    // ---- StagingStripView.Listener -------------------------------------------------------------------
-
-    override fun onStagedWordTapped(index: Int) {
-        feedback.keyPress()
-        text.selectStaged(index)
-    }
-
-    override fun onStagedAlternativeTapped(index: Int) {
-        feedback.keyPress()
-        text.pickStagedAlternative(index)
     }
 
     override fun onSpaceLongPress() {
@@ -626,11 +606,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun setComposing(composing: Boolean) {
         strip?.setComposing(composing)
-    }
-
-    override fun showStaging(words: List<String>, selected: Int, previewStart: Int, previewCount: Int, alternatives: List<String>) {
-        strip?.showStaging(words, selected, previewStart, previewCount, alternatives)
-        if (words.isEmpty()) applyPendingBundle()
     }
 
     companion object {

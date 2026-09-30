@@ -14,16 +14,20 @@ import android.view.inputmethod.InputContentInfo
 class FakeInputConnection(initial: String = "") : InputConnection {
     val text = StringBuilder(initial)
     var cursor = initial.length
-    private var composingStart = -1
+    var composingStart = -1
+        private set
     private var composingEnd = -1
+    /** End of the selection, which starts at [cursor]; -1 when nothing is selected. */
+    var selectionEnd = -1
     val keyEvents = ArrayList<KeyEvent>()
     var editorActions = 0
 
     override fun toString() = text.toString()
 
     override fun getTextBeforeCursor(n: Int, flags: Int): CharSequence = text.substring(maxOf(0, cursor - n), cursor)
-    override fun getTextAfterCursor(n: Int, flags: Int): CharSequence = text.substring(cursor, minOf(text.length, cursor + n))
-    override fun getSelectedText(flags: Int): CharSequence? = null
+    private val afterSelection get() = if (selectionEnd > cursor) selectionEnd else cursor
+    override fun getTextAfterCursor(n: Int, flags: Int): CharSequence = text.substring(afterSelection, minOf(text.length, afterSelection + n))
+    override fun getSelectedText(flags: Int): CharSequence? = if (selectionEnd > cursor) text.substring(cursor, selectionEnd) else null
     override fun getCursorCapsMode(reqModes: Int): Int = 0
     override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? = null
 
@@ -32,6 +36,7 @@ class FakeInputConnection(initial: String = "") : InputConnection {
         val end = minOf(text.length, cursor + afterLength)
         text.delete(start, end)
         cursor = start
+        selectionEnd = -1
         composingStart = -1
         composingEnd = -1
         return true
@@ -51,9 +56,11 @@ class FakeInputConnection(initial: String = "") : InputConnection {
             text.replace(composingStart, composingEnd, t.toString())
             cursor = composingStart + t.length
         } else {
+            if (selectionEnd > cursor) text.delete(cursor, selectionEnd)
             text.insert(cursor, t)
             cursor += t.length
         }
+        selectionEnd = -1
     }
 
     override fun setComposingRegion(start: Int, end: Int): Boolean {
@@ -79,6 +86,7 @@ class FakeInputConnection(initial: String = "") : InputConnection {
     override fun commitCorrection(correctionInfo: CorrectionInfo?): Boolean = false
     override fun setSelection(start: Int, end: Int): Boolean {
         cursor = start
+        selectionEnd = if (end > start) end else -1
         return true
     }
 

@@ -147,16 +147,6 @@ fun SettingsScreen(
                 }
             }
             item {
-                SwitchRow("Preview glides", "Glided words wait in the row above the keys for 2 seconds. Tap one to glide or type it again.", settings.glidePreview, enabled = settings.glide) { v ->
-                    update { it.copy(glidePreview = v) }
-                }
-            }
-            item {
-                SwitchRow("Refine previewed words", "While glided words wait in the preview row, a later glide may change them when the phrase reads better. Words in the text field are never changed.", settings.reviseGlide, enabled = settings.glide && settings.glidePreview) { v ->
-                    update { it.copy(reviseGlide = v) }
-                }
-            }
-            item {
                 ListItem(
                     headlineContent = { Text("Record glides") },
                     supportingContent = { Text("Glide prompted words to measure accuracy on your own fingers. Kept on this phone.") },
