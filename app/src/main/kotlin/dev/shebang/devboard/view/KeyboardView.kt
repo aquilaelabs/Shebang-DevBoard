@@ -282,9 +282,9 @@ class KeyboardView(context: Context) : View(context) {
                 val label = if (shifted) key.shiftedLabel else key.label
                 val scale = if (label.length > 1) 0.7f else 1f
                 drawLabel(canvas, label, fg, scale)
-                if (key.def.alternates.isNotEmpty() && key.letter != 0.toChar()) {
+                if (key.alternates.isNotEmpty() && key.letter != 0.toChar()) {
                     hintPaint.color = theme.keyTextSecondary
-                    canvas.drawText(key.def.alternates[0], rect.right - 5 * density, rect.top + hintSize + 3 * density, hintPaint)
+                    canvas.drawText(key.alternates[0], rect.right - 5 * density, rect.top + hintSize + 3 * density, hintPaint)
                 }
             }
         }
@@ -541,8 +541,8 @@ class KeyboardView(context: Context) : View(context) {
                 pointerCancelled[p] = true
                 listener?.onSpaceLongPress()
             }
-            key.def.alternates.isNotEmpty() -> {
-                val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.def.alternates
+            key.alternates.isNotEmpty() -> {
+                val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.alternates
                 popup.showAlternates(this, key, alts)
                 popup.updateSelection(pointerLastX[p])
             }

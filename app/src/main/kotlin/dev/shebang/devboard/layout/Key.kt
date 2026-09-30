@@ -8,6 +8,8 @@ class Key(
     val top: Float,
     val right: Float,
     val bottom: Float,
+    /** Long-press alternates: the layout's, less the digits when a number row already shows them. */
+    val alternates: List<String> = def.alternates,
 ) {
     val width: Float get() = right - left
     val height: Float get() = bottom - top
@@ -18,7 +20,7 @@ class Key(
     val shiftedLabel: String = if (def.isLetter) label.uppercase() else label
     val shiftedText: String? = if (def.isLetter) def.text!!.uppercase() else def.text
     /** Alternates shown while shifted (uppercase accents); digits and symbols are unchanged. */
-    val shiftedAlternates: List<String> = if (def.isLetter) def.alternates.map { it.uppercase() } else def.alternates
+    val shiftedAlternates: List<String> = if (def.isLetter) alternates.map { it.uppercase() } else alternates
     /** The lowercase letter this key types, or 0 when it is not a letter key. Used by glide. */
     val letter: Char = if (def.isLetter) def.text!![0].lowercaseChar() else 0.toChar()
     val action: KeyAction = def.keyAction

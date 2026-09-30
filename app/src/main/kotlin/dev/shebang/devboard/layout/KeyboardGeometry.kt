@@ -26,7 +26,8 @@ class KeyboardGeometry(
     private val letterByChar = arrayOfNulls<Key>(26)
 
     init {
-        val rows = (if (numberRow && layout.numberRow != null) listOf(layout.numberRow) else emptyList()) + layout.rows
+        val showsNumbers = numberRow && layout.numberRow != null
+        val rows = (if (showsNumbers) listOf(layout.numberRow) else emptyList()) + layout.rows
         rowCount = rows.size
         val totalHeightUnits = rows.sumOf { it.height.toDouble() }.toFloat()
         rowHeightPx = heightPx / totalHeightUnits
@@ -51,6 +52,8 @@ class KeyboardGeometry(
                             top = y + verticalGapPx / 2f,
                             right = x + w - horizontalGapPx / 2f,
                             bottom = y + rowH - verticalGapPx / 2f,
+                            // With the number row up, letters do not also hold the digits.
+                            alternates = if (showsNumbers && def.isLetter) def.alternates.filter { a -> !a.all { it.isDigit() } } else def.alternates,
                         )
                     )
                 }

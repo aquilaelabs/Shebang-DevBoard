@@ -15,6 +15,18 @@ class KeyboardGeometryTest {
         KeyboardGeometry(layout, variant, 1000, 400, numberRow, 4f, 6f, 1)
 
     @Test
+    fun withTheNumberRowLettersDoNotAlsoHoldDigits() {
+        val plain = geometry(text, FieldVariant.PLAIN)
+        val q = plain.keys.first { it.letter == 'q' }
+        assertTrue("1" in q.alternates)
+        val withRow = geometry(text, FieldVariant.PLAIN, numberRow = true)
+        val q2 = withRow.keys.first { it.letter == 'q' }
+        assertTrue(q2.alternates.none { a -> a.all { it.isDigit() } })
+        // Accents stay.
+        assertTrue("é" in withRow.keys.first { it.letter == 'e' }.alternates)
+    }
+
+    @Test
     fun rowsSpanTheFullWidthInEveryVariant() {
         for (variant in listOf(FieldVariant.PLAIN, FieldVariant.EMAIL, FieldVariant.URL)) {
             val g = geometry(text, variant)
