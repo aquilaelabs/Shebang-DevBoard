@@ -57,7 +57,7 @@ object LanguageBuilder {
             if (i >= 0) counts[i] += w.count
         }
         return LanguageBundle(
-            dictionary, lm, GlideLanguage.build(dictionary, lm), Suggester(dictionary, counts),
+            dictionary, lm, GlideLanguage.build(dictionary, lm), Suggester(dictionary, counts, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }),
             vocabularyVersion, countsVersion, systemWords.size,
         )
     }

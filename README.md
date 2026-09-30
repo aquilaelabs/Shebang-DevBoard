@@ -191,8 +191,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **"1,000 most common words" for the harness**: the original harness keeps its first definition (1,000
   tier-10 SCOWL words, fixed seed); the realistic benchmark uses the 1,000 most frequent glide-able words by
   Tatoeba count.
-- **Frequency weights per tier**: 10 -> 1.0, 20 -> 0.45, 35 -> 0.18, 40 -> 0.08, 50 -> 0.03. Typed
-  suggestions still rank by these tiers; glide uses the Tatoeba counts.
+- **Frequency weights per tier**: 10 -> 1.0, 20 -> 0.45, 35 -> 0.18, 40 -> 0.08, 50 -> 0.03, used as pseudo
+  counts where a word has no Tatoeba count. Glide and typed suggestions both rank by the language model's
+  word probability (Tatoeba counts, these tiers where counts are missing, and the user's own words), so "the"
+  outranks "tea" although both are tier 10.
 - **Glide decoder**: the streaming decoder replaced the whole-word SHARK2 decoder in the app, because it is
   far more accurate on realistic strokes (see Glide typing) and needs no wait after lift. The spec's
   ideal-path LRU cache has no counterpart any more: per-geometry work is one table of states per tree node,
@@ -270,7 +272,24 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Suggestion strip order**: the typed word on the left (when it is not itself a suggestion), the best
   candidate in the middle, the runner-up on the right. The best *prefix completion* always leads; corrections
   never displace it.
-- **Autocorrect-on-space** only fires for a tier <= 35 word one edit away from a word not in the dictionary.
+- **Autocorrect** (on space, and on sentence punctuation; on enter and a following glide when the suggestions
+  are for the word) leaves a dictionary word alone, except one typed without the apostrophe of a contraction
+  at least 50 times more common ("cant", "wont", "dont"; "its", "were", "well" and "ill" stay). Otherwise the
+  most likely of the six suggestions wins, among common words (tier 35 or better, or used by the user) within
+  one slip (two from six letters): frequency times exp(-6 x slip cost) times 0.35 for a wrong first letter.
+  Slip costs follow how fingers miss on QWERTY: a skipped apostrophe 0.2, one of a double letter dropped 0.4,
+  a neighbouring key, two letters swapped or a letter doubled 0.5, another letter dropped 0.8, anything else
+  1.0. Two-letter words are only corrected by a letter they dropped, so "js" and "ui" stay. Backspace right
+  after an autocorrect puts back what was typed, and that word is not corrected again in the field. When
+  the suggestions are not for the word yet (a quick space), the correction is worked out in the background
+  and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
+  (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe): 89.1% fixed, 9.2%
+  changed to another word (mostly real ambiguities such as "tht" for "that" or "the"), 1.6% left alone; no
+  correctly typed word changed. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
+  and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
+  Autocorrect (off by default).
+- **The pronoun I**: "i", "i'm", "i'd", "i'll" and "i've" typed on their own get a capital as the word ends,
+  with auto-capitalisation on, whether or not autocorrect is.
 - **Glide commit** adds a leading space unless at the field start or after whitespace or `( [ { <`; no
   trailing space, except after a phrase stroke that lifts inside the space bar. Backspace right after a
   glide deletes everything that glide wrote (all words of a phrase stroke; the leading space stays). The strip
@@ -283,7 +302,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   `PopupWindow`: creating a window per tap stalled the main thread for hundreds of milliseconds on the
   emulator. The popup sits over the upper third of its key so the top row's popup fits under the strip.
 - **Caps-mode queries** (`getCursorCapsMode`, an IPC) run only at word boundaries, never after a letter that is
-  still being composed. Autocorrect-on-space reuses the candidates the background thread already produced.
+  still being composed. Autocorrect reuses the candidates the background thread already produced for the
+  word, and never scans the dictionary on the main thread.
 - **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms.
   Arrows and Del repeat the same way on the bar and in code mode.
 - **Sticky modifiers**: tap = one-shot, second tap within 350 ms = locked, tap while locked = off.

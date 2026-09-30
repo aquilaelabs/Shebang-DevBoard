@@ -122,8 +122,9 @@ class GlideCommitTest {
         type("i")
         assertEquals("hello i", ic.toString())
         type(" ")
-        assertEquals("hello i ", ic.toString())
-        assertEquals(listOf("hello", "i"), learned.map { it.first })
+        // The pronoun gets its capital as the word ends.
+        assertEquals("hello I ", ic.toString())
+        assertEquals(listOf("hello", "I"), learned.map { it.first })
     }
 
     @Test

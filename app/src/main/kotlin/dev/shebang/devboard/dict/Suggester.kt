@@ -13,10 +13,15 @@ class Suggester(
     private val dict: Dictionary,
     /** How often the user has used each dictionary word (learned locally); null without personal data. */
     private val personalCounts: IntArray? = null,
+    /**
+     * How common each word is: the language model's unigram probability (sentence counts, the word list's
+     * frequency tiers where counts are missing, and the user's own words). Null ranks by tiers alone.
+     */
+    private val frequency: FloatArray? = null,
 ) {
-    /** Tier weight, raised for words the user uses: 1 use x1.35, 10 uses x2.2. */
+    /** How common word [i] is, raised for words the user uses: 1 use x1.35, 10 uses x2.2. */
     private fun weight(i: Int): Double {
-        val base = dict.weight(i)
+        val base = frequency?.getOrNull(i)?.toDouble() ?: dict.weight(i)
         val pc = personalCounts?.getOrNull(i) ?: 0
         return if (pc > 0) base * (1.0 + 0.5 * kotlin.math.ln(1.0 + pc)) else base
     }
@@ -69,6 +74,17 @@ class Suggester(
             }
         }
 
+        // 3. The word with an apostrophe put in ("cant" -> "can't"): people skip it, and the typed letters may
+        // themselves be a rare word, which keeps the corrections above from running.
+        if (lower.length >= 2 && '\'' !in lower) {
+            for (i in 1 until lower.length) {
+                val idx = dict.indexOf(lower.substring(0, i) + "'" + lower.substring(i))
+                if (idx < 0) continue
+                val word = matchCase(typed, dict.words[idx])
+                if (out.none { it.word.equals(word, ignoreCase = true) }) out.add(Suggestion(word, weight(idx) / 1.3, true))
+            }
+        }
+
         // The best prefix completion always leads: what was typed so far is trusted over a correction that
         // changes it. Corrections and the remaining completions then compete on score.
         val lead = out.firstOrNull { !it.isCorrection }
@@ -76,25 +92,72 @@ class Suggester(
         return (listOfNotNull(lead) + rest).take(limit)
     }
 
+    /**
+     * A word typed where a far more common contraction was meant, without its apostrophe ("cant" for
+     * "can't", "wont" for "won't"); null for everything else the dictionary knows ("ill", "well" stay).
+     */
+    private fun contractionFor(typed: String, known: Int, candidates: List<Suggestion>): String? {
+        if ((personalCounts?.getOrNull(known) ?: 0) > 0) return null
+        val lower = typed.lowercase()
+        for (c in candidates) {
+            val idx = dict.indexOf(c.word)
+            if (idx < 0 || !dict.lower[idx].contains('\'') || dict.lower[idx].replace("'", "") != lower) continue
+            // Only when the contraction is far more common than the word typed: "its", "were", "well" and
+            // "ill" are words people mean.
+            if (weight(idx) >= CONTRACTION_RATIO * weight(known)) return matchCase(typed, c.word)
+        }
+        return null
+    }
+
     /** The single best correction for autocorrect-on-space, or null when the typed word is fine. */
-    fun autocorrect(typed: String): String? = autocorrectFrom(typed, suggest(typed, 1))
+    fun autocorrect(typed: String): String? = autocorrectFrom(typed, suggest(typed, AUTOCORRECT_CANDIDATES))
 
     /**
      * Autocorrect using suggestions already computed for [typed] (the strip's candidates), so the space key
      * never scans the dictionary on the main thread. Only cheap lookups happen here.
+     *
+     * A word the dictionary knows is left alone. Otherwise the most common candidate within one slip of it
+     * (two for words of six letters or more) wins: a neighbouring key, two letters swapped, one dropped or
+     * one doubled, completions included ("te" for "the"). Only common words (tier 35 or better, or words the
+     * user uses) are corrected to. A two-letter word is only corrected by adding a letter it dropped, so
+     * abbreviations such as "js" or "ui" are not turned into other two-letter words.
      */
     fun autocorrectFrom(typed: String, candidates: List<Suggestion>): String? {
-        if (typed.length < 2 || dict.contains(typed)) return null
-        val best = candidates.firstOrNull() ?: return null
-        if (!best.isCorrection) return null
-        // Only correct confidently: a common word one edit away.
-        val idx = dict.indexOf(best.word)
-        if (idx < 0 || dict.tiers[idx] > 35) return null
-        val d = EditDistance.bounded(typed.lowercase(), dict.lower[idx], 2)
-        return if (d in 0..1) best.word else null
+        if (typed.length < 2) return null
+        val known = dict.indexOf(typed)
+        if (known >= 0) return contractionFor(typed, known, candidates)
+        val lower = typed.lowercase()
+        val maxD = if (lower.length >= 6) 2 else 1
+        var best: String? = null
+        var bestScore = 0.0
+        for (c in candidates) {
+            val idx = dict.indexOf(c.word)
+            if (idx < 0) continue
+            val used = (personalCounts?.getOrNull(idx) ?: 0) > 0
+            if (dict.tiers[idx] > 35 && !used) continue
+            val w = dict.lower[idx]
+            if (lower.length == 2 && !(w.length == 3 && EditDistance.bounded(lower, w, 1) == 1)) continue
+            val d = EditDistance.bounded(lower, w, maxD)
+            if (d < 1) continue
+            // How likely a finger makes this slip, against how common the word is.
+            val firstPenalty = if (w[0] != lower[0]) 0.35 else 1.0
+            val score = weight(idx) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w))
+            if (score > bestScore) {
+                bestScore = score
+                best = c.word
+            }
+        }
+        return best?.let { matchCase(typed, it) }
     }
 
     companion object {
+        /** How many suggestions are computed while typing: the strip shows three, autocorrect weighs them all. */
+        const val AUTOCORRECT_CANDIDATES = 6
+        /** How much more common a contraction must be than the word typed without its apostrophe. */
+        private const val CONTRACTION_RATIO = 50.0
+        /** How strongly an unlikely slip counts against a common word (per unit of [SlipCost]). */
+        var SLIP_WEIGHT = 6.0
+
         /** Copies the user's casing onto a suggestion: "Hel" -> "Hello", "HEL" -> "HELLO", "hel" -> dictionary casing. */
         fun matchCase(typed: String, word: String): String {
             if (typed.isEmpty()) return word
@@ -140,5 +203,55 @@ object EditDistance {
         }
         val d = prev[m]
         return if (d > max) -1 else d
+    }
+}
+
+/**
+ * How likely a typed word is a slip of the finger for a word: an edit distance where the slips people make
+ * on a QWERTY keyboard cost less. A neighbouring key instead of the right one, two letters swapped, or a
+ * letter doubled cost 0.5; a skipped apostrophe ("dont") 0.2; one of a double letter dropped ("adress")
+ * 0.4; any other letter dropped 0.8; any other letter extra or wrong 1.0.
+ */
+object SlipCost {
+    private val rows = arrayOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
+    private val rowOf = IntArray(26) { -1 }
+    private val colOf = FloatArray(26)
+
+    init {
+        for ((r, row) in rows.withIndex()) for ((i, c) in row.withIndex()) {
+            rowOf[c - 'a'] = r
+            colOf[c - 'a'] = i + r * 0.5f
+        }
+    }
+
+    private fun adjacent(a: Char, b: Char): Boolean {
+        val i = a - 'a'
+        val j = b - 'a'
+        if (i !in 0..25 || j !in 0..25) return false
+        val dr = kotlin.math.abs(rowOf[i] - rowOf[j])
+        val dc = kotlin.math.abs(colOf[i] - colOf[j])
+        return dr <= 1 && dc <= 1.0f
+    }
+
+    fun cost(typed: String, word: String): Double {
+        val n = typed.length
+        val m = word.length
+        val d = Array(n + 1) { DoubleArray(m + 1) }
+        for (i in 0..n) d[i][0] = i * 1.0
+        for (j in 0..m) d[0][j] = j * 0.8
+        for (i in 1..n) for (j in 1..m) {
+            val a = typed[i - 1]
+            val b = word[j - 1]
+            val sub = if (a == b) 0.0 else if (adjacent(a, b)) 0.5 else 1.0
+            // An extra letter typed: cheap when it doubles the one before or sits next to it.
+            val extra = if (i >= 2 && (typed[i - 2] == a || adjacent(typed[i - 2], a))) 0.6 else 1.0
+            // A letter the word has and the typing lacks: cheapest for a skipped apostrophe, cheap for one of a
+            // double letter.
+            val dropped = if (b == '\'') 0.2 else if (j >= 2 && word[j - 2] == b) 0.4 else 0.8
+            var v = minOf(d[i - 1][j - 1] + sub, d[i - 1][j] + extra, d[i][j - 1] + dropped)
+            if (i > 1 && j > 1 && a == word[j - 2] && typed[i - 2] == b) v = minOf(v, d[i - 2][j - 2] + 0.5)
+            d[i][j] = v
+        }
+        return d[n][m]
     }
 }

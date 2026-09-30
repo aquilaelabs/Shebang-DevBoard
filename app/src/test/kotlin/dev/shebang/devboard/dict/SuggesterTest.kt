@@ -69,8 +69,13 @@ class SuggesterTest {
     fun autocorrectFromReusesCandidatesWithoutScanning() {
         assertEquals("hello", s.autocorrectFrom("helo", listOf(Suggestion("hello", 1.0, isCorrection = true))))
         assertNull(s.autocorrectFrom("helo", emptyList()))
-        assertNull(s.autocorrectFrom("helo", listOf(Suggestion("help", 1.0, isCorrection = false))))
+        // Every candidate counts, completions included; the likeliest slip of a common word wins.
+        assertEquals("hello", s.autocorrectFrom("helo", listOf(Suggestion("help", 1.0, isCorrection = false), Suggestion("hello", 0.5, isCorrection = true))))
+        assertEquals("the", s.autocorrectFrom("te", listOf(Suggestion("tea", 1.0, isCorrection = false), Suggestion("the", 0.5, isCorrection = true))))
+        // A word the dictionary knows is never changed.
         assertNull(s.autocorrectFrom("hello", listOf(Suggestion("help", 1.0, isCorrection = true))))
+        // Two-letter words are only corrected by a letter they dropped.
+        assertNull(s.autocorrectFrom("js", listOf(Suggestion("is", 1.0, isCorrection = true))))
     }
 
     @Test

@@ -37,6 +37,8 @@ class TextInputController(
     private val background: Executor,
     private val main: Handler,
     private val learner: Learner = Learner.NONE,
+    /** Runs work on the main thread; the Handler by default, replaceable where no Looper runs (tests). */
+    private val postToMain: (Runnable) -> Unit = { main.post(it) },
 ) {
     interface Ui {
         /** Words for the strip, best first; empty clears it. */
@@ -75,6 +77,14 @@ class TextInputController(
 
     private val word = StringBuilder(32)
     private var candidates: List<Suggestion> = emptyList()
+    /** The typed word [candidates] were computed for: autocorrect trusts them only for that word. */
+    private var candidatesFor = ""
+
+    /** The last word autocorrect changed, while it is the last thing typed: backspace puts back [typed]. */
+    private class Autocorrected(val typed: String, val corrected: String, val after: String)
+    private var lastAutocorrect: Autocorrected? = null
+    /** Words the user took back from autocorrect in this field (lowercase): typed again, they stay as typed. */
+    private val keptAsTyped = HashSet<String>()
     private var suggestGeneration = 0
     private var lastSpaceTime = 0L
     private var lastActionWasSpace = false
@@ -148,6 +158,9 @@ class TextInputController(
     private fun resetState() {
         word.setLength(0)
         candidates = emptyList()
+        candidatesFor = ""
+        lastAutocorrect = null
+        keptAsTyped.clear()
         lastGlide = null
         target = null
         recent.clear()
@@ -240,7 +253,7 @@ class TextInputController(
         val s = suggester ?: return
         background.execute {
             val found = s.suggest(t.text.lowercase(), 3).map { caseFor(t, it.word) }.filter { !it.equals(t.text, ignoreCase = true) }.take(2)
-            main.post { if (gen == targetGeneration && target === t) showTarget(t, found) }
+            postToMain { if (gen == targetGeneration && target === t) showTarget(t, found) }
         }
     }
 
@@ -317,6 +330,7 @@ class TextInputController(
         val ic = connection() ?: return
         dropTarget()
         ownEdit()
+        lastAutocorrect = null
         lastActionWasSpace = false
         val glideBefore = lastGlide
         settle()
@@ -337,8 +351,11 @@ class TextInputController(
             requestSuggestions()
             return
         }
-        if (isComposing) learnTyped(ic, word.toString())
-        finishComposing(ic)
+        if (isComposing) {
+            // Sentence punctuation ends a word as space does; anything else (a digit, a symbol) just follows it.
+            endWord(ic, text, correct = text.length == 1 && text[0] in SENTENCE_PUNCTUATION, deferOk = true)
+            return
+        }
         ic.commitText(text, 1)
     }
 
@@ -356,19 +373,12 @@ class TextInputController(
             return
         }
         ownEdit()
+        lastAutocorrect = null
         lastGlide?.let { lastGlide = null; clearCandidates() }
         settle()
         val now = clock()
         if (isComposing) {
-            val typed = word.toString()
-            var commit = typed
-            // Uses the candidates the background thread already produced for this word; nothing is scanned here.
-            if (settings.autocorrect) suggester?.autocorrectFrom(typed, candidates)?.let { commit = Suggester.matchCase(typed, it) }
-            learnTyped(ic, commit)
-            ic.commitText(commit, 1)
-            word.setLength(0)
-            clearCandidates()
-            ic.commitText(" ", 1)
+            endWord(ic, " ", correct = true, deferOk = true)
         } else if (settings.doubleSpacePeriod && field.allowsComposing && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
@@ -421,6 +431,17 @@ class TextInputController(
         dropTarget()
         ownEdit()
         lastActionWasSpace = false
+        val ac = lastAutocorrect
+        lastAutocorrect = null
+        if (ac != null && !isComposing && ic.getTextBeforeCursor(ac.corrected.length + ac.after.length, 0)?.toString() == ac.corrected + ac.after) {
+            // Right after an autocorrect: put back what was typed (without the space), and leave it be from now on.
+            ic.beginBatchEdit()
+            ic.deleteSurroundingText(ac.corrected.length + ac.after.length, 0)
+            ic.commitText(ac.typed, 1)
+            ic.endBatchEdit()
+            keptAsTyped += ac.typed.lowercase()
+            return
+        }
         val glide = lastGlide
         lastGlide = null
         // Backspace right after a glide removes everything that glide wrote, unlearned: when it still stands
@@ -468,10 +489,10 @@ class TextInputController(
         dropTarget()
         ownEdit()
         lastActionWasSpace = false
+        lastAutocorrect = null
         lastGlide = null
         settle()
-        if (isComposing) learnTyped(ic, word.toString())
-        finishComposing(ic)
+        if (isComposing) endWord(ic, "", correct = true, deferOk = false)
         clearCandidates()
         when {
             field.enterIsNewline -> ic.commitText("\n", 1)
@@ -485,8 +506,8 @@ class TextInputController(
         val ic = connection() ?: return
         dropTarget()
         ownEdit()
-        if (isComposing) learnTyped(ic, word.toString())
-        finishComposing(ic)
+        lastAutocorrect = null
+        if (isComposing) endWord(ic, "", correct = false, deferOk = false)
         lastGlide = null
         settle()
         clearCandidates()
@@ -498,6 +519,76 @@ class TextInputController(
             word.setLength(0)
             clearCandidates()
         }
+    }
+
+    /**
+     * Ends the word being typed, followed by [after] (a space, punctuation, or nothing). With [correct],
+     * autocorrect (when on) applies; the pronoun I is capitalised when auto-capitalisation is on; the word is
+     * learned as it ends up. When the strip's suggestions are not for this word yet (a quick space), with
+     * [deferOk] the correction is worked out in the background and applied if the word and what follows still
+     * stand as typed.
+     */
+    private fun endWord(ic: InputConnection, after: String, correct: Boolean, deferOk: Boolean) {
+        val typed = word.toString()
+        val context = learningContext(ic)
+        val canCorrect = correct && settings.autocorrect && field.allowsComposing && typed.lowercase() !in keptAsTyped
+        var commit = typed
+        var defer = false
+        if (canCorrect) {
+            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates)?.let { commit = it }
+            else defer = deferOk && suggester != null
+        }
+        commit = pronounCase(commit)
+        ic.beginBatchEdit()
+        ic.commitText(commit, 1)
+        if (after.isNotEmpty()) ic.commitText(after, 1)
+        ic.endBatchEdit()
+        word.setLength(0)
+        clearCandidates()
+        if (commit != pronounCase(typed)) lastAutocorrect = Autocorrected(typed, commit, after)
+        if (!defer) {
+            learnAs(commit, context)
+            return
+        }
+        val s = suggester ?: return
+        background.execute {
+            val fix = s.autocorrect(typed)
+            postToMain {
+                val ic2 = connection()
+                val late = fix?.let { pronounCase(it) }
+                if (late != null && ic2 != null && !isComposing &&
+                    ic2.getTextBeforeCursor(typed.length + after.length, 0)?.toString() == typed + after
+                ) {
+                    ownEdit()
+                    ic2.beginBatchEdit()
+                    ic2.deleteSurroundingText(typed.length + after.length, 0)
+                    ic2.commitText(late + after, 1)
+                    ic2.endBatchEdit()
+                    lastAutocorrect = Autocorrected(typed, late, after)
+                    learnAs(late, context)
+                } else {
+                    learnAs(commit, context)
+                }
+            }
+        }
+    }
+
+    /** "i", "i'm", "i'd", "i'll" and "i've" with a capital, when auto-capitalisation is on. */
+    private fun pronounCase(w: String): String {
+        if (!settings.autoCaps || !field.allowsAutoCaps) return w
+        return if (w.lowercase().replace('’', '\'') in PRONOUN_I) w.replaceFirstChar { it.uppercaseChar() } else w
+    }
+
+    /** The word before the composing word (lowercase, or null) and whether it begins a sentence. */
+    private fun learningContext(ic: InputConnection): Pair<String?, Boolean> {
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return null to false
+        val rest = if (word.isNotEmpty() && before.endsWith(word)) before.subSequence(0, before.length - word.length) else before
+        val prev = GlideText.contextWord(rest)
+        return prev.takeIf { it.isNotEmpty() && it != GlideText.SENTENCE_START } to (prev == GlideText.SENTENCE_START)
+    }
+
+    private fun learnAs(w: String, context: Pair<String?, Boolean>) {
+        if (field.allowsLearning) learner.learnWord(w, context.first, context.second)
     }
 
     /** Learns a typed word as it is committed, with the word before it. One InputConnection read. */
@@ -539,11 +630,12 @@ class TextInputController(
         val typed = word.toString()
         val gen = ++suggestGeneration
         background.execute {
-            val result = s.suggest(typed, 3)
-            main.post {
-                if (gen != suggestGeneration || !isComposing) return@post
+            val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES)
+            postToMain {
+                if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
-                ui.showCandidates(arrangeForStrip(typed, result.map { it.word }))
+                candidatesFor = typed
+                ui.showCandidates(arrangeForStrip(typed, result.take(3).map { it.word }))
             }
         }
     }
@@ -701,8 +793,8 @@ class TextInputController(
         if (result.words.isEmpty()) return
         val ic = connection() ?: return
         dictionaryInUse = dictionary
-        if (isComposing) learnTyped(ic, word.toString())
-        finishComposing(ic)
+        lastAutocorrect = null
+        if (isComposing) endWord(ic, "", correct = true, deferOk = false)
         lastActionWasSpace = false
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
         target?.glided?.let { pending.remove(it) }
@@ -772,6 +864,9 @@ class TextInputController(
 
     companion object {
         private const val DOUBLE_SPACE_MS = 600L
+        /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
+        private const val SENTENCE_PUNCTUATION = ".,!?;:)\"'"
+        private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
         /** Characters read before the cursor for the word before it. */
