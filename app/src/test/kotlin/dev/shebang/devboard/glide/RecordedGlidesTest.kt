@@ -9,19 +9,28 @@ import java.io.File
  * Replays glides recorded with the app's recorder (Settings > Record glides > Export). Put exported
  * .jsonl files in src/test/resources/glide/traces/ or point DEVBOARD_TRACES at a file or folder.
  * Skipped when there are none.
+ *
+ *     DEVBOARD_TRACES=/path/glides.jsonl ./gradlew testDebugUnitTest --tests '*RecordedGlidesTest*' -i | grep GLIDE
+ *
+ * This only measures: the decoder's shipped values are tuned on the FUTO dataset alone (see
+ * FutoSwipesTest.futoTune), never on one person's recordings; a user's own habits are learned on the
+ * device by GlideAdaptation.
  */
 class RecordedGlidesTest {
-    @Test
-    fun recordedGlides() {
+    private val files: List<File> by lazy {
         val sources = listOfNotNull(File("src/test/resources/glide/traces"), System.getenv("DEVBOARD_TRACES")?.let { File(it) })
-        val files = sources.flatMap { src ->
+        sources.flatMap { src ->
             when {
                 src.isDirectory -> src.listFiles { f -> f.name.endsWith(".jsonl") }?.toList().orEmpty()
                 src.isFile -> listOf(src)
                 else -> emptyList()
             }
         }
-        val traces = files.flatMap { f -> f.readLines().filter { it.isNotBlank() }.map { GlideTrace.parseLine(it) } }
+    }
+    private val traces: List<GlideTrace> by lazy { files.flatMap { f -> f.readLines().filter { it.isNotBlank() }.map { GlideTrace.parseLine(it) } } }
+
+    @Test
+    fun recordedGlides() {
         assumeTrue("no recorded glides", traces.isNotEmpty())
 
         val dictionary = GlideBenchmarkTest.dictionary

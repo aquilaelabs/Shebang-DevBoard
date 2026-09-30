@@ -235,6 +235,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   frequency and context.
 - **When nothing fits**: after the wider retry, the decoder falls back to the candidates the preview last
   showed rather than drop the gesture; one backspace removes the result.
+- **Whose glides tune the decoder** (the user's decision): the shipped parameters are tuned on the FUTO
+  dataset only. Glides recorded with **Settings > Record glides** (by the author or sent in by users as
+  exported `.jsonl`) are replayed by `RecordedGlidesTest` to measure, never to tune: a trial search on
+  1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
+  and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
+  adaptation, with its daily limits and snapshots.
 - **Redoing a word in the field** (changed at the user's request, after a preview row was tried): the
   keyboard never rewrites text on its own. An earlier design rewrote up to four glided words in place when
   a later glide made another reading likelier, which changed text the user had already seen go in. A

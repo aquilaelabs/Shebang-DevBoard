@@ -18,17 +18,16 @@ import java.io.File
  * The data is not in the repository: download it from https://huggingface.co/datasets/futo-org/swipe.futo.org
  */
 class FutoSwipesTest {
-    private class Swipe(val word: String, val context: Int, val context2: Int, val layout: KeyLayoutModel, val x: FloatArray, val y: FloatArray, val t: LongArray)
-
     private val dictionary get() = GlideBenchmarkTest.dictionary
     private val lm get() = GlideBenchmarkTest.lm
 
-    private fun load(path: String? = System.getenv("FUTO_SWIPES"), limit: Int = System.getenv("FUTO_LIMIT")?.toIntOrNull() ?: 5000): Pair<List<Swipe>, Int>? {
+    /** Swipes from [path] whose word is in the dictionary, and how many were skipped as out of vocabulary. */
+    fun load(path: String? = System.getenv("FUTO_SWIPES"), limit: Int = System.getenv("FUTO_LIMIT")?.toIntOrNull() ?: 5000): Pair<List<ReplayGlide>, Int>? {
         if (path == null) return null
         val file = File(path)
         if (!file.isFile) return null
         val layoutFile = System.getenv("FUTO_LAYOUT")?.let { File(it) } ?: File(file.parentFile, "qwerty.json")
-        val out = ArrayList<Swipe>()
+        val out = ArrayList<ReplayGlide>()
         var outOfVocabulary = 0
         // Read more than asked for: words the test cannot use are skipped.
         for (r in FutoData.read(file, limit * 2, layoutFile)) {
@@ -38,7 +37,7 @@ class FutoSwipesTest {
                 outOfVocabulary++
                 continue
             }
-            out += Swipe(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t)
+            out += ReplayGlide(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t)
         }
         return out to outOfVocabulary
     }
@@ -65,7 +64,7 @@ class FutoSwipesTest {
 
     private class Score(var n: Int = 0, var top1: Int = 0, var top3: Int = 0, var empty: Int = 0)
 
-    private fun run(swipes: List<Swipe>, params: GlideParams, useContext: Boolean, confusions: MutableMap<String, Int>? = null, byLength: MutableMap<Int, Score>? = null): Score {
+    private fun run(swipes: List<ReplayGlide>, params: GlideParams, useContext: Boolean, confusions: MutableMap<String, Int>? = null, byLength: MutableMap<Int, Score>? = null): Score {
         val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, params)
         val s = Score()
         for (sw in swipes) {
@@ -142,44 +141,9 @@ class FutoSwipesTest {
         val dev = load(devPath, System.getenv("FUTO_TUNE_LIMIT")?.toIntOrNull() ?: 4000)!!.first
         val test = load()?.first
         val pct = GlideBenchmarkTest::pct
-        fun score(p: GlideParams, set: List<Swipe>) = run(set, p, true).let { it.top1.toDouble() / it.n }
-
-        class Knob(val name: String, val get: (GlideParams) -> Float, val set: (GlideParams, Float) -> GlideParams)
-        val knobs = listOf(
-            Knob("sigmaVertex", { it.sigmaVertex }, { p, v -> p.copy(sigmaVertex = v) }),
-            Knob("sigmaMid", { it.sigmaMid }, { p, v -> p.copy(sigmaMid = v) }),
-            Knob("sigmaStart", { it.sigmaStart }, { p, v -> p.copy(sigmaStart = v) }),
-            Knob("startRadius", { it.startRadius }, { p, v -> p.copy(startRadius = v) }),
-            Knob("stayCost", { it.stayCost }, { p, v -> p.copy(stayCost = v) }),
-            Knob("skipCost", { it.skipCost }, { p, v -> p.copy(skipCost = v) }),
-            Knob("endCost", { it.endCost }, { p, v -> p.copy(endCost = v) }),
-            Knob("slowWeight", { it.slowWeight }, { p, v -> p.copy(slowWeight = v) }),
-            Knob("vertexBias", { it.vertexBias }, { p, v -> p.copy(vertexBias = v) }),
-            Knob("turnWeight", { it.turnWeight }, { p, v -> p.copy(turnWeight = v) }),
-            Knob("turnMidWeight", { it.turnMidWeight }, { p, v -> p.copy(turnMidWeight = v) }),
-            Knob("lmWeight", { it.lmWeight }, { p, v -> p.copy(lmWeight = v) }),
-            Knob("lookaheadWeight", { it.lookaheadWeight }, { p, v -> p.copy(lookaheadWeight = v) }),
-        )
-        var best = GlideParams()
-        var bestScore = score(best, dev)
-        println("FUTO TUNE start: dev top-1 ${"%.2f".format(100 * bestScore)}% on ${dev.size} swipes")
-        var step = 0.5f
-        repeat(3) { round ->
-            for (k in knobs) {
-                val cur = k.get(best)
-                val tries = if (cur == 0f) listOf(0.25f, 0.5f) else listOf(cur * (1 - step), cur * (1 + step), cur * (1 + 2 * step))
-                for (v in tries) {
-                    val p = k.set(best, v)
-                    val sc = score(p, dev)
-                    if (sc > bestScore + 0.0005) {
-                        bestScore = sc
-                        best = p
-                        println("FUTO TUNE round ${round + 1}: ${k.name} ${"%.3f".format(cur)} -> ${"%.3f".format(v)}  dev top-1 ${"%.2f".format(100 * sc)}%")
-                    }
-                }
-            }
-            step /= 2
-        }
+        fun score(p: GlideParams, set: List<ReplayGlide>) = run(set, p, true).let { it.top1.toDouble() / it.n }
+        println("FUTO TUNE on ${dev.size} dev swipes")
+        val best = GlideTuner.tune(GlideParams(), { score(it, dev) }, { println("FUTO TUNE $it") })
         println("FUTO TUNE best: $best")
         if (test != null) {
             val before = run(test, GlideParams(), true)
