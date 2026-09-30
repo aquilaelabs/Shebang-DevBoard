@@ -1,0 +1,112 @@
+{
+ "name": "numeric",
+ "mode": "numeric",
+ "widthUnits": 4,
+ "rows": [
+  {
+   "keys": [
+    {
+     "text": "1"
+    },
+    {
+     "text": "2"
+    },
+    {
+     "text": "3"
+    },
+    {
+     "action": "backspace",
+     "label": "⌫",
+     "repeat": true,
+     "functional": true
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "text": "4"
+    },
+    {
+     "text": "5"
+    },
+    {
+     "text": "6"
+    },
+    {
+     "text": "-",
+     "alternates": [
+      "+",
+      "*",
+      "/",
+      "#",
+      "(",
+      ")"
+     ]
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "text": "7"
+    },
+    {
+     "text": "8"
+    },
+    {
+     "text": "9"
+    },
+    {
+     "text": ".",
+     "alternates": [
+      ":",
+      ";",
+      ","
+     ]
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "action": "mode_code",
+     "label": "#!",
+     "functional": true
+    },
+    {
+     "text": ",",
+     "alternates": [
+      " ",
+      "+",
+      "*",
+      "#"
+     ],
+     "hide": [
+      "phone"
+     ]
+    },
+    {
+     "text": "+",
+     "alternates": [
+      "*",
+      "#",
+      ",",
+      ";"
+     ],
+     "only": [
+      "phone"
+     ]
+    },
+    {
+     "text": "0"
+    },
+    {
+     "action": "enter",
+     "label": "⏎",
+     "functional": true
+    }
+   ]
+  }
+ ]
+}

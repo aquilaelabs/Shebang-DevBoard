@@ -1,0 +1,206 @@
+{
+ "name": "code",
+ "mode": "code",
+ "widthUnits": 10,
+ "rows": [
+  {
+   "keys": [
+    {
+     "text": "1"
+    },
+    {
+     "text": "2"
+    },
+    {
+     "text": "3"
+    },
+    {
+     "text": "4"
+    },
+    {
+     "text": "5"
+    },
+    {
+     "text": "6"
+    },
+    {
+     "text": "7"
+    },
+    {
+     "text": "8"
+    },
+    {
+     "text": "9"
+    },
+    {
+     "text": "0"
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "text": "!"
+    },
+    {
+     "text": "@"
+    },
+    {
+     "text": "#"
+    },
+    {
+     "text": "$"
+    },
+    {
+     "text": "%"
+    },
+    {
+     "text": "^"
+    },
+    {
+     "text": "&"
+    },
+    {
+     "text": "*"
+    },
+    {
+     "text": "("
+    },
+    {
+     "text": ")"
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "text": "`"
+    },
+    {
+     "text": "~"
+    },
+    {
+     "text": "-"
+    },
+    {
+     "text": "_"
+    },
+    {
+     "text": "="
+    },
+    {
+     "text": "+"
+    },
+    {
+     "text": "["
+    },
+    {
+     "text": "]"
+    },
+    {
+     "text": "{"
+    },
+    {
+     "text": "}"
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "text": "\\"
+    },
+    {
+     "text": "|"
+    },
+    {
+     "text": ";"
+    },
+    {
+     "text": ":"
+    },
+    {
+     "text": "'"
+    },
+    {
+     "text": "\""
+    },
+    {
+     "text": ","
+    },
+    {
+     "text": "."
+    },
+    {
+     "text": "<"
+    },
+    {
+     "text": ">"
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "action": "mode_text",
+     "label": "ABC",
+     "width": 1,
+     "functional": true
+    },
+    {
+     "text": "/"
+    },
+    {
+     "text": "?"
+    },
+    {
+     "code": "DPAD_LEFT",
+     "label": "←",
+     "width": 0.875,
+     "repeat": true,
+     "functional": true
+    },
+    {
+     "code": "DPAD_UP",
+     "label": "↑",
+     "width": 0.875,
+     "repeat": true,
+     "functional": true
+    },
+    {
+     "code": "DPAD_DOWN",
+     "label": "↓",
+     "width": 0.875,
+     "repeat": true,
+     "functional": true
+    },
+    {
+     "code": "DPAD_RIGHT",
+     "label": "→",
+     "width": 0.875,
+     "repeat": true,
+     "functional": true
+    },
+    {
+     "action": "space",
+     "label": "",
+     "width": 1.5,
+     "flex": true
+    },
+    {
+     "action": "backspace",
+     "label": "⌫",
+     "width": 1,
+     "repeat": true,
+     "functional": true
+    },
+    {
+     "action": "enter",
+     "label": "⏎",
+     "width": 1,
+     "functional": true
+    }
+   ]
+  }
+ ]
+}

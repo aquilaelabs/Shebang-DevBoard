@@ -1,0 +1,199 @@
+{
+ "items": [
+  {
+   "type": "key",
+   "label": "Esc",
+   "code": "ESCAPE"
+  },
+  {
+   "type": "key",
+   "label": "Tab",
+   "code": "TAB"
+  },
+  {
+   "type": "modifier",
+   "label": "Ctrl",
+   "mod": "ctrl"
+  },
+  {
+   "type": "modifier",
+   "label": "Alt",
+   "mod": "alt"
+  },
+  {
+   "type": "modifier",
+   "label": "Shift",
+   "mod": "shift"
+  },
+  {
+   "type": "key",
+   "label": "^C",
+   "code": "C",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "^D",
+   "code": "D",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "^Z",
+   "code": "Z",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "^L",
+   "code": "L",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "^R",
+   "code": "R",
+   "mods": [
+    "ctrl"
+   ]
+  },
+  {
+   "type": "key",
+   "label": "←",
+   "code": "DPAD_LEFT",
+   "repeat": true
+  },
+  {
+   "type": "key",
+   "label": "↑",
+   "code": "DPAD_UP",
+   "repeat": true
+  },
+  {
+   "type": "key",
+   "label": "↓",
+   "code": "DPAD_DOWN",
+   "repeat": true
+  },
+  {
+   "type": "key",
+   "label": "→",
+   "code": "DPAD_RIGHT",
+   "repeat": true
+  },
+  {
+   "type": "key",
+   "label": "Home",
+   "code": "MOVE_HOME"
+  },
+  {
+   "type": "key",
+   "label": "End",
+   "code": "MOVE_END"
+  },
+  {
+   "type": "key",
+   "label": "PgUp",
+   "code": "PAGE_UP"
+  },
+  {
+   "type": "key",
+   "label": "PgDn",
+   "code": "PAGE_DOWN"
+  },
+  {
+   "type": "key",
+   "label": "Del",
+   "code": "FORWARD_DEL",
+   "repeat": true
+  },
+  {
+   "type": "key",
+   "label": "F1",
+   "code": "F1"
+  },
+  {
+   "type": "key",
+   "label": "F2",
+   "code": "F2"
+  },
+  {
+   "type": "key",
+   "label": "F3",
+   "code": "F3"
+  },
+  {
+   "type": "key",
+   "label": "F4",
+   "code": "F4"
+  },
+  {
+   "type": "key",
+   "label": "F5",
+   "code": "F5"
+  },
+  {
+   "type": "key",
+   "label": "F6",
+   "code": "F6"
+  },
+  {
+   "type": "key",
+   "label": "F7",
+   "code": "F7"
+  },
+  {
+   "type": "key",
+   "label": "F8",
+   "code": "F8"
+  },
+  {
+   "type": "key",
+   "label": "F9",
+   "code": "F9"
+  },
+  {
+   "type": "key",
+   "label": "F10",
+   "code": "F10"
+  },
+  {
+   "type": "key",
+   "label": "F11",
+   "code": "F11"
+  },
+  {
+   "type": "key",
+   "label": "F12",
+   "code": "F12"
+  },
+  {
+   "type": "snippet",
+   "label": "sudo",
+   "text": "sudo "
+  },
+  {
+   "type": "snippet",
+   "label": "&&",
+   "text": "&&"
+  },
+  {
+   "type": "snippet",
+   "label": "| grep",
+   "text": "| grep "
+  },
+  {
+   "type": "snippet",
+   "label": "2>&1",
+   "text": "2>&1"
+  }
+ ]
+}

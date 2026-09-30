@@ -1,0 +1,385 @@
+{
+ "name": "text_qwerty",
+ "mode": "text",
+ "widthUnits": 10,
+ "composing": true,
+ "numberRow": {
+  "keys": [
+   {
+    "text": "1",
+    "alternates": [
+     "¹",
+     "½",
+     "⅓",
+     "¼"
+    ]
+   },
+   {
+    "text": "2",
+    "alternates": [
+     "²",
+     "⅔"
+    ]
+   },
+   {
+    "text": "3",
+    "alternates": [
+     "³",
+     "¾"
+    ]
+   },
+   {
+    "text": "4",
+    "alternates": [
+     "⁴"
+    ]
+   },
+   {
+    "text": "5",
+    "alternates": [
+     "⁵"
+    ]
+   },
+   {
+    "text": "6",
+    "alternates": [
+     "⁶"
+    ]
+   },
+   {
+    "text": "7",
+    "alternates": [
+     "⁷"
+    ]
+   },
+   {
+    "text": "8",
+    "alternates": [
+     "⁸"
+    ]
+   },
+   {
+    "text": "9",
+    "alternates": [
+     "⁹"
+    ]
+   },
+   {
+    "text": "0",
+    "alternates": [
+     "⁰",
+     "ⁿ",
+     "∅"
+    ]
+   }
+  ]
+ },
+ "rows": [
+  {
+   "keys": [
+    {
+     "text": "q",
+     "alternates": [
+      "1"
+     ]
+    },
+    {
+     "text": "w",
+     "alternates": [
+      "2"
+     ]
+    },
+    {
+     "text": "e",
+     "alternates": [
+      "3",
+      "é",
+      "è",
+      "ê",
+      "ë",
+      "ē"
+     ]
+    },
+    {
+     "text": "r",
+     "alternates": [
+      "4"
+     ]
+    },
+    {
+     "text": "t",
+     "alternates": [
+      "5",
+      "þ"
+     ]
+    },
+    {
+     "text": "y",
+     "alternates": [
+      "6",
+      "ý",
+      "ÿ"
+     ]
+    },
+    {
+     "text": "u",
+     "alternates": [
+      "7",
+      "ú",
+      "ù",
+      "û",
+      "ü",
+      "ū"
+     ]
+    },
+    {
+     "text": "i",
+     "alternates": [
+      "8",
+      "í",
+      "ì",
+      "î",
+      "ï",
+      "ī"
+     ]
+    },
+    {
+     "text": "o",
+     "alternates": [
+      "9",
+      "ó",
+      "ò",
+      "ô",
+      "ö",
+      "õ",
+      "ø",
+      "œ"
+     ]
+    },
+    {
+     "text": "p",
+     "alternates": [
+      "0"
+     ]
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "spacer": true,
+     "width": 0.5
+    },
+    {
+     "text": "a",
+     "alternates": [
+      "á",
+      "à",
+      "â",
+      "ä",
+      "ã",
+      "å",
+      "æ",
+      "ā"
+     ]
+    },
+    {
+     "text": "s",
+     "alternates": [
+      "ß",
+      "ś",
+      "š",
+      "$"
+     ]
+    },
+    {
+     "text": "d",
+     "alternates": [
+      "ð",
+      "ď"
+     ]
+    },
+    {
+     "text": "f",
+     "alternates": []
+    },
+    {
+     "text": "g",
+     "alternates": [
+      "ğ"
+     ]
+    },
+    {
+     "text": "h",
+     "alternates": []
+    },
+    {
+     "text": "j",
+     "alternates": []
+    },
+    {
+     "text": "k",
+     "alternates": []
+    },
+    {
+     "text": "l",
+     "alternates": [
+      "ł"
+     ]
+    },
+    {
+     "spacer": true,
+     "width": 0.5
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "action": "shift",
+     "label": "⇧",
+     "width": 1.5,
+     "functional": true
+    },
+    {
+     "text": "z",
+     "alternates": [
+      "ž",
+      "ź",
+      "ż"
+     ]
+    },
+    {
+     "text": "x",
+     "alternates": []
+    },
+    {
+     "text": "c",
+     "alternates": [
+      "ç",
+      "ć",
+      "č"
+     ]
+    },
+    {
+     "text": "v",
+     "alternates": []
+    },
+    {
+     "text": "b",
+     "alternates": []
+    },
+    {
+     "text": "n",
+     "alternates": [
+      "ñ",
+      "ń"
+     ]
+    },
+    {
+     "text": "m",
+     "alternates": []
+    },
+    {
+     "action": "backspace",
+     "label": "⌫",
+     "width": 1.5,
+     "repeat": true,
+     "functional": true
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
+     "action": "mode_code",
+     "label": "#!",
+     "width": 1.25,
+     "functional": true
+    },
+    {
+     "text": ",",
+     "label": ",",
+     "width": 1,
+     "alternates": [
+      "!",
+      "?",
+      ";",
+      ":",
+      "-",
+      "'",
+      "\""
+     ],
+     "hide": [
+      "email",
+      "url"
+     ]
+    },
+    {
+     "text": "/",
+     "width": 1,
+     "only": [
+      "email",
+      "url"
+     ],
+     "alternates": [
+      "-",
+      "_",
+      "~",
+      ":"
+     ]
+    },
+    {
+     "text": "@",
+     "width": 1,
+     "only": [
+      "email",
+      "url"
+     ],
+     "alternates": [
+      "#",
+      "%",
+      "&",
+      "+"
+     ]
+    },
+    {
+     "action": "space",
+     "label": "",
+     "flex": true
+    },
+    {
+     "text": ".",
+     "label": ".",
+     "width": 1,
+     "alternates": [
+      "?",
+      "!",
+      ",",
+      ";",
+      ":",
+      "…",
+      "-",
+      "'",
+      "\"",
+      "(",
+      ")",
+      "@",
+      "#",
+      "$",
+      "%",
+      "&",
+      "*",
+      "/"
+     ]
+    },
+    {
+     "action": "enter",
+     "label": "⏎",
+     "width": 1.25,
+     "functional": true
+    }
+   ]
+  }
+ ]
+}
