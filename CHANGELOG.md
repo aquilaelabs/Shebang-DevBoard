@@ -9,9 +9,13 @@
 - Terminal bar with sticky Ctrl/Alt/Shift/Meta, real KeyEvents for terminals, hold-to-repeat arrows and Del, snippets, and a JSON editor with import/export (4447b83)
 - Field-aware behaviour: raw input for terminals, no suggestions or glide in password fields, numeric pad for number/phone/date, @ and / for email/URL (4447b83)
 - Setup screen with the three enable/select/test steps and a Material 3 settings app (theme, height, haptics, sounds, glide, autocorrect, strip mode) (4447b83)
-- A later glide can fix up to four earlier glided words when the pair makes their meaning clear (Settings: Fix earlier glided words) (6383035)
+- Glided words wait in a preview row above the keys for two seconds before going into the field; a later glide can re-read words still in the row, and text in the field is never rewritten (Settings: Preview glides, Refine previewed words) (6383035, 15d883d)
 - Phrase gliding: dip into the space bar mid-stroke to glide several words without lifting (Settings, off by default) (6383035)
 - Settings > Record glides keeps glides of prompted words on the phone to measure accuracy on real fingers (6383035)
+- Tap a word in the glide preview row to fix it: glide it again, type it with suggestions, or pick an alternative (15d883d)
+- The keyboard learns your words and word pairs on the phone; new words become glidable after two uses; review or delete them in Settings > Personal words (Settings: Learn words I type) (15d883d)
+- Glide adapts to where your swipes land on each key, learning most from the words you correct (Settings: Adapt glide to my swiping) (15d883d)
+- Words in Android's personal dictionary can be glided and are suggested (15d883d)
 
 ### Changed
 
