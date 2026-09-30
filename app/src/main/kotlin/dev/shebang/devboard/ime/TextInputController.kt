@@ -125,7 +125,10 @@ class TextInputController(
         val selection: Boolean,
         val glided: GlidedWord?,
         val underlined: Boolean,
-    )
+    ) {
+        /** Whether the word begins a sentence, set when the target is found. */
+        var sentenceStart = false
+    }
     private var target: Target? = null
     private var targetGeneration = 0
 
@@ -224,18 +227,19 @@ class TextInputController(
     /** Shows the target in the middle of the strip with its alternatives: its own runners-up if it was glided, else suggestions. */
     private fun setTarget(t: Target) {
         target = t
+        connection()?.let { t.sentenceStart = GlideText.contextWord(textBeforeTarget(it)) == GlideText.SENTENCE_START }
         val gen = ++targetGeneration
         val dictionary = dictionaryInUse
         val glided = t.glided
         if (glided != null && dictionary != null) {
-            val alts = glided.word.candidates.filter { it >= 0 && it != glided.word.word }.take(2).map { GlideText.matchCase(t.text, dictionary.words[it]) }
+            val alts = glided.word.candidates.filter { it >= 0 && it != glided.word.word }.take(2).map { caseFor(t, dictionary.words[it]) }
             showTarget(t, alts)
             return
         }
         showTarget(t, emptyList())
         val s = suggester ?: return
         background.execute {
-            val found = s.suggest(t.text.lowercase(), 3).map { Suggester.matchCase(t.text, it.word) }.filter { !it.equals(t.text, ignoreCase = true) }.take(2)
+            val found = s.suggest(t.text.lowercase(), 3).map { caseFor(t, it.word) }.filter { !it.equals(t.text, ignoreCase = true) }.take(2)
             main.post { if (gen == targetGeneration && target === t) showTarget(t, found) }
         }
     }
@@ -276,10 +280,28 @@ class TextInputController(
         }
         if (ok) {
             if (!t.selection) ic.deleteSurroundingText(t.before, t.after)
-            ic.commitText(GlideText.matchCase(t.text, replacement), 1)
+            ic.commitText(replacement, 1)
         }
         ic.endBatchEdit()
         return ok
+    }
+
+    /**
+     * How [word] (in its dictionary casing) is written in place of the target: capitalised when the old word's
+     * capital was the user's (a sentence start, or a normally lowercase word they shifted), in capitals when
+     * they wrote it in capitals, and as the dictionary writes it otherwise. A capital that belongs to the old
+     * word itself ("I", "I'd", a name) says nothing about the new one.
+     */
+    private fun caseFor(t: Target, word: String): String {
+        val old = t.text
+        if (old.isEmpty() || word.isEmpty()) return word
+        val dictionary = dictionaryInUse
+        val oldForm = dictionary?.indexOfLower(old.lowercase())?.takeIf { it >= 0 }?.let { dictionary.words[it] }
+        val allCaps = old.length > 1 && old.all { !it.isLetter() || it.isUpperCase() }
+        if (allCaps && (oldForm == null || !oldForm.all { !it.isLetter() || it.isUpperCase() })) return word.uppercase()
+        if (!old[0].isUpperCase()) return word
+        val ownCapital = oldForm != null && oldForm[0].isUpperCase()
+        return if (!ownCapital || t.sentenceStart) word.replaceFirstChar { it.uppercaseChar() } else word
     }
 
     /** Text before the target's first letter (or before the cursor when nothing is targeted), for context. */
@@ -301,8 +323,14 @@ class TextInputController(
         lastGlide = null
         if (glideBefore != null) clearCandidates()
         if (field.allowsComposing && isWordChar(text)) {
-            // A letter right after a glide starts a new word, as a glide right after typing does.
-            if (glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty()) ic.commitText(" ", 1)
+            // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
+            // still stands right before the cursor and nothing is selected).
+            if (glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
+                ic.getSelectedText(0).isNullOrEmpty() &&
+                ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
+            ) {
+                ic.commitText(" ", 1)
+            }
             word.append(text)
             ic.setComposingText(word, 1)
             ui.setComposing(true)
@@ -538,7 +566,7 @@ class TextInputController(
                 val idx = dictionary?.indexOfLower(chosen.lowercase()) ?: -1
                 if (dictionary != null && idx >= 0) learner.correction(t.glided?.stroke, idx, dictionary)
                 t.glided?.let { recent.remove(it) }
-                if (field.allowsLearning) learner.learnWord(GlideText.matchCase(t.text, chosen), prev.first, prev.second)
+                if (field.allowsLearning) learner.learnWord(chosen, prev.first, prev.second)
             }
             clearCandidates()
             return
@@ -610,7 +638,9 @@ class TextInputController(
             if (t != null && t.selection && t.text == sel) return
             dropTarget()
             if (sel.all { isLetterInWord(it) } && sel.first().isLetter()) {
-                target = Target(sel, -1, 0, 0, selection = true, glided = recentMatch(sel), underlined = false)
+                target = Target(sel, -1, 0, 0, selection = true, glided = recentMatch(sel), underlined = false).also {
+                    it.sentenceStart = GlideText.contextWord(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: "") == GlideText.SENTENCE_START
+                }
             }
             return
         }
@@ -625,7 +655,9 @@ class TextInputController(
         if (t != null && !t.selection && t.before == b && t.after == a && t.text == text) return
         dropTarget()
         if (text.isNotEmpty() && text.first().isLetter()) {
-            target = Target(text, -1, b, a, selection = false, glided = recentMatch(text), underlined = false)
+            target = Target(text, -1, b, a, selection = false, glided = recentMatch(text), underlined = false).also {
+                it.sentenceStart = GlideText.contextWord(before.subSequence(0, before.length - b)) == GlideText.SENTENCE_START
+            }
         }
     }
 
@@ -638,7 +670,7 @@ class TextInputController(
         for ((i, w) in result.words.withIndex()) {
             if (i > 0) sb.append(' ')
             val text = dictionary.words[w]
-            sb.append(if (i == 0 && t != null) GlideText.matchCase(t.text, text) else caseNew(text, i == 0 && capitalize))
+            sb.append(if (i == 0 && t != null) caseFor(t, text) else caseNew(text, i == 0 && capitalize))
         }
         return sb.toString()
     }
@@ -679,7 +711,7 @@ class TextInputController(
         val t = target
         if (t != null) {
             val fresh = newWords(result, dictionary, false, previousOf(textBeforeTarget(ic)))
-            fresh.first().text = GlideText.matchCase(t.text, fresh.first().text)
+            fresh.first().text = caseFor(t, fresh.first().text)
             val text = fresh.joinToString(" ") { it.text }
             if (replaceTarget(t, text)) {
                 val first = fresh.first()
@@ -687,7 +719,7 @@ class TextInputController(
                 t.glided?.let { recent.remove(it) }
                 remember(fresh)
                 pending.addAll(fresh)
-                val alternatives = result.alternatives.map { GlideText.matchCase(t.text, dictionary.words[it]) }
+                val alternatives = result.alternatives.map { caseFor(t, dictionary.words[it]) }
                 lastGlide = GlideCommit(text, fresh.last().text, alternatives, result.alternatives, fresh.size, "")
                 ui.showCandidates(arrangeBestMiddle(alternatives))
                 ui.setComposing(true)

@@ -220,6 +220,30 @@ class GlideCommitTest {
     }
 
     @Test
+    fun aCapitalThatBelongsToTheOldWordIsNotCopied() {
+        ic.commitText("It is within the Borough ", 1)
+        glide("i'd")
+        assertEquals("It is within the Borough I'd", ic.toString())
+        userMovesCursor(ic.toString().length - 2)
+        glide("of")
+        assertEquals("It is within the Borough of", ic.toString())
+    }
+
+    @Test
+    fun aCapitalTheUserGaveIsKept() {
+        glide("hello", capitalize = true)
+        glide("world", capitalize = true)
+        // "World" is normally lowercase: the user shifted it, so its replacement is capitalised too.
+        userMovesCursor(8)
+        glide("would")
+        assertEquals("Hello Would", ic.toString())
+        // At a sentence start the capital is the sentence's.
+        userMovesCursor(2)
+        glide("help")
+        assertEquals("Help Would", ic.toString())
+    }
+
+    @Test
     fun aDoubleTappedWordIsReplacedToo() {
         glide("hello")
         glide("world")

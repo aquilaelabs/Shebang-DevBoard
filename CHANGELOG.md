@@ -25,3 +25,4 @@
 ### Fixed
 
 - Glide can now produce apostrophe words (don't, it's), and it's, that's, let's and other 's contractions are in the word list (6383035)
+- Tapping inside a word and gliding no longer sometimes splits the word in two (dd5bef3)
