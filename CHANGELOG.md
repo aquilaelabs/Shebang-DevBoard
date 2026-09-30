@@ -17,6 +17,7 @@
 - Glide adapts to where your swipes land on each key, learning most from the words you correct (Settings: Adapt glide to my swiping) (15d883d)
 - Words in Android's personal dictionary can be glided and are suggested (15d883d)
 - Settings > Personal words > Undo recent learning goes back to how learned words and swipe adaptation stood at the start of any of the last 14 days (3cf59d0)
+- Twelve original themes (Night, Day, Phosphor, Amber, Deep Sea, Ember, Orchid, Forest, Paper, Glacier, Sand, High Contrast) plus Auto and Wallpaper, picked from swatches in Settings > Appearance; the setup and settings screens follow the theme (925a20f)
 
 ### Changed
 
@@ -24,6 +25,7 @@
 - Glide typing decodes while the finger moves and shows the word in the strip before you lift; it is far more accurate and uses the word before the cursor (6383035)
 - Glide reads real, imprecise swipes far better: tuned on a public set of a million real swipes, it picks the right word 89% of the time there, up from 81% (3cf59d0)
 - Swipe adaptation learns slowly, ignores sloppy glides and only takes so much each day, so one careless day cannot throw it off (3cf59d0)
+- A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (925a20f)
 
 ### Fixed
 
