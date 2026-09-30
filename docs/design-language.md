@@ -137,9 +137,9 @@ Layout of the settings screen, the terminal-bar editor and personal words on a p
   6. List (rows of like things): Corrections: autocorrect, auto-capitalize, double-space period, across the middle, rows 17 to 18 of 28
   7. List (rows of like things): Terminal bar: strip behaviour chips, Edit terminal bar, across the middle, rows 19 to 20 of 28
   8. List (rows of like things): Bar editor: items with up/down/remove, + add dialog, More: export/import/reset, across the middle, rows 21 to 24 of 28
-  9. List (rows of like things): Personal words: note, reset adaptation, Android dictionary, delete all, words with count and delete, across the bottom, rows 25 to 28 of 28
+  9. List (rows of like things): Personal words: note, reset adaptation, undo recent learning, Android dictionary, words with delete, across the bottom, rows 25 to 28 of 28
 Notes:
-  Switch rows are ListItems with a trailing Switch; choices are FilterChip rows; the bar editor is a second screen inside the same activity. Personal words is a third screen in the same activity: a plain explanation first, then actions as ListItems, then each learned word with its use count and a trailing delete icon; clearing all and resetting adaptation confirm in an AlertDialog.
+  Switch rows are ListItems with a trailing Switch; choices are FilterChip rows; the bar editor is a second screen inside the same activity. Personal words is a third screen in the same activity: a plain explanation first, then actions as ListItems, then each learned word with its use count and a trailing delete icon; clearing all, resetting adaptation and undoing recent learning confirm in an AlertDialog; undo first lists the kept days (Today, Yesterday, then weekday and date).
 
 ### the glide recorder: prompts common words and records glides on a copy of the keyboard (Android app)
 

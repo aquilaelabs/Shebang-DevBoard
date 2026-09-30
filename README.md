@@ -95,26 +95,52 @@ The whole-word SHARK2 decoder (Kristensson & Zhai 2004) that shipped first is ke
 baseline. `GestureSimulator` produces human-like strokes: noisy aim with a per-stroke offset, corners cut
 toward the chord between neighbours, a smooth curve, speed following the two-thirds power law on curvature
 with extra slowdowns at some intended letters, overshoot at the end, 120 Hz sampling that keeps only 2 dp
-moves as the keyboard does. `GlideBenchmarkTest` prints:
+moves as the keyboard does.
 
-| Benchmark | Whole-word decoder | Streaming decoder |
+Real fingers are sloppier than the simulator. The [FUTO swipe dataset](https://huggingface.co/datasets/futo-org/swipe.futo.org)
+(MIT) has about a million real English swipes, each with its timing, the keyboard geometry it was made on
+and the sentence it came from; the decoder's parameters are tuned on its dev split (coordinate descent,
+`FutoSwipesTest.futoTune`) and measured on its test split, which the tuning never saw:
+
+| Real swipes (FUTO test split, 10,000 in-dictionary words, word before known) | Before tuning | Tuned |
 |---|---|---|
-| 1,000 most frequent words, no context, top-1 / top-3 | 73.0% / 87.2% | 94.3% / 98.6% |
-| 3,679 words of 600 held-out sentences, top-1 | 73.7% | 93.9% alone, 96.3% with context (98.8% top-3) |
-| Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 94.5% / 99.5% |
-| Phrase strokes of 2-4 words with the travel to and from the space bar | | 94.2% (96.3% one stroke per word) |
-| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 96.8% when glided, 97.5% at sentence end; 28 words fixed, 1 broken |
-| A swiper who lands 0.15 key right and 0.3 row low, before and after adapting on 250 glides (`GlideAdaptationTest`) | | 67.5% before, 89.3% after |
+| Top-1 / top-3 | 80.9% / 85.7% | 89.0% / 95.6% |
+| Top-1 without the word before | 79.0% (5,000 swipes) | 86.7% |
+| Time per swipe after lift (JVM) | 0.50 ms | 1.28 ms |
 
-These are synthetic strokes, and the decoder's timing assumptions are the simulator's too. On the simulator
-the slowness cue adds under a point, and the turning angle lowered accuracy, so its weight is 0. Real
-fingers decide: **Settings > Record glides** prompts common words on the real keyboard and keeps each glide
-with its timing and the key positions on the phone until you export it. Put exported `.jsonl` files in
-`app/src/test/resources/glide/traces/` (or point `DEVBOARD_TRACES` at them) and run:
+`FrictionTest` writes 600 of the dataset's sentences (6,282 words) through the text controller the way a
+person would: each word glided with the swipe made for it, punctuation, digits and one-letter words tapped,
+shift tapped for a capital the keyboard would not give, and a misread word fixed the cheapest way that
+works (a strip alternative, else tapping inside it and gliding it again with someone else's swipe, else
+selecting it and typing it). With the tuned decoder 89.4% of glided words are right first time, 6.5% are
+fixed from the strip, 2.5% by gliding again and 1.6% only by typing; 99.0% of sentences end up exactly as
+meant, the rest differing only in capitals (the dataset's own lowercase after "?" and "!", and "may" for
+the month).
+
+`GlideBenchmarkTest` prints the simulator's view, tuned values first, earlier values (tuned on the
+simulator) second:
+
+| Simulated strokes | Whole-word decoder | Streaming decoder, tuned / before |
+|---|---|---|
+| 1,000 most frequent words, no context, top-1 / top-3 | 73.0% / 87.2% | 91.7% / 99.0%, before 94.3% / 98.6% |
+| 3,679 words of 600 held-out sentences, top-1 | 73.7% | 92.8% alone, 96.1% with context (99.5% top-3); before 93.9% and 96.3% |
+| Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 87.2% / 97.7%, before 94.5% / 99.5% |
+| Phrase strokes of 2-4 words with the travel to and from the space bar | | 90.9% (95.9% one stroke per word), before 94.2% |
+| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 96.0% when glided, 97.0% at sentence end |
+| A swiper who lands 0.15 key right and 0.3 row low, before and after ten days of adapting (`GlideAdaptationTest`) | | 83.0% before, 89.0% after |
+
+The looser matching costs a little on the simulator's neat strokes and wins much more on real ones. Record
+your own with **Settings > Record glides**, which prompts common words on the real keyboard and keeps each
+glide with its timing and the key positions until you export it. Put exported `.jsonl` files in
+`app/src/test/resources/glide/traces/` (or point `DEVBOARD_TRACES` at them). The dataset is not in the
+repository; download `test.jsonl`, `dev.jsonl` and `swipe-5/layouts/qwerty.json` into one folder and run:
 
 ```sh
 ./gradlew testDebugUnitTest --tests '*GlideBenchmarkTest*' --tests '*RecordedGlidesTest*' -i | grep 'GLIDE BENCH'
-GLIDE_TUNE=1 ./gradlew testDebugUnitTest --tests '*GlideTuningTest*' -i | grep 'GLIDE TUNE'   # parameter sweeps
+FUTO_SWIPES=/data/test.jsonl FUTO_LIMIT=10000 ./gradlew testDebugUnitTest --tests '*FutoSwipesTest.futoSwipes*' --rerun -i | grep FUTO
+FUTO_TUNE=/data/dev.jsonl FUTO_SWIPES=/data/test.jsonl ./gradlew testDebugUnitTest --tests '*FutoSwipesTest.futoTune*' --rerun -i | grep FUTO
+FUTO_SWIPES=/data/test.jsonl FUTO_LIMIT=50000 ./gradlew testDebugUnitTest --tests '*FrictionTest*' --rerun -i | grep FRICTION
+GLIDE_TUNE=1 ./gradlew testDebugUnitTest --tests '*GlideTuningTest*' -i | grep 'GLIDE TUNE'   # simulator sweeps
 ```
 
 ## Learning on the phone
@@ -130,7 +156,12 @@ its own, locally:
 - **How you swipe.** Where each kept glide passed each letter, relative to the key centre, moves that
   letter's key centre for decoding, shrunk toward the average lean of all your glides. A correction (a
   tapped word glided again, or swapped for an alternative) re-aligns the word's original stroke, when it
-  was glided lately, to the word you meant and counts twice, when the stroke plausibly was that word. Reset in Settings > Personal words.
+  was glided lately, to the word you meant and counts twice, when the stroke plausibly was that word. It
+  learns slowly and ignores sloppy glides, and only so much counts each day, so one careless day cannot
+  throw it off. Reset in Settings > Personal words.
+- **Going back.** The learned words and the swipe adaptation as they stood at the start of each of the last
+  14 days are kept; Settings > Personal words > Undo recent learning goes back to any of them. Deleting a
+  word deletes it from those days too.
 - **Android's personal dictionary.** Its words (English, or with no locale) join the vocabulary when the
   keyboard loads.
 
@@ -166,11 +197,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   far more accurate on realistic strokes (see Glide typing) and needs no wait after lift. The spec's
   ideal-path LRU cache has no counterpart any more: per-geometry work is one table of states per tree node,
   rebuilt when the key geometry version changes (rotation, height, layout). Parameters, in key pitches:
-  resampling 0.25, location sigma 0.42 at letters and 0.45 between them, 0.40 at the first touch, first
-  letters within 1.6, stay 0.8, skip 0.35, early lift 0.8 per state, slowness weight 1.0 with bias 0.5,
-  turning weight 0, bigram weight 1.0, lookahead 0.5, beam 10 cost units and 3,000 hypotheses (three times
-  wider when a word finds no candidate), 48 candidates re-aligned, 16 kept per word. Chosen by sweeps on the
-  simulator (`GlideTuningTest`); to be revisited on recorded glides.
+  resampling 0.25, location sigma 0.84 at letters and 1.125 between them, 0.40 at the first touch, first
+  letters within 1.6, stay 0.4, skip 0.2625, early lift 1.8 per state, slowness weight 1.0 with bias 1.0,
+  turning weight 0.5, bigram weight 0.75, lookahead 0.5, beam 10 cost units and 3,000 hypotheses (three
+  times wider when a word finds no candidate), 48 candidates re-aligned, 16 kept per word. Tuned on real
+  swipes (the FUTO dataset's dev split, see Glide typing); a second pass from these values found nothing
+  better. The earlier values (sigma 0.42 and 0.45, stay 0.8, skip 0.35, early lift 0.8, bias 0.5, turning 0,
+  bigram 1.0) were tuned on the simulator and scored 80.9% on real swipes against 89.0% now. The cost: with
+  no context a perfectly drawn "hello" now reads "help" first ("hello" second), because matching is loose
+  enough for real fingers; words that share a path ("of" and "off", "to" and "too") were always settled by
+  frequency and context.
 - **When nothing fits**: after the wider retry, the decoder falls back to the candidates the preview last
   showed rather than drop the gesture; one backspace removes the result.
 - **Redoing a word in the field** (changed at the user's request, after a preview row was tried): the
@@ -199,17 +235,28 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   the rebuilt model is swapped in only when no glide is in flight. Setting: Learn words
   I type (on).
 - **Glide adaptation**: per-letter offsets in key pitches, a running mean of where kept glides passed each
-  letter, capped at 50 observations per letter and 200 overall so it keeps following the user, shrunk
-  toward the overall lean with a weight of 5 observations, at most 0.35 key from the centre; single points
-  more than 0.8 key off are ignored. Corrections count twice, and only when the re-aligned stroke passed
-  within 0.4 key of the meant word's letters on average: typing a different word over a glide is a change
-  of mind, not a mis-glide. In `glide_adaptation.json`, with the glide and correction counts. Setting: Adapt
-  glide to my swiping (on).
+  letter, capped at 200 observations per letter and 800 overall so it keeps following the user slowly,
+  shrunk toward the overall lean with a weight of 5 observations, at most 0.35 key from the centre; single
+  points more than 0.8 key off are ignored. Corrections count twice, and only when the re-aligned stroke
+  passed within 0.4 key of the meant word's letters on average: typing a different word over a glide is a
+  change of mind, not a mis-glide. In `glide_adaptation.json`, with the glide and correction counts.
+  Setting: Adapt glide to my swiping (on).
+- **A bad day does no lasting harm** (asked for by the user: a night of drunk gliding must not ruin the
+  tuning): a glide that strays more than 0.45 key from its letters on average teaches nothing; each
+  observation's pull on an estimate is clipped to 0.25 key before the 1/n step; only 400 letter
+  observations (about 80 words) count per day. In `GlideAdaptationTest` a night of 1,000 sloppy,
+  uncorrected glides after ten sober days moves no key more than 0.042 of a key and leaves the next
+  morning's accuracy unchanged (91.3% both). The state at the start of each of the last 14 days is kept, in
+  `glide_adaptation.json` and, for learned words, as `personal_words.day-N.json` beside the vocabulary;
+  Settings > Personal words > Undo recent learning restores both to the start of a chosen day. Deleting a
+  word rewrites the kept days without it, and deleting everything deletes them, so going back never
+  brings a deleted word back.
 - **Android's personal dictionary**: read through `UserDictionary.Words` when the language loads, words of
   English or no locale, frequency 1 to 255 mapped to a use count; the keyboard never writes to it.
 - **Phrase gliding**: off by default. A dip counts below the middle of the space bar or after 150 ms there,
-  so grazing it on the way to c, v, b or n does not. Travel to and from the space bar costs 0.3 per point
-  (swept 0.1 to 0.5); treating it as letters got 14.1% of words right.
+  so grazing it on the way to c, v, b or n does not. Travel to and from the space bar is free (swept 0 to
+  0.3 per point with the tuned location spread; 0 is best, 89.4%, and the next word may still only start
+  within its first 40 points); treating it as letters got 18.4% of words right.
 - **Glide threading**: one decoder thread per keyboard process, previews at most every 40 ms and only when
   the words change; results carry the glide's id so a late result for an abandoned glide is ignored. A
   glide owns the keyboard until it ends: other fingers are ignored.
@@ -299,8 +346,10 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [x] A word typed twice ("kubectl") is glidable after the keyboard hides and reopens; a word added to
       Android's personal dictionary is glidable; Settings > Personal words lists learned words.
       *(verified on the emulator, except the Personal words screen)*
-- [ ] Settings > Personal words: delete a word, then the keyboard no longer glides it after reopening;
-      reset glide adaptation zeroes the counts.
+- [x] Settings > Personal words lists learned words; delete removes one; Undo recent learning lists the kept
+      days and going back to the start of today restores the counts of that morning. *(verified on the
+      emulator: "world" went from 5 uses back to 4 and "hello" from 3 to 2)*
+- [ ] Reset glide adaptation zeroes the glide and correction counts.
 - [x] Phrase gliding on: "hello", dip below the middle of the space bar, "world" in one stroke writes
       "hello world"; lifting inside the space bar adds a space. *(verified on the emulator)*
 - [x] Settings > Record glides: gliding the prompted word stores it, the count goes up, the next word
