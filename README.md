@@ -113,6 +113,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Enter**: newline when the field is multiline or sets `IME_FLAG_NO_ENTER_ACTION`; otherwise
   `performEditorAction` for Go/Search/Send/Next/Done/Previous; a plain Enter `KeyEvent` when the action is
   none/unspecified or the field is a terminal.
+- **Permissions**: the merged manifest declares `VIBRATE` and nothing else. AndroidX Core's automatic
+  `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed with `tools:node="remove"`; no code here or in the
+  Compose/DataStore dependencies registers a runtime receiver through `ContextCompat`. If a future dependency
+  does, it will fail loudly on Android 12 and older and this removal must go.
 - **Theme colours**: Material 3 dynamic colour from `android.R.color.system_*` on Android 12+, an original
   fallback palette otherwise. Light/dark follows the setting or the system.
 - **Icons**: backspace and return are Material Symbols paths (Apache-2.0); the shift arrow and the `#!`
