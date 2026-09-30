@@ -119,11 +119,4 @@ class GlideDecoderTest {
         val n = IdealPath.points("to", model, raw)
         assertEquals("to", decoder.decode(raw, n, model).first().word.lowercase())
     }
-
-    @Test
-    fun tapIsNotAGlide() {
-        assertTrue(!GlideDecoder.isGlide(0f, 0f, 3f, 0f, 3f, 100f, startKeyEndKeySame = true))
-        assertTrue(GlideDecoder.isGlide(0f, 0f, 120f, 0f, 120f, 100f, startKeyEndKeySame = false))
-        assertTrue(!GlideDecoder.isGlide(0f, 0f, 10f, 0f, 10f, 100f, startKeyEndKeySame = false))
-    }
 }

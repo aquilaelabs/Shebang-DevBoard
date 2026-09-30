@@ -36,6 +36,8 @@ import dev.shebang.devboard.layout.KeyboardGeometry
 import dev.shebang.devboard.layout.LayoutDef
 import dev.shebang.devboard.settings.Settings
 import dev.shebang.devboard.settings.SettingsRepository
+import dev.shebang.devboard.view.ImeRootView
+import dev.shebang.devboard.view.KeyPopup
 import dev.shebang.devboard.view.KeyboardTheme
 import dev.shebang.devboard.view.KeyboardView
 import dev.shebang.devboard.view.ShiftState
@@ -68,9 +70,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var barConfig: BarConfig? = null
     private val modifiers = ModifierState()
 
-    private var root: LinearLayout? = null
+    private var root: ImeRootView? = null
     private var strip: TopStripView? = null
     private var keyboard: KeyboardView? = null
+    private var popup: KeyPopup? = null
 
     private var mode = Mode.TEXT
     private var field: FieldInfo = FieldInfo.from(null)
@@ -123,6 +126,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val t = KeyboardTheme.build(this, settings)
         theme = t
         keyboard?.theme = t
+        popup?.setTheme(t)
         strip?.setTheme(t)
         root?.setBackgroundColor(t.background)
     }
@@ -130,14 +134,18 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     // ---- Views ---------------------------------------------------------------------------------------
 
     override fun onCreateInputView(): View {
-        val container = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val s = TopStripView(this)
         val k = KeyboardView(this)
+        val p = KeyPopup(this)
+        k.popup = p
         k.listener = this
         s.bar.listener = this
         s.suggestions.onSuggestion = { word -> text.pickCandidate(word); afterEdit() }
-        container.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        container.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        column.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        column.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        // The popup overlay covers strip and keys so a top-row preview can draw above its key.
+        val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
         // recent Android; systemBars() reports that height, so pad the keys above it.
         ViewCompat.setOnApplyWindowInsetsListener(container) { v, insets ->
@@ -148,6 +156,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         root = container
         strip = s
         keyboard = k
+        popup = p
         applyTheme()
         barConfig?.let { s.bar.setConfig(it) }
         s.setMode(settings.stripMode)
@@ -229,11 +238,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
         rebuildGeometry()
-        if (field.allowsComposing) {
+        if (field.allowsComposing && glideDecoder == null) {
             dictLoader.ensureLoading { dict ->
                 main.post {
-                    text.suggester = Suggester(dict)
-                    glideDecoder = GlideDecoder(dict, idealPaths)
+                    if (glideDecoder == null) {
+                        text.suggester = Suggester(dict)
+                        glideDecoder = GlideDecoder(dict, idealPaths)
+                    }
                 }
             }
         }
@@ -251,7 +262,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         text.onSelectionChanged(newSelStart, newSelEnd, candidatesStart, candidatesEnd)
-        updateAutoCaps()
+        // Mid-word the caps mode cannot change; asking the editor (an IPC) is only worth it at a boundary.
+        if (!text.isComposing) updateAutoCaps()
     }
 
     override fun onEvaluateFullscreenMode(): Boolean = false
@@ -280,9 +292,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
     }
 
-    /** Housekeeping after anything that changed the text. */
-    private fun afterEdit() {
-        updateAutoCaps()
+    /**
+     * Housekeeping after an edit. The caps-mode query is an IPC to the editor, so it runs only at word
+     * boundaries: never after a letter that is still being composed.
+     */
+    private fun afterEdit(wordBoundary: Boolean = true) {
+        if (wordBoundary || !text.isComposing) updateAutoCaps()
     }
 
     // ---- KeyboardView.Listener -----------------------------------------------------------------------
@@ -324,6 +339,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                         autoShifted = false
                         keyboard?.setShift(ShiftState.OFF, notify = false)
                     }
+                    afterEdit(wordBoundary = !key.def.isLetter)
+                    return
                 }
             }
         }

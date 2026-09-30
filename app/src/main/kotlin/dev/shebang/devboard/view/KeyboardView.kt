@@ -54,7 +54,7 @@ class KeyboardView(context: Context) : View(context) {
     var theme: KeyboardTheme = KeyboardTheme.build(context, dev.shebang.devboard.settings.Settings())
         set(value) {
             field = value
-            popup.setTheme(value)
+            if (::popup.isInitialized) popup.setTheme(value)
             applyTheme()
             invalidate()
         }
@@ -70,7 +70,8 @@ class KeyboardView(context: Context) : View(context) {
     var glideTrailEnabled = true
 
     private val density = resources.displayMetrics.density
-    private val popup = KeyPopup(context)
+    /** The preview/alternates overlay, owned by the IME root so it can draw above the top row. */
+    lateinit var popup: KeyPopup
     private val handler = Handler(Looper.getMainLooper())
 
     // Paints and scratch, allocated once.

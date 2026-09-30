@@ -56,14 +56,4 @@ class SuggestionStripView(context: Context) : LinearLayout(context) {
     }
 
     fun clear() = show(emptyList())
-
-    /** Reorders so the best candidate sits in the middle: [2nd, 1st, 3rd]. */
-    companion object {
-        fun arrange(ranked: List<String>): List<String> = when (ranked.size) {
-            0 -> emptyList()
-            1 -> listOf("", ranked[0], "")
-            2 -> listOf(ranked[1], ranked[0], "")
-            else -> listOf(ranked[1], ranked[0], ranked[2])
-        }
-    }
 }

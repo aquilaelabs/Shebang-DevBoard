@@ -66,6 +66,14 @@ class SuggesterTest {
     }
 
     @Test
+    fun autocorrectFromReusesCandidatesWithoutScanning() {
+        assertEquals("hello", s.autocorrectFrom("helo", listOf(Suggestion("hello", 1.0, isCorrection = true))))
+        assertNull(s.autocorrectFrom("helo", emptyList()))
+        assertNull(s.autocorrectFrom("helo", listOf(Suggestion("help", 1.0, isCorrection = false))))
+        assertNull(s.autocorrectFrom("hello", listOf(Suggestion("help", 1.0, isCorrection = true))))
+    }
+
+    @Test
     fun editDistanceBound() {
         assertEquals(0, EditDistance.bounded("abc", "abc", 2))
         assertEquals(1, EditDistance.bounded("abc", "abd", 2))

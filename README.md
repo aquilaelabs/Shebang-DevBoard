@@ -97,6 +97,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Autocorrect-on-space** only fires for a tier <= 35 word one edit away from a word not in the dictionary.
 - **Glide commit** adds a leading space unless at the field start or after whitespace or `( [ { <`; no
   trailing space. Backspace right after a glide deletes the word only (the leading space stays).
+- **Key preview and alternates** are drawn by one overlay view inside the IME window rather than a
+  `PopupWindow`: creating a window per tap stalled the main thread for hundreds of milliseconds on the
+  emulator. The popup sits over the upper third of its key so the top row's popup fits under the strip.
+- **Caps-mode queries** (`getCursorCapsMode`, an IPC) run only at word boundaries, never after a letter that is
+  still being composed. Autocorrect-on-space reuses the candidates the background thread already produced.
 - **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms.
   Arrows and Del repeat the same way on the bar and in code mode.
 - **Sticky modifiers**: tap = one-shot, second tap within 350 ms = locked, tap while locked = off.

@@ -66,9 +66,15 @@ class Suggester(private val dict: Dictionary) {
     }
 
     /** The single best correction for autocorrect-on-space, or null when the typed word is fine. */
-    fun autocorrect(typed: String): String? {
+    fun autocorrect(typed: String): String? = autocorrectFrom(typed, suggest(typed, 1))
+
+    /**
+     * Autocorrect using suggestions already computed for [typed] (the strip's candidates), so the space key
+     * never scans the dictionary on the main thread. Only cheap lookups happen here.
+     */
+    fun autocorrectFrom(typed: String, candidates: List<Suggestion>): String? {
         if (typed.length < 2 || dict.contains(typed)) return null
-        val best = suggest(typed, 1).firstOrNull() ?: return null
+        val best = candidates.firstOrNull() ?: return null
         if (!best.isCorrection) return null
         // Only correct confidently: a common word one edit away.
         val idx = dict.indexOf(best.word)

@@ -104,9 +104,11 @@ class Dictionary(
                 tiers.add(line.substring(tab + 1).trim().toIntOrNull() ?: 60)
             }
             // Sort by lowercase so binary search on `lower` is valid whatever the input order.
-            val order = words.indices.sortedWith(compareBy({ words[it].lowercase() }, { words[it] }))
+            // Lowercase once up front; doing it inside the comparator allocates on every comparison.
+            val lowered = Array(words.size) { words[it].lowercase() }
+            val order = words.indices.sortedWith(compareBy({ lowered[it] }, { words[it] }))
             val w = Array(order.size) { words[order[it]] }
-            val l = Array(order.size) { w[it].lowercase() }
+            val l = Array(order.size) { lowered[order[it]] }
             val t = IntArray(order.size) { tiers[order[it]] }
             return Dictionary(w, l, t)
         }

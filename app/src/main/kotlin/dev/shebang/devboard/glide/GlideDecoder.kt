@@ -1,7 +1,6 @@
 package dev.shebang.devboard.glide
 
 import dev.shebang.devboard.dict.Dictionary
-import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.ln
 import kotlin.math.sqrt
@@ -106,12 +105,6 @@ class GlideDecoder(
         fun gaussian(x: Double, sigma: Double): Double {
             val z = x / sigma
             return maxOf(exp(-0.5 * z * z) / (sigma * sqrt(2 * Math.PI)), FLOOR)
-        }
-
-        /** Distinguishes a glide from a tap: travelled far enough and ended on another key. */
-        fun isGlide(startX: Float, startY: Float, endX: Float, endY: Float, pathLength: Float, keyWidth: Float, startKeyEndKeySame: Boolean): Boolean {
-            val disp = sqrt((endX - startX) * (endX - startX) + (endY - startY) * (endY - startY))
-            return !startKeyEndKeySame && (pathLength > 0.5f * keyWidth || disp > 0.5f * keyWidth) && abs(pathLength) > 0f
         }
     }
 }

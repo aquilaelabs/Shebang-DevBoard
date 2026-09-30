@@ -23,9 +23,11 @@ object KeyIcons {
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
     val keyboardHide: Path = PathParser.createPathFromPathData(KEYBOARD_HIDE)
 
-    /** Copies [src] scaled and centred inside [bounds] at [size] pixels. */
+    private val matrix = Matrix()
+
+    /** Copies [src] scaled and centred inside [bounds] at [size] pixels. Main thread only; allocates nothing. */
     fun fit(src: Path, size: Float, bounds: RectF, out: Path) {
-        val m = Matrix()
+        val m = matrix
         val s = size / 24f
         m.setScale(s, s)
         m.postTranslate(bounds.centerX() - size / 2f, bounds.centerY() - size / 2f)

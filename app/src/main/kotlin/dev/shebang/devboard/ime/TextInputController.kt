@@ -106,7 +106,8 @@ class TextInputController(
         if (isComposing) {
             val typed = word.toString()
             var commit = typed
-            if (settings.autocorrect) suggester?.autocorrect(typed)?.let { commit = Suggester.matchCase(typed, it) }
+            // Uses the candidates the background thread already produced for this word; nothing is scanned here.
+            if (settings.autocorrect) suggester?.autocorrectFrom(typed, candidates)?.let { commit = Suggester.matchCase(typed, it) }
             ic.commitText(commit, 1)
             word.setLength(0)
             clearCandidates()
