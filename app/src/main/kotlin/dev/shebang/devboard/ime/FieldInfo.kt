@@ -32,18 +32,6 @@ data class FieldInfo(
     val enterIsKeyEvent: Boolean
         get() = isTerminal || (!enterIsNewline && (editorAction == EditorInfo.IME_ACTION_NONE || editorAction == EditorInfo.IME_ACTION_UNSPECIFIED))
 
-    /** Text for the enter key, or null for the return icon. */
-    val enterLabel: String?
-        get() = if (enterIsNewline || enterIsKeyEvent) null else when (editorAction) {
-            EditorInfo.IME_ACTION_GO -> "Go"
-            EditorInfo.IME_ACTION_SEARCH -> "Search"
-            EditorInfo.IME_ACTION_SEND -> "Send"
-            EditorInfo.IME_ACTION_NEXT -> "Next"
-            EditorInfo.IME_ACTION_DONE -> "Done"
-            EditorInfo.IME_ACTION_PREVIOUS -> "Prev"
-            else -> null
-        }
-
     companion object {
         fun from(info: EditorInfo?): FieldInfo = from(info?.inputType ?: InputType.TYPE_NULL, info?.imeOptions ?: 0)
 

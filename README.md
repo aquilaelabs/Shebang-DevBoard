@@ -184,6 +184,9 @@ its own, locally:
 
 ## Decisions
 
+- **Enter key**: always the enter icon, whatever the field asks for (search, go, send, done); it still
+  performs that action. Labels such as "Search" were drawn on the key until the user found them too big and
+  preferred the icon not to change.
 - **Autofill chips** (R11): the strip asks the autofill service for inline suggestions, styled with the
   bar-chip colour and strip text colours, and shows them in the bar's row (or the suggestions' in Auto mode)
   while no word is composed, so the keyboard's height never changes. They show in password fields too: they

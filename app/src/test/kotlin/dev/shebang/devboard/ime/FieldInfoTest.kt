@@ -17,7 +17,6 @@ class FieldInfoTest {
         assertFalse(f.allowsComposing)
         assertFalse(f.allowsGlide)
         assertTrue(f.enterIsKeyEvent)
-        assertNull(f.enterLabel)
     }
 
     @Test
@@ -25,7 +24,6 @@ class FieldInfoTest {
         val pw = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, EditorInfo.IME_ACTION_DONE)
         assertTrue(pw.isPassword)
         assertFalse(pw.allowsComposing)
-        assertEquals("Done", pw.enterLabel)
         val ns = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS, 0)
         assertTrue(ns.noSuggestions)
         assertFalse(ns.allowsComposing)
@@ -55,15 +53,10 @@ class FieldInfoTest {
         assertEquals(EditorInfo.IME_ACTION_GO, go.editorAction)
         assertFalse(go.enterIsNewline)
         assertFalse(go.enterIsKeyEvent)
-        assertEquals("Go", go.enterLabel)
-        assertEquals("Search", FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH).enterLabel)
-        assertEquals("Send", FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEND).enterLabel)
-        assertEquals("Next", FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_NEXT).enterLabel)
 
         val multi = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_SEND)
         assertTrue(multi.multiline)
         assertTrue(multi.enterIsNewline)
-        assertNull(multi.enterLabel)
 
         val noAction = FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_ENTER_ACTION)
         assertTrue(noAction.enterIsNewline)

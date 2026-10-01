@@ -77,12 +77,6 @@ class KeyboardView(context: Context) : View(context) {
         }
     var shiftState: ShiftState = ShiftState.OFF
         private set
-    /** Label drawn on the enter key ("Go", "Search"...) or null for the return icon. */
-    var enterLabel: String? = null
-        set(value) {
-            field = value
-            invalidate()
-        }
     var keyPreviewEnabled = true
     var glideTrailEnabled = true
     /** Dipping into the space bar during a glide starts the next word. */
@@ -301,10 +295,8 @@ class KeyboardView(context: Context) : View(context) {
         val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
         when (action) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
-            KeyAction.ENTER -> {
-                val label = enterLabel
-                if (label == null) drawIcon(canvas, KeyIcons.enter, fg, false) else drawLabel(canvas, label, fg, 0.8f)
-            }
+            // Always the enter icon, whatever the field's action (search, send, go): the user's choice.
+            KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enter, fg, false)
             KeyAction.SHIFT -> drawIcon(canvas, if (shiftState == ShiftState.OFF) KeyIcons.shift else KeyIcons.shiftOn, fg, false)
             KeyAction.SPACE -> {
                 // A cursor mark on the space bar.

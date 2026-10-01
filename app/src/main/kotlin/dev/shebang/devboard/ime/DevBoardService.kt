@@ -394,7 +394,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         bundle?.let { if (it.vocabularyVersion != personal.vocabularyVersion) languageLoader.rebuild() }
         modifiers.clearAll()
         strip?.bar?.updateModifiers(modifiers)
-        keyboard?.enterLabel = field.enterLabel
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
         rebuildGeometry()
