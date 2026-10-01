@@ -68,14 +68,15 @@ class TapModel(
     }
 
     /**
-     * The letter a tap at x,y most likely meant: the one whose aim (its centre, nudged by the lean and this
-     * user's offsets) is nearest, among [letters]; null when none has a key.
+     * The letter a tap at x,y most likely meant, among [letters]: the one whose aim (its centre, nudged by the
+     * lean and this user's offsets) is nearest, weighed with [prior], how likely each letter is next
+     * ([dev.shebang.devboard.dict.LetterPrior]), at [priorWeight]; null when none has a key.
      */
-    fun nearestLetter(x: Float, y: Float, letters: Iterable<Char> = 'a'..'z'): Char? {
+    fun nearestLetter(x: Float, y: Float, letters: Iterable<Char> = 'a'..'z', prior: FloatArray? = null, priorWeight: Double = PRIOR_WEIGHT): Char? {
         var best: Char? = null
         var bestCost = Double.MAX_VALUE
         for (c in letters) {
-            val n = nats(x, y, c) ?: continue
+            val n = (nats(x, y, c) ?: continue) + priorWeight * dev.shebang.devboard.dict.LetterPrior.cost(prior, c)
             if (n < bestCost) {
                 bestCost = n
                 best = c
@@ -100,5 +101,7 @@ class TapModel(
         /** Where taps land on average relative to the key centre, in dp (TSI: -0.056 and -0.053 of a key). */
         const val LEAN_X_DP = -2.2f
         const val LEAN_Y_DP = -2.0f
+        /** How much the next letter's likelihood counts against where the tap landed. */
+        var PRIOR_WEIGHT = 1.0
     }
 }

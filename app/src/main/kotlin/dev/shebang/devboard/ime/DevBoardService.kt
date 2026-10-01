@@ -401,6 +401,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (field.allowsComposing) languageLoader.ensureLoading()
         applyPendingBundle()
         updateAutoCaps()
+        text.refreshLetterPrior()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -418,6 +419,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
         text.onSelectionChanged(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        text.refreshLetterPrior()
         // Mid-word the caps mode cannot change; asking the editor (an IPC) is only worth it at a boundary.
         if (!text.isComposing) updateAutoCaps()
     }
@@ -513,6 +515,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
      */
     private fun afterEdit(wordBoundary: Boolean = true) {
         if (wordBoundary || !text.isComposing) updateAutoCaps()
+        text.refreshLetterPrior()
     }
 
     // ---- KeyboardView.Listener -----------------------------------------------------------------------
@@ -748,6 +751,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun showCandidates(words: List<String>) {
         strip?.suggestions?.show(words)
+    }
+
+    override fun setLetterPrior(prior: FloatArray?) {
+        keyboard?.letterPrior = prior
     }
 
     override fun showCorrection(typed: String, fix: String, other: String?) {

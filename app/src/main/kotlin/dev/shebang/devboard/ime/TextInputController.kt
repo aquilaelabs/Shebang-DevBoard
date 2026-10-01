@@ -5,6 +5,7 @@ import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 import dev.shebang.devboard.dict.Dictionary
+import dev.shebang.devboard.dict.LetterPrior
 import dev.shebang.devboard.dict.NgramModel
 import dev.shebang.devboard.dict.SlipCost
 import dev.shebang.devboard.dict.Suggester
@@ -14,6 +15,7 @@ import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideWord
 import dev.shebang.devboard.glide.TapModel
 import dev.shebang.devboard.input.KeySender
+import dev.shebang.devboard.layout.FieldVariant
 import dev.shebang.devboard.settings.Settings
 import java.util.concurrent.Executor
 
@@ -51,6 +53,8 @@ class TextInputController(
          * correction marked as the one that will go in, and [other].
          */
         fun showCorrection(typed: String, fix: String, other: String?) = showCandidates(listOfNotNull(typed, fix, other))
+        /** How likely each letter a..z is to be typed next ([LetterPrior]), or null for no opinion. */
+        fun setLetterPrior(prior: FloatArray?) = Unit
     }
 
     /** What the keyboard learns from; implementations apply the user's settings. */
@@ -122,6 +126,38 @@ class TextInputController(
         repeat(unknown) {
             tapXs += Float.NaN
             tapYs += Float.NaN
+        }
+    }
+
+    private var priorGeneration = 0
+
+    /**
+     * Works out, in the background, how likely each letter is next given the word typed so far and the words
+     * before, for the keyboard to weigh taps between keys. Clears the last odds at once, so a tap never uses
+     * odds for another prefix. Only where dictionary words are typed: not in code mode, nor in password,
+     * email, URL, number or terminal fields.
+     */
+    fun refreshLetterPrior() {
+        val gen = ++priorGeneration
+        ui.setLetterPrior(null)
+        if (codeMode || !field.allowsComposing || field.variant != FieldVariant.PLAIN) return
+        val (dictionary, lm) = predictionModel ?: return
+        val ic = connection() ?: return
+        if (!ic.getSelectedText(0).isNullOrEmpty()) return
+        val prefix = if (isComposing) word.toString().lowercase() else ""
+        if (prefix.any { it !in 'a'..'z' }) return
+        // Mid-word in text the keyboard is not composing (after a tap inside a word): no opinion.
+        if (!isComposing) {
+            val before = ic.getTextBeforeCursor(1, 0)
+            if (!before.isNullOrEmpty() && isLetterInWord(before[0])) return
+        }
+        val context = currentContext(ic) ?: return
+        val users = suggester
+        background.execute {
+            val prior = LetterPrior(dictionary) { i ->
+                kotlin.math.exp(-(Suggester.CONTEXT_WEIGHT * lm.cost3(i, context.context2, context.context1) + (1 - Suggester.CONTEXT_WEIGHT) * lm.unigramCost(i)).toDouble())
+            }.next(prefix)
+            postToMain { if (gen == priorGeneration && users === suggester) ui.setLetterPrior(prior) }
         }
     }
 

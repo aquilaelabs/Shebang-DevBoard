@@ -132,10 +132,13 @@ class KeyboardView(context: Context) : View(context) {
      */
     var tapModel: TapModel? = null
 
+    /** How likely each letter a..z is next in the word being typed, weighed with where a tap landed; null: none. */
+    var letterPrior: FloatArray? = null
+
     private fun resolveLetter(hit: Key, x: Float, y: Float): Key {
         if (hit.letter == 0.toChar()) return hit
         val g = geometry ?: return hit
-        val c = tapModel?.nearestLetter(x, y) ?: return hit
+        val c = tapModel?.nearestLetter(x, y, prior = letterPrior) ?: return hit
         if (c == hit.letter) return hit
         return g.letterKey(c) ?: hit
     }

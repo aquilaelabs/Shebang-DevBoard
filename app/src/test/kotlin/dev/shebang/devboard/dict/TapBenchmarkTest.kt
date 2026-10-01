@@ -27,7 +27,12 @@ class TapBenchmarkTest {
     }
 
     /** A phrase word: what was meant, the keys nearest its taps, the taps, and the two words meant before it. */
-    class Word(val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray, val before1: String? = null, val before2: String? = null, val person: String = "", val task: Int = 0)
+    class Word(
+        val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray, val before1: String? = null, val before2: String? = null,
+        val person: String = "", val task: Int = 0,
+        /** TSI's own language model's odds for a..z at each tap (null where it has none). */
+        val lmScores: List<FloatArray?> = emptyList(),
+    )
 
     companion object {
         /** TSI's Pixel 6 Pro: 1440 px across 411 dp. */
@@ -67,6 +72,7 @@ class TapBenchmarkTest {
             }
             // First tap per character of each phrase trial.
             val taps = HashMap<String, HashMap<Int, Pair<Float, Float>>>()
+            val scores = HashMap<String, HashMap<Int, FloatArray?>>()
             File(dir, "touch_data.csv").bufferedReader().useLines { lines ->
                 for (l in lines.drop(1)) {
                     val f = fields(l)
@@ -74,6 +80,8 @@ class TapBenchmarkTest {
                     if (trial !in prompts) continue
                     val at = f[5].toInt()
                     taps.getOrPut(trial) { HashMap() }.putIfAbsent(at, f[6].toFloat() to f[7].toFloat())
+                    val lm = f[14].trim().removePrefix("[").removeSuffix("]").split(',').mapNotNull { it.trim().toFloatOrNull() }
+                    scores.getOrPut(trial) { HashMap() }.putIfAbsent(at, if (lm.size >= 26) FloatArray(26) { lm[it] } else null)
                 }
             }
             fun nearest(x: Float, y: Float): Char = ('a'..'z').minBy { c ->
@@ -98,7 +106,7 @@ class TapBenchmarkTest {
                         // A sentence start counts as no word before (null); a phrase is one sentence.
                         val parts = trial.split('/')
                         out += Word(prompt.substring(i, j).lowercase(), typed, xs, ys, prev.getOrNull(prev.size - 1), prev.getOrNull(prev.size - 2),
-                            parts[0], parts[1].removePrefix("task").toIntOrNull() ?: 0)
+                            parts[0], parts[1].removePrefix("task").toIntOrNull() ?: 0, (i until j).map { scores[trial]?.get(it) })
                     }
                     i = j
                 }
@@ -162,8 +170,9 @@ class TapBenchmarkTest {
 
     /**
      * Which key a tap hits, on the same phrase words: the key under the finger, the nearest after the overall
-     * lean, and the nearest after the lean and each person's own offsets, learned as they type (from words
-     * that came out right, through the same adaptation as the phone's, one day per task block).
+     * lean, the nearest after the lean and each person's own offsets (learned as they type, from words that
+     * came out right, one day per task block), and that with the next letter's odds: from word frequency
+     * alone, with the words before, and TSI's own language model's (for reference).
      */
     @Test
     fun keysOnRealTaps() {
@@ -171,39 +180,65 @@ class TapBenchmarkTest {
         assumeTrue("TSI_DIR not set", dir != null && File(dir, "touch_data.csv").isFile)
         val layout = layout(dir!!)
         val words = words(dir, layout)
+        val lm = GlideBenchmarkTest.lm
         val lean = TapModel(layout, TSI_DENSITY)
+        val uniPrior = LetterPrior(dictionary) { kotlin.math.exp(-lm.unigramCost(it).toDouble()) }
+        val weights = if (System.getenv("AUTOCORRECT_SWEEP") != null) listOf(0.5, 1.0, 1.5, 2.0) else listOf(TapModel.PRIOR_WEIGHT)
+        val names = mutableListOf("key under the finger (before)", "nearest after the overall lean", "lean and own offsets (R14)")
+        for (k in weights) names += listOf("+ next letter by frequency, weight $k", "+ next letter with the words before, $k", "+ TSI's own letter odds, weight $k")
+        val right = IntArray(names.size)
+        val wordsRight = IntArray(names.size)
+        // Words the dictionary lacks (names, odd spellings): the letter odds must not bend them.
+        val unknownRight = IntArray(names.size)
+        var unknown = 0
         var letters = 0
-        val right = IntArray(3)
-        val wordsRight = IntArray(3)
-        for ((person, theirs) in words.groupBy { it.person }) {
+        val t0 = System.nanoTime()
+        var priors = 0
+        for ((_, theirs) in words.groupBy { it.person }) {
             var day = 0
             val adaptation = dev.shebang.devboard.glide.GlideAdaptation(null) { day }
             for (w in theirs) {
                 day = w.task
                 val own = TapModel(layout, TSI_DENSITY, adaptation.offsets())
-                val reads = arrayOf(
+                val c1 = w.before1?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
+                val c2 = if (w.before1 == null) NgramModel.UNKNOWN else w.before2?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
+                val ctxPrior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it)).toDouble()) }
+                fun decode(prior: ((String, Int) -> FloatArray?)?, weight: Double): String {
+                    val sb = StringBuilder()
+                    for (i in w.meant.indices) {
+                        val p = prior?.invoke(sb.toString(), i)
+                        sb.append(own.nearestLetter(w.xs[i], w.ys[i], prior = p, priorWeight = weight) ?: '?')
+                    }
+                    return sb.toString()
+                }
+                val reads = mutableListOf(
                     w.typed,
                     String(CharArray(w.meant.length) { lean.nearestLetter(w.xs[it], w.ys[it]) ?: '?' }),
-                    String(CharArray(w.meant.length) { own.nearestLetter(w.xs[it], w.ys[it]) ?: '?' }),
+                    decode(null, 0.0),
                 )
-                letters += w.meant.length
-                for (k in 0..2) {
-                    right[k] += w.meant.indices.count { reads[k][it] == w.meant[it] }
-                    if (reads[k] == w.meant) wordsRight[k]++
+                for (k in weights) {
+                    reads += decode({ pre, _ -> priors++; uniPrior.next(pre) }, k)
+                    reads += decode({ pre, _ -> ctxPrior.next(pre) }, k)
+                    reads += decode({ _, i -> w.lmScores.getOrNull(i) }, k)
                 }
-                // The phone learns from words that came out right and that it knows.
+                letters += w.meant.length
+                val known = dictionary.contains(w.meant)
+                if (!known) unknown++
+                for (v in reads.indices) {
+                    right[v] += w.meant.indices.count { reads[v][it] == w.meant[it] }
+                    if (reads[v] == w.meant) {
+                        wordsRight[v]++
+                        if (!known) unknownRight[v]++
+                    }
+                }
                 if (reads[2] == w.meant && dictionary.contains(w.meant)) {
                     val obs = w.meant.indices.flatMap { i -> own.observation(w.xs[i], w.ys[i], w.meant[i])!!.toList() }.toFloatArray()
                     adaptation.learn(obs)
                 }
             }
-            if (System.getenv("TAPS_PEOPLE") != null) {
-                val o = adaptation.offsets()
-                println("TAPS   $person learned lean: across %+.2f, down %+.2f (key pitches, mean of letters)".format(o.take(26).average(), o.drop(26).average()))
-            }
         }
         val pct = GlideBenchmarkTest::pct
-        val names = listOf("key under the finger (before)", "nearest after the overall lean", "nearest after lean and own offsets")
-        for (k in 0..2) println("TAPS KEYS ${names[k].padEnd(36)} letters ${pct(right[k], letters)}, words typed right ${pct(wordsRight[k], words.size)}")
+        for (v in names.indices) println("TAPS KEYS ${names[v].padEnd(44)} letters ${pct(right[v], letters)}, words typed right ${pct(wordsRight[v], words.size)}; of $unknown not in the dictionary ${pct(unknownRight[v], unknown)}")
+        println("TAPS KEYS frequency prior: %.2f ms per letter".format((System.nanoTime() - t0) / 1e6 / maxOf(1, priors) / 4))
     }
 }

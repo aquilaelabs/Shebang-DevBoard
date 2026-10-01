@@ -272,6 +272,17 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   0.75 is the best on real taps. A word the dictionary knows is still never changed, and nothing changes
   an earlier typed word: correcting real words by context ("if" for "of") was considered and left out at
   the user's request.
+- **Keys weigh the next letter's odds**: on top of where the finger landed, a tap on a letter key weighs how
+  likely each letter is next: the dictionary words that start with what has been typed, each weighted by
+  the three-word model with the words before (as autocorrect does), summed by their next letter, with 5%
+  of the odds spread evenly so words the dictionary lacks can still be typed. Worked out in the background
+  after each edit (0.4 ms per letter on the JVM) and cleared at once on every edit, so a tap never uses odds
+  for another prefix. Only in plain text fields outside code mode: not in password, email, URL, number or
+  terminal fields. On TSI's phrase words with each person's learned offsets: letters typed as meant 97.0%
+  without the odds, 99.1% with word frequency alone, 99.3% with the words before; words typed right 87.9%,
+  96.6% and 97.3% (TSI's own language model's letter odds give 95.4%). Of the 83 words the dictionary lacks,
+  91.6% came out right without the odds and 94.0% with them. Weights of 0.5, 1, 1.5 and 2 against the tap
+  gave 95.9%, 97.3%, 96.5% and 94.4% of words; 1 it is.
 - **Keys follow where the user taps** (R14): a touch on a letter key types the letter whose usual landing
   spot is nearest: its centre nudged by the overall lean and this user's learned offsets (the same tap
   adaptation as R12, capped at 0.35 of a key). Other keys go by their drawn edges, and the key preview
