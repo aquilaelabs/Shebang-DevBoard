@@ -303,5 +303,14 @@ class GlideAdaptation(
 
         fun get(filesDir: File): GlideAdaptation =
             instance ?: synchronized(this) { instance ?: GlideAdaptation(File(filesDir, FILE)).also { instance = it } }
+
+        /** Where this user's taps land on each key: the same learning and safeguards, for [TapModel]. */
+        const val TAP_FILE = "tap_adaptation.json"
+
+        @Volatile
+        private var tapInstance: GlideAdaptation? = null
+
+        fun getTaps(filesDir: File): GlideAdaptation =
+            tapInstance ?: synchronized(this) { tapInstance ?: GlideAdaptation(File(filesDir, TAP_FILE)).also { tapInstance = it } }
     }
 }

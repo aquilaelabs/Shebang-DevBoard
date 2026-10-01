@@ -44,6 +44,7 @@ class SettingsRepository(context: Context) {
             flickSymbols = p[Keys.FLICK_SYMBOLS] ?: d.flickSymbols,
             learnWords = p[Keys.LEARN_WORDS] ?: d.learnWords,
             adaptGlide = p[Keys.ADAPT_GLIDE] ?: d.adaptGlide,
+            adaptTaps = p[Keys.ADAPT_TAPS] ?: d.adaptTaps,
             autocorrect = p[Keys.AUTOCORRECT] ?: d.autocorrect,
             autoCaps = p[Keys.AUTO_CAPS] ?: d.autoCaps,
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
@@ -70,6 +71,7 @@ class SettingsRepository(context: Context) {
         p[Keys.FLICK_SYMBOLS] = s.flickSymbols
         p[Keys.LEARN_WORDS] = s.learnWords
         p[Keys.ADAPT_GLIDE] = s.adaptGlide
+        p[Keys.ADAPT_TAPS] = s.adaptTaps
         p[Keys.AUTOCORRECT] = s.autocorrect
         p[Keys.AUTO_CAPS] = s.autoCaps
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
@@ -95,6 +97,7 @@ class SettingsRepository(context: Context) {
         val FLICK_SYMBOLS = booleanPreferencesKey("flick_symbols")
         val LEARN_WORDS = booleanPreferencesKey("learn_words")
         val ADAPT_GLIDE = booleanPreferencesKey("adapt_glide")
+        val ADAPT_TAPS = booleanPreferencesKey("adapt_taps")
         val AUTOCORRECT = booleanPreferencesKey("autocorrect")
         val AUTO_CAPS = booleanPreferencesKey("auto_caps")
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")

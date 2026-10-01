@@ -167,6 +167,7 @@ fun SettingsScreen(
             }
             item { SectionHeader("Learning") }
             item { SwitchRow("Learn words I type", "Remember new words and the ones you use most, on this phone only", settings.learnWords) { v -> update { it.copy(learnWords = v) } } }
+            item { SwitchRow("Adapt autocorrect to my taps", "Learn where your taps land on each key, from the words you type right", settings.adaptTaps) { v -> update { it.copy(adaptTaps = v) } } }
             item { SwitchRow("Adapt glide to my swiping", "Learn how your glides lean off each key, most from the words you correct", settings.adaptGlide, enabled = settings.glide) { v -> update { it.copy(adaptGlide = v) } } }
             item {
                 ListItem(

@@ -32,6 +32,7 @@ import androidx.core.view.WindowInsetsCompat
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.GlideAdaptation
+import dev.shebang.devboard.glide.TapModel
 import dev.shebang.devboard.glide.PathMatch
 import dev.shebang.devboard.glide.GlideLanguage
 import dev.shebang.devboard.glide.GlideResult
@@ -112,6 +113,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var pendingBundle: LanguageBundle? = null
     private lateinit var personal: PersonalWords
     private lateinit var adaptation: GlideAdaptation
+    /** Where this user's taps land on each key, for weighing typing slips. */
+    private lateinit var tapAdaptation: GlideAdaptation
     /** The glide in progress (its session id), or -1. */
     private var glideId = -1
     private var glideCapitalize = false
@@ -125,6 +128,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         personal = PersonalWords.get(filesDir)
         appProfiles = AppProfiles(this)
         adaptation = GlideAdaptation.get(filesDir)
+        tapAdaptation = GlideAdaptation.getTaps(filesDir)
         background.execute { adaptation.load() }
         languageLoader = LanguageLoader(
             this,
@@ -208,6 +212,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         background.execute {
             personal.save()
             adaptation.save()
+            tapAdaptation.save()
         }
         val b = bundle ?: return
         if (personal.vocabularyVersion != b.vocabularyVersion || personal.countsVersion - b.countsVersion >= REBUILD_AFTER_WORDS) {
@@ -219,6 +224,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (!settings.learnWords) return
         val dictionary = bundle?.dictionary ?: return
         background.execute { personal.learn(word, previous, sentenceStart) { dictionary.indexOfLower(it) >= 0 } }
+    }
+
+    override fun learnTaps(observations: FloatArray) {
+        if (!settings.adaptTaps) return
+        background.execute { tapAdaptation.learn(observations) }
     }
 
     override fun learnGlide(observations: FloatArray) {
@@ -341,8 +351,15 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideModel = null
         k.setGeometry(g)
         k.requestLayout()
+        refreshTapModel()
         root?.let { ViewCompat.requestApplyInsets(it) }
         strip?.setCodeMode(mode == Mode.CODE)
+    }
+
+    /** The tap model for the current keys and this user's learned tap offsets (read once per field). */
+    private fun refreshTapModel() {
+        val g = geometry ?: return
+        text.tapModel = TapModel(glideModelFor(g), resources.displayMetrics.density, if (settings.adaptTaps) tapAdaptation.offsets() else null)
     }
 
     private fun glideModelFor(g: KeyboardGeometry): KeyLayoutModel {
@@ -524,7 +541,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                     strip?.bar?.updateModifiers(modifiers)
                 } else {
                     val t = (if (shift != ShiftState.OFF && mode == Mode.TEXT) key.shiftedText else key.def.text) ?: return
-                    typeFromKeyboard(t)
+                    // A letter keeps where its tap came down, for weighing slips.
+                    val kb = keyboard
+                    if (key.def.isLetter && t.length == 1 && kb != null) typeFromKeyboard(t, kb.lastTapX, kb.lastTapY) else typeFromKeyboard(t)
                     if (shift == ShiftState.ON && !autoShifted) keyboard?.releaseOneShotShift()
                     if (autoShifted) {
                         autoShifted = false
@@ -547,7 +566,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         return true
     }
 
-    private fun typeFromKeyboard(t: String) {
+    private fun typeFromKeyboard(t: String, tapX: Float = Float.NaN, tapY: Float = Float.NaN) {
         if (modifiers.anyActive) {
             when (val d = KeyEventMapper.dispatchChar(t, modifiers.consume())) {
                 is CharDispatch.Text -> text.typeText(d.text)
@@ -558,7 +577,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             }
             strip?.bar?.updateModifiers(modifiers)
         } else {
-            text.typeText(t)
+            text.typeText(t, tapX, tapY)
         }
     }
 

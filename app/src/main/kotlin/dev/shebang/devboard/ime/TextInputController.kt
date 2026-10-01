@@ -6,11 +6,13 @@ import android.view.KeyEvent
 import android.view.inputmethod.InputConnection
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.NgramModel
+import dev.shebang.devboard.dict.SlipCost
 import dev.shebang.devboard.dict.Suggester
 import dev.shebang.devboard.dict.Suggestion
 import dev.shebang.devboard.glide.GlideContext
 import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideWord
+import dev.shebang.devboard.glide.TapModel
 import dev.shebang.devboard.input.KeySender
 import dev.shebang.devboard.settings.Settings
 import java.util.concurrent.Executor
@@ -57,6 +59,8 @@ class TextInputController(
          * alternative; [stroke] is its own earlier stroke when it was glided recently, for re-aligning.
          */
         fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary)
+        /** Where a word typed right was tapped: triples (letter, du, dv) from [TapModel.observation]. */
+        fun learnTaps(observations: FloatArray) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -100,6 +104,43 @@ class TextInputController(
      * as it went in right before the cursor ([tail] is it with the space after it). Set by [glideContext].
      */
     private class Revisable(val word: GlidedWord, val tail: String)
+
+    /** Where this user's taps land on the keys, so slips are weighed by where each letter's tap came down. */
+    var tapModel: TapModel? = null
+    /** Touch-down points of the composing word's letters (NaN for a letter not tapped), in step with [word]. */
+    private val tapXs = ArrayList<Float>()
+    private val tapYs = ArrayList<Float>()
+
+    private fun resetTaps(unknown: Int) {
+        tapXs.clear()
+        tapYs.clear()
+        repeat(unknown) {
+            tapXs += Float.NaN
+            tapYs += Float.NaN
+        }
+    }
+
+    /** The composing word's taps for [SlipCost], or null when they are not all in step with it. */
+    private fun currentTaps(): SlipCost.Taps? {
+        val m = tapModel ?: return null
+        if (tapXs.size != word.length || tapXs.all { it.isNaN() }) return null
+        val xs = tapXs.toFloatArray()
+        val ys = tapYs.toFloatArray()
+        return SlipCost.Taps { i, a, b -> if (i >= xs.size || xs[i].isNaN()) null else m.cost(xs[i], ys[i], a, b) }
+    }
+
+    /** Where each letter of [typed] was tapped relative to where this user aims, for learning; null when unknown. */
+    private fun tapObservations(typed: String): FloatArray? {
+        val m = tapModel ?: return null
+        if (tapXs.size != typed.length) return null
+        val out = ArrayList<Float>()
+        for ((i, c) in typed.lowercase().withIndex()) {
+            if (tapXs[i].isNaN()) continue
+            m.observation(tapXs[i], tapYs[i], c)?.let { o -> o.forEach { out += it } }
+        }
+        return if (out.isEmpty()) null else out.toFloatArray()
+    }
+
     private var revisable: Revisable? = null
 
     /** Milliseconds since boot; replaceable in tests. */
@@ -385,7 +426,7 @@ class TextInputController(
 
     // ---- Typing --------------------------------------------------------------------------------------
 
-    fun typeText(text: String) {
+    fun typeText(text: String, tapX: Float = Float.NaN, tapY: Float = Float.NaN) {
         val ic = connection() ?: return
         dropTarget()
         ownEdit()
@@ -406,11 +447,16 @@ class TextInputController(
             }
             if (word.isEmpty()) {
                 refreshIdentifiers(ic)
+                resetTaps(0)
                 // Typing on at the end of a word that is not composing (the field dropped it, or the cursor was
                 // put there): the whole word is composed, so the underline and a strip pick cover all of it.
                 if (recomposeWordBeforeCursor(ic) != null) reopenedGlide = null
             }
             word.append(text)
+            for (k in text.indices) {
+                tapXs += if (text.length == 1) tapX else Float.NaN
+                tapYs += if (text.length == 1) tapY else Float.NaN
+            }
             ic.setComposingText(word, 1)
             ui.setComposing(true)
             requestSuggestions()
@@ -594,6 +640,10 @@ class TextInputController(
         }
         settle()
         if (isComposing) {
+            if (tapXs.size == word.length) {
+                tapXs.removeAt(tapXs.size - 1)
+                tapYs.removeAt(tapYs.size - 1)
+            }
             word.setLength(word.length - 1)
             if (word.isEmpty()) {
                 ic.setComposingText("", 1)
@@ -678,6 +728,7 @@ class TextInputController(
         ic.endBatchEdit()
         word.setLength(0)
         word.append(text)
+        resetTaps(text.length)
         reopened = text
         return text
     }
@@ -811,6 +862,8 @@ class TextInputController(
      */
     private fun endWord(ic: InputConnection, after: String, correct: Boolean, deferOk: Boolean) {
         val typed = word.toString()
+        val taps = currentTaps()
+        val tapsSeen = tapObservations(typed)
         val context = learningContext(ic)
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
         val untouched = reopenedUnchanged
@@ -820,7 +873,7 @@ class TextInputController(
         var commit = typed
         var defer = false
         if (canCorrect) {
-            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates)?.let { commit = it }
+            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps)?.let { commit = it }
             else defer = deferOk && suggester != null
             // A word that stands elsewhere in the text as typed is a name the user means (an identifier,
             // a handle), not a slip.
@@ -839,11 +892,15 @@ class TextInputController(
         if (commit != pronounCase(typed)) lastAutocorrect = Autocorrected(typed, commit, after)
         if (!defer) {
             if (!untouched) learnAs(commit, context)
+            // A word the dictionary knows, typed and kept as it is, shows where this user's taps land.
+            if (!untouched && commit == typed && tapsSeen != null && field.allowsLearning && suggester?.knows(typed) == true) {
+                learner.learnTaps(tapsSeen)
+            }
             return
         }
         val s = suggester ?: return
         background.execute {
-            val fix = s.autocorrect(typed)
+            val fix = s.autocorrect(typed, taps)
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
@@ -954,8 +1011,9 @@ class TextInputController(
         val s = suggester ?: return
         val typed = word.toString()
         val gen = ++suggestGeneration
+        val taps = currentTaps()
         background.execute {
-            val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES)
+            val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps)
             postToMain {
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result

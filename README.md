@@ -12,6 +12,8 @@ An Android keyboard (IME) for developers, written in Kotlin.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
   snippets...) that sends real `KeyEvent`s, so Termux and other terminals receive them. Sticky modifiers let
   `Ctrl` then `c` on the main keyboard send Ctrl+C.
+- **Autocorrect that knows where you tapped**: a slip is weighed by where the finger came down, and the
+  keyboard learns where your own taps land on each key.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no
   suggestions or glide; number/phone/date fields get a numeric pad; email/URL fields get `@` and `/`.
 - **Autofill in the strip** (Android 11+): the password manager's or autofill service's suggestions show as
@@ -255,6 +257,19 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
   adaptation, with its daily limits and snapshots.
+- **Autocorrect by where the taps landed** (R12): each typed letter keeps where its tap came down, and a
+  wrong letter costs by how much less likely that tap was meant for the word's letter than for the key it
+  hit, in place of a flat cost for neighbouring keys. Taps scatter around where a key is aimed at with a
+  10.2 dp spread, 2.2 dp left of and 2.0 dp above its centre: fitted on the TSI tap dataset (CC BY 4.0;
+  37,022 letter taps by 16 people; 94.2% land nearest the key meant). The overall lean is used rather than
+  TSI's per-key one, which belongs to its phone's layout; each user's own lean per key is learned on the
+  phone from words typed right and kept (not from corrected ones), with the glide adaptation's daily limit,
+  clipped pulls and 14 days of snapshots, in its own file, under its own setting. Candidates rank by the
+  same cost when the taps are known, and words of four letters or more may then be two slips away. On TSI's
+  6,338 phrase words typed as the keys nearest their first taps (1,244 typos), autocorrect fixes 77.0%
+  instead of 71.0%, makes another word of 9.2% instead of 11.3%, and changes none of the words typed right.
+  Of the typos it leaves, 86 are themselves words (the word before would have to tell, R13) and 129 lack
+  the word meant among the six candidates.
 - **Fixing the word before** (the user's request, after the in-field design below): a glide may fix the
   glided word right before it, and only that one, when the decoder reads the pair otherwise by its margin
   (2.0 cost units); only while that word stands exactly as it went in, nothing has been typed since, and it

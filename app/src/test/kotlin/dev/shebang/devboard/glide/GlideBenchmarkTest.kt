@@ -20,7 +20,7 @@ import java.util.Random
 class GlideBenchmarkTest {
 
     companion object {
-        private const val DENSITY = 2.625f
+        const val DENSITY = 2.625f
         private val layoutDef = LayoutParser.parse(File("src/main/assets/layouts/text_qwerty.json").readText())
         val geometry = KeyboardGeometry(
             layoutDef, FieldVariant.PLAIN, 1080, (4 * 52 * DENSITY).toInt(), false, 5 * DENSITY, 8 * DENSITY, 1,

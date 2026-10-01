@@ -34,6 +34,8 @@ data class Settings(
     val learnWords: Boolean = true,
     /** Adapt glide to where this user's strokes actually pass the keys. */
     val adaptGlide: Boolean = true,
+    /** Autocorrect learns where this user's taps land on each key. */
+    val adaptTaps: Boolean = true,
     val autocorrect: Boolean = false,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,

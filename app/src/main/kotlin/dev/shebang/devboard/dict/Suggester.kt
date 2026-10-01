@@ -30,8 +30,10 @@ class Suggester(
     /**
      * @param typed the composing text (any case).
      * @param limit how many results to return.
+     * @param taps where the typed letters were tapped, when known: corrections then rank by how likely the
+     *   taps were meant for them ([SlipCost] with taps) rather than by plain edit distance.
      */
-    fun suggest(typed: String, limit: Int = 3): List<Suggestion> {
+    fun suggest(typed: String, limit: Int = 3, taps: SlipCost.Taps? = null): List<Suggestion> {
         if (typed.isEmpty()) return emptyList()
         val lower = typed.lowercase()
         val out = ArrayList<Suggestion>(limit * 4)
@@ -64,7 +66,11 @@ class Suggester(
                 if (d < 0) continue
                 // A wrong first letter is a stronger signal of a different word.
                 val firstPenalty = if (w[0] != lower[0]) 0.5 else 1.0
-                val score = weight(i) * firstPenalty / (1.0 + 1.5 * d)
+                val score = if (taps != null) {
+                    weight(i) * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
+                } else {
+                    weight(i) * firstPenalty / (1.0 + 1.5 * d)
+                }
                 corrections.add(Suggestion(matchCase(typed, dict.words[i]), score, true))
             }
             corrections.sortByDescending { it.score }
@@ -110,7 +116,11 @@ class Suggester(
     }
 
     /** The single best correction for autocorrect-on-space, or null when the typed word is fine. */
-    fun autocorrect(typed: String): String? = autocorrectFrom(typed, suggest(typed, AUTOCORRECT_CANDIDATES))
+    fun autocorrect(typed: String, taps: SlipCost.Taps? = null): String? =
+        autocorrectFrom(typed, suggest(typed, AUTOCORRECT_CANDIDATES, taps), taps)
+
+    /** Whether the dictionary has [word] as it is spelled. */
+    fun knows(word: String): Boolean = dict.indexOf(word) >= 0
 
     /**
      * Autocorrect using suggestions already computed for [typed] (the strip's candidates), so the space key
@@ -122,12 +132,12 @@ class Suggester(
      * user uses) are corrected to. A two-letter word is only corrected by adding a letter it dropped, so
      * abbreviations such as "js" or "ui" are not turned into other two-letter words.
      */
-    fun autocorrectFrom(typed: String, candidates: List<Suggestion>): String? {
+    fun autocorrectFrom(typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null): String? {
         if (typed.length < 2) return null
         val known = dict.indexOf(typed)
         if (known >= 0) return contractionFor(typed, known, candidates)
         val lower = typed.lowercase()
-        val maxD = if (lower.length >= 6) 2 else 1
+        val maxD = if (lower.length >= 6 || (taps != null && lower.length >= TAP_TWO_SLIPS_FROM)) 2 else 1
         var best: String? = null
         var bestScore = 0.0
         for (c in candidates) {
@@ -141,7 +151,7 @@ class Suggester(
             if (d < 1) continue
             // How likely a finger makes this slip, against how common the word is.
             val firstPenalty = if (w[0] != lower[0]) 0.35 else 1.0
-            val score = weight(idx) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w))
+            val score = weight(idx) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
             if (score > bestScore) {
                 bestScore = score
                 best = c.word
@@ -157,6 +167,8 @@ class Suggester(
         private const val CONTRACTION_RATIO = 50.0
         /** How strongly an unlikely slip counts against a common word (per unit of [SlipCost]). */
         var SLIP_WEIGHT = 6.0
+        /** With tap positions, words from this length may be two slips away (else from six letters). */
+        private const val TAP_TWO_SLIPS_FROM = 4
 
         /** Copies the user's casing onto a suggestion: "Hel" -> "Hello", "HEL" -> "HELLO", "hel" -> dictionary casing. */
         fun matchCase(typed: String, word: String): String {
@@ -211,8 +223,17 @@ object EditDistance {
  * on a QWERTY keyboard cost less. A neighbouring key instead of the right one, two letters swapped, or a
  * letter doubled cost 0.5; a skipped apostrophe ("dont") 0.2; one of a double letter dropped ("adress")
  * 0.4; any other letter dropped 0.8; any other letter extra or wrong 1.0.
+ *
+ * With [Taps] (where each typed letter's tap came down), a wrong letter costs by how much less likely the
+ * tap was meant for the word's letter than for the key it hit, in the same units: a tap on the line
+ * between two keys makes either letter nearly free, a tap in the middle of its key makes the other costly.
  */
 object SlipCost {
+    /** Where the typed letters were tapped: [cost] for letter [i] typed as [typed] but meant as [meant], in nats; null when unknown. */
+    fun interface Taps {
+        fun cost(i: Int, typed: Char, meant: Char): Double?
+    }
+
     private val rows = arrayOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
     private val rowOf = IntArray(26) { -1 }
     private val colOf = FloatArray(26)
@@ -233,7 +254,7 @@ object SlipCost {
         return dr <= 1 && dc <= 1.0f
     }
 
-    fun cost(typed: String, word: String): Double {
+    fun cost(typed: String, word: String, taps: Taps? = null): Double {
         val n = typed.length
         val m = word.length
         val d = Array(n + 1) { DoubleArray(m + 1) }
@@ -242,7 +263,8 @@ object SlipCost {
         for (i in 1..n) for (j in 1..m) {
             val a = typed[i - 1]
             val b = word[j - 1]
-            val sub = if (a == b) 0.0 else if (adjacent(a, b)) 0.5 else 1.0
+            val sub = if (a == b) 0.0 else taps?.cost(i - 1, a, b)?.let { minOf(1.0, it / Suggester.SLIP_WEIGHT) }
+                ?: if (adjacent(a, b)) 0.5 else 1.0
             // An extra letter typed: cheap when it doubles the one before or sits next to it.
             val extra = if (i >= 2 && (typed[i - 2] == a || adjacent(typed[i - 2], a))) 0.6 else 1.0
             // A letter the word has and the typing lacks: cheapest for a skipped apostrophe, cheap for one of a

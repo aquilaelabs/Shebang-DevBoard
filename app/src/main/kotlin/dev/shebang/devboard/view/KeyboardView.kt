@@ -123,6 +123,12 @@ class KeyboardView(context: Context) : View(context) {
     // Per-pointer touch state (index = pointer id, capped at MAX_POINTERS).
     private val pointerKey = arrayOfNulls<Key>(MAX_POINTERS)
     private val pointerDownX = FloatArray(MAX_POINTERS)
+
+    /** Where the finger came down for the tap being reported to [Listener.onKeyTap], in view pixels. */
+    var lastTapX = Float.NaN
+        private set
+    var lastTapY = Float.NaN
+        private set
     private val pointerDownY = FloatArray(MAX_POINTERS)
     private val pointerDownT = LongArray(MAX_POINTERS)
     private val pointerLastX = FloatArray(MAX_POINTERS)
@@ -616,7 +622,11 @@ class KeyboardView(context: Context) : View(context) {
             wasActive && deleteDrag -> l?.onDeleteWords(deleteWords)
             wasActive && repeatFired -> Unit
             key.action == KeyAction.SHIFT -> onShiftTap()
-            else -> l?.onKeyTap(key, shiftState)
+            else -> {
+                lastTapX = pointerDownX[id]
+                lastTapY = pointerDownY[id]
+                l?.onKeyTap(key, shiftState)
+            }
         }
         popup.dismiss()
         pointerKey[id] = null

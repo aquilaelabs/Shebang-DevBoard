@@ -52,6 +52,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val personal = remember { PersonalWords.get(context.filesDir) }
     val adaptation = remember { GlideAdaptation.get(context.filesDir) }
+    val taps = remember { GlideAdaptation.getTaps(context.filesDir) }
     val scope = rememberCoroutineScope()
     var words by remember { mutableStateOf<List<PersonalWord>?>(null) }
     var glides by remember { mutableIntStateOf(0) }
@@ -69,7 +70,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 adaptation.load()
                 Triple(personal.list(), adaptation.glides, adaptation.corrections)
             }
-            restoreDays = withContext(Dispatchers.IO) { (personal.restoreDays() + adaptation.restoreDays()).distinct().sortedDescending() }
+            restoreDays = withContext(Dispatchers.IO) { (personal.restoreDays() + adaptation.restoreDays() + taps.restoreDays()).distinct().sortedDescending() }
             words = w
             glides = g
             corrections = c
@@ -82,6 +83,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 action()
                 personal.save()
                 adaptation.save()
+                taps.save()
             }
             refresh()
         }
@@ -107,7 +109,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             }
             item {
                 ListItem(
-                    headlineContent = { Text("Reset glide adaptation") },
+                    headlineContent = { Text("Reset glide and tap adaptation") },
                     supportingContent = {
                         Text("Learned from ${plural(glides, "glide")} and ${plural(corrections, "correction")}. Resetting forgets how your swipes lean off each key.")
                     },
@@ -121,7 +123,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     supportingContent = {
                         Text(
                             if (restoreDays.isEmpty()) "Nothing to undo yet. The keyboard keeps where things stood at the start of each of the last ${PersonalWords.KEEP_DAYS} days."
-                            else "Go back to how learned words and swipe adaptation stood at the start of a recent day, if a sloppy day taught the keyboard the wrong things."
+                            else "Go back to how learned words and swipe and tap adaptation stood at the start of a recent day, if a sloppy day taught the keyboard the wrong things."
                         )
                     },
                     modifier = Modifier.clickable(enabled = restoreDays.isNotEmpty()) { choosingDay = true },
@@ -207,13 +209,14 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmDay = null },
             title = { Text("Go back to ${dayLabel(day, today).replaceFirstChar { it.lowercase() }}?") },
-            text = { Text("Words and swipe habits learned since then are forgotten. Words you deleted stay deleted.") },
+            text = { Text("Words, swipe and tap habits learned since then are forgotten. Words you deleted stay deleted.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDay = null
                     change {
                         personal.restore(day)
                         adaptation.restore(day)
+                        taps.restore(day)
                     }
                 }) { Text("Go back") }
             },
@@ -223,9 +226,9 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Reset glide adaptation?") },
-            text = { Text("Gliding goes back to the keyboard's defaults and starts learning your swipes again.") },
-            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset() } }) { Text("Reset") } },
+            title = { Text("Reset glide and tap adaptation?") },
+            text = { Text("Gliding and autocorrect go back to the keyboard's defaults and start learning your swipes and taps again.") },
+            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset() } }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
     }

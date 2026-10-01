@@ -67,6 +67,18 @@ Princeton University and LICENSEE agrees to preserve same.
 - Licence: the sentences are public domain under CC0 1.0 (<https://creativecommons.org/publicdomain/zero/1.0/>);
   Common Voice accepts only CC0 sentences into the collection. Only counts are shipped.
 
+### TSI tap dataset (Tap Typing with Touch Sensing Images)
+- Used for: the tap model's constants in `app/src/main/kotlin/dev/shebang/devboard/glide/TapModel.kt` (where
+  taps land relative to a key's centre and how widely they spread), fitted from the dataset's 37,022 letter
+  taps, and `TapBenchmarkTest`, which replays its copy-typed phrases. No data from it is shipped or kept in
+  the repository.
+- Source: <https://github.com/google-research-datasets/tap-typing-with-touch-sensing-images>, downloaded
+  2026-10-01. Paper: Piyawat Lertvittayakumjorn, Shanqing Cai, Billy Dou, Cedric Ho and Shumin Zhai, "Can
+  Capacitive Touch Images Enhance Mobile Keyboard Decoding?", UIST 2024, <https://doi.org/10.1145/3654777.3676420>.
+- Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
+  <https://creativecommons.org/licenses/by/4.0/>. Changes: only summary statistics (two spreads and two
+  offsets) are used.
+
 ### FUTO swipe dataset (swipe.futo.org)
 - Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the
   decoder's default parameters (`GlideParams`) were chosen on its dev split. No part of the data is in this
