@@ -589,7 +589,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                 KeySender.sendPlain(ic, key.keyCode)
             }
         }
-        feedback.keyPress(key.action)
+        feedback.keyRepeat(key.action)
         afterEdit()
     }
 

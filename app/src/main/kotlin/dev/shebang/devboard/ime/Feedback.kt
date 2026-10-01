@@ -27,6 +27,13 @@ class Feedback(context: Context) {
 
     fun keyPress(action: KeyAction = KeyAction.NONE) {
         if (settings.haptics) vibrator?.let { if (it.hasVibrator()) it.vibrate(effects[settings.hapticStrength.coerceIn(1, 3) - 1]) }
+        keySound(action)
+    }
+
+    /** A hold-to-repeat tick (backspace held): the key's sound, no vibration, so a held key does not buzz. */
+    fun keyRepeat(action: KeyAction) = keySound(action)
+
+    private fun keySound(action: KeyAction) {
         if (settings.keySounds) {
             val fx = when (action) {
                 KeyAction.BACKSPACE -> AudioManager.FX_KEYPRESS_DELETE
