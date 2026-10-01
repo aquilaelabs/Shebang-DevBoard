@@ -483,6 +483,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   API 36 emulator right after install (not yet compiled ahead of time); the keyboard appears at once and
   glide starts working when both are in.
 
+## Licence
+
+MIT (see `LICENSE`). The data and libraries it builds on keep their own licences, all permissive or public
+domain, listed with their attributions in `THIRD_PARTY_NOTICES.md`; the CC BY ones (Tatoeba, TSI) ask for
+credit wherever the app or its data is redistributed.
+
 ## Manual checklist
 
 Emulator notes: an AVD reports a hardware keyboard, so run

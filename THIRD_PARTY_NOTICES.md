@@ -1,6 +1,7 @@
 # Third-party notices
 
-Everything listed here is redistributable under a permissive licence. No GPL code and no proprietary
+Shebang DevBoard itself is under the MIT licence (`LICENSE`). Everything listed here is redistributable
+under a permissive licence. No GPL code and no proprietary
 keyboard code, data, sounds or images are used anywhere in this project.
 
 ## Data
