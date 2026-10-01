@@ -49,6 +49,7 @@ class SettingsRepository(context: Context) {
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
             pairBrackets = p[Keys.PAIR_BRACKETS] ?: d.pairBrackets,
             nextWord = p[Keys.NEXT_WORD] ?: d.nextWord,
+            fixPreviousGlide = p[Keys.FIX_PREVIOUS_GLIDE] ?: d.fixPreviousGlide,
             stripMode = p[Keys.STRIP_MODE]?.let { runCatching { StripMode.valueOf(it) }.getOrNull() } ?: d.stripMode,
             barJson = p[Keys.BAR_JSON],
             appBars = p[Keys.APP_BARS]?.let { runCatching { appBarsJson.decodeFromString<Map<String, String>>(it) }.getOrNull() } ?: emptyMap(),
@@ -74,6 +75,7 @@ class SettingsRepository(context: Context) {
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
         p[Keys.PAIR_BRACKETS] = s.pairBrackets
         p[Keys.NEXT_WORD] = s.nextWord
+        p[Keys.FIX_PREVIOUS_GLIDE] = s.fixPreviousGlide
         p[Keys.STRIP_MODE] = s.stripMode.name
         if (s.barJson == null) p.remove(Keys.BAR_JSON) else p[Keys.BAR_JSON] = s.barJson
         if (s.appBars.isEmpty()) p.remove(Keys.APP_BARS) else p[Keys.APP_BARS] = appBarsJson.encodeToString(s.appBars)
@@ -98,6 +100,7 @@ class SettingsRepository(context: Context) {
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
         val PAIR_BRACKETS = booleanPreferencesKey("pair_brackets")
         val NEXT_WORD = booleanPreferencesKey("next_word")
+        val FIX_PREVIOUS_GLIDE = booleanPreferencesKey("fix_previous_glide")
         val STRIP_MODE = stringPreferencesKey("strip_mode")
         val BAR_JSON = stringPreferencesKey("bar_json")
         val APP_BARS = stringPreferencesKey("bar_json_apps")

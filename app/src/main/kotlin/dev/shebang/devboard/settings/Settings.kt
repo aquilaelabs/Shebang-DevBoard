@@ -37,6 +37,8 @@ data class Settings(
     val autocorrect: Boolean = false,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,
+    /** A glide may fix the glided word right before it, when the two together clearly read otherwise. */
+    val fixPreviousGlide: Boolean = true,
     /** After a space, the strip offers the words likely to come next. */
     val nextWord: Boolean = true,
     /** In code mode, ( [ { and quotes are typed in pairs. */

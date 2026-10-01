@@ -78,8 +78,8 @@ class GlideCommitTest {
 
     /** Glides [words] the way the service does: context first, then the result. */
     private fun glide(vararg words: String, capitalize: Boolean = false, trailingSpace: Boolean = false, runnersUp: List<String> = emptyList()) {
-        val ctx = controller.glideContext(dictionary, lm)
-        assertTrue(ctx.history.isEmpty())
+        // The decoder's result keeps any word before as it stands (FixPreviousGlideTest covers fixing it).
+        controller.glideContext(dictionary, lm)
         controller.commitGlide(result(words.toList(), runnersUp), dictionary, capitalize, trailingSpace)
     }
 

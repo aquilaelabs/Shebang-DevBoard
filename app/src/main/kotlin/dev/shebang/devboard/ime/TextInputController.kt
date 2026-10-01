@@ -95,6 +95,13 @@ class TextInputController(
     private class JoinOffer(val runText: String, val camel: String, val snake: String, val glide: Any)
     private var joinOffer: JoinOffer? = null
 
+    /**
+     * The glided word the glide now starting may fix: the last word of the glide just before, still exactly
+     * as it went in right before the cursor ([tail] is it with the space after it). Set by [glideContext].
+     */
+    private class Revisable(val word: GlidedWord, val tail: String)
+    private var revisable: Revisable? = null
+
     /** Milliseconds since boot; replaceable in tests. */
     var clock: () -> Long = { SystemClock.uptimeMillis() }
 
@@ -1069,10 +1076,38 @@ class TextInputController(
     fun glideContext(dictionary: Dictionary, lm: NgramModel): GlideContext {
         val ic = connection() ?: return GlideContext(NgramModel.SENTENCE_START)
         resolveTarget(ic)
+        revisable = null
+        revisableBefore(ic)?.let { r ->
+            // The glide just before may be fixed by this one: the decoder reads the two together, from the
+            // context before the earlier word.
+            revisable = r
+            val head = (ic.getTextBeforeCursor(CONTEXT_CHARS + r.tail.length, 0) ?: "").let { it.subSequence(0, it.length - r.tail.length) }
+            val w2 = GlideText.contextWord2(head)
+            val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
+            return GlideContext(GlideText.contextId(GlideText.contextWord(head), dictionary, lm), history = listOf(r.word.word), context2 = context2)
+        }
         val before = textBeforeTarget(ic)
         val w2 = GlideText.contextWord2(before)
         val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
         return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2)
+    }
+
+    /**
+     * The last glided word, when a glide starting now may fix it: the setting is on, nothing is targeted or
+     * being typed, the glide before is still the last thing typed, its last word was not picked from the
+     * strip, and it stands exactly as it went in right before the cursor.
+     */
+    private fun revisableBefore(ic: InputConnection): Revisable? {
+        if (!settings.fixPreviousGlide || !field.allowsComposing || target != null || isComposing) return null
+        val g = lastGlide ?: return null
+        val last = pending.lastOrNull() ?: return null
+        if (last.word.locked || last.text != g.lastWord) return null
+        if (!ic.getSelectedText(0).isNullOrEmpty()) return null
+        val tail = last.text + g.after
+        val before = ic.getTextBeforeCursor(tail.length + 1, 0)?.toString() ?: return null
+        if (!before.endsWith(tail)) return null
+        if (before.length > tail.length && isLetterInWord(before[0])) return null
+        return Revisable(last, tail)
     }
 
     /**
@@ -1173,6 +1208,7 @@ class TextInputController(
             }
         }
         lastActionWasSpace = false
+        reviseBefore(ic, result, dictionary)
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
         target?.glided?.let { pending.remove(it) }
         settle()
@@ -1224,6 +1260,34 @@ class TextInputController(
         }
         ui.showCandidates(strip)
         ui.setComposing(true)
+    }
+
+    /**
+     * The decoder read the glide before this one differently now that it has the next word: that word is
+     * rewritten in place, keeping its capitals, before this glide goes in. It is learned as it now reads,
+     * without its stroke offsets (they were measured against the old word). Tapping it offers the old word
+     * back among its alternatives.
+     */
+    private fun reviseBefore(ic: InputConnection, result: GlideResult, dictionary: Dictionary) {
+        val r = revisable ?: return
+        revisable = null
+        if (target != null || result.firstRevised != 0 || result.history.size != 1) return
+        val w = result.history[0]
+        if (w < 0 || w == r.word.word.word) return
+        val text = GlideText.matchCase(r.word.text, dictionary.words[w])
+        if (ic.getTextBeforeCursor(r.tail.length, 0)?.toString() != r.tail) return
+        val after = r.tail.substring(r.word.text.length)
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(r.tail.length, 0)
+        ic.commitText(text + after, 1)
+        ic.endBatchEdit()
+        r.word.text = text
+        r.word.word = r.word.word.revisedTo(w)
+        r.word.observations = null
+        lastGlide?.let { g ->
+            g.text = g.text.substring(0, g.text.length - r.tail.length) + text + after
+            g.lastWord = text
+        }
     }
 
     /**

@@ -88,7 +88,9 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    suggestions otherwise). The next glide, or a tapped alternative, replaces it and keeps its capitals.
    To add a word instead, tap between words (a cursor at a word's edge targets nothing), or press space
    while a word is targeted, which moves past it. After the keyboard's own edits nothing is targeted, so
-   gliding on never replaces anything, and nothing else in the field is ever rewritten. Each glide is
+   gliding on never replaces a word; the one exception is the glided word right before it (setting, on by
+   default), which the next glide may fix when the two together clearly read otherwise, and only while it
+   stands as it went in and was not picked from the strip. Each glide is
    decoded after the two words before it, with the language model mixed with the user's own word pairs, against a
    stroke measured on keys shifted by the user's learned offsets.
 6. **Phrase gliding** (setting, off by default). Dipping below the middle of the space bar, or resting on it
@@ -139,7 +141,7 @@ simulator) second:
 | 3,679 words of 600 held-out sentences, top-1 | 73.7% | 92.6% alone, 95.5% with context (99.3% top-3); before 93.9% and 96.3% |
 | Original harness (tier-10 words, jittered ideal paths), top-1 / top-3 | 93.5% / 99.7% | 87.8% / 98.2%, before 94.5% / 99.5% |
 | Phrase strokes of 2-4 words with the travel to and from the space bar | | 91.2% (95.4% one stroke per word), before 94.2% |
-| Sentences glided word by word, each glide free to re-read up to four earlier words (a decoder capability the keyboard does not use: it never rewrites text on its own) | | 95.9% when glided, 97.2% at sentence end |
+| Sentences glided word by word, each glide free to re-read up to four earlier words (the keyboard lets it fix one) | | 95.9% when glided, 97.2% at sentence end |
 | A swiper who lands 0.15 key right and 0.3 row low, before and after ten days of adapting (`GlideAdaptationTest`) | | 84.0% before, 91.3% after |
 
 The looser matching costs a little on the simulator's neat strokes and wins much more on real ones. Record
@@ -253,8 +255,17 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
   adaptation, with its daily limits and snapshots.
+- **Fixing the word before** (the user's request, after the in-field design below): a glide may fix the
+  glided word right before it, and only that one, when the decoder reads the pair otherwise by its margin
+  (2.0 cost units); only while that word stands exactly as it went in, nothing has been typed since, and it
+  was not picked from the strip. It is rewritten with its capitals, learned as it ends up without its
+  stroke offsets, and tapping it offers the old word back. Gliding 400 FUTO sentences on without fixing
+  anything (`GlideOnTest`), words right at the end go from 91.9% to 92.8%: 34 fixed, 1 broken. Margins of 3,
+  4 and 6 broke none but fixed 14, 12 and 3. In `FrictionTest`, where every misread is fixed at once, the
+  fixing can only change words already right: 2 of 400 sentences end with one wrong word (98.5% exact,
+  99.0% without). Setting: Fix the last glided word.
 - **Redoing a word in the field** (changed at the user's request, after a preview row was tried): the
-  keyboard never rewrites text on its own. An earlier design rewrote up to four glided words in place when
+  keyboard does not rewrite text on its own beyond fixing the word before (above). An earlier design rewrote up to four glided words in place when
   a later glide made another reading likelier, which changed text the user had already seen go in. A
   preview row that held glided words for two seconds before they went in came next; it grew into a second
   text field, and since Android cuts a field's connection before the keyboard hears the user tapped
