@@ -9,6 +9,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,12 +22,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -48,12 +49,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -305,7 +314,14 @@ fun BarEditorScreen(
             },
         )
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding()) {
+        // The items as they stand while one is dragged, each with an id that follows it through the moves; the
+        // new order is saved when the finger lifts.
+        var order by remember(bar) { mutableStateOf(bar.items.mapIndexed { i, item -> i.toLong() to item }) }
+        var dragging by remember { mutableStateOf<Long?>(null) }
+        var dragOffset by remember { mutableFloatStateOf(0f) }
+        val listState = rememberLazyListState()
+        fun commit(items: List<Pair<Long, BarItem>>) = onChange(BarConfig(items.map { it.second }))
+        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(), state = listState) {
             item {
                 ListItem(
                     headlineContent = { Text(if (app == null) "Bar for all apps" else "Bar for ${appName(app)}") },
@@ -328,23 +344,56 @@ fun BarEditorScreen(
                 }
                 HorizontalDivider()
             }
-            itemsIndexed(bar.items, key = { i, item -> "$i-${item.label}" }) { index, item ->
+            itemsIndexed(order, key = { _, entry -> entry.first }) { index, (id, item) ->
+                val lifted = dragging == id
                 ListItem(
+                    leadingContent = {
+                        // Drag the handle to move the item; rows swap as it passes their middle.
+                        Icon(
+                            Icons.Default.Menu,
+                            contentDescription = "Drag to reorder",
+                            modifier = Modifier.pointerInput(id) {
+                                detectDragGestures(
+                                    onDragStart = { dragging = id; dragOffset = 0f },
+                                    onDragEnd = { dragging = null; dragOffset = 0f; commit(order) },
+                                    onDragCancel = { dragging = null; dragOffset = 0f; order = bar.items.mapIndexed { i, it -> i.toLong() to it } },
+                                ) { change, amount ->
+                                    change.consume()
+                                    dragOffset += amount.y
+                                    val at = order.indexOfFirst { it.first == id }
+                                    val rows = listState.layoutInfo.visibleItemsInfo
+                                    val next = order.getOrNull(at + 1)?.let { n -> rows.firstOrNull { it.key == n.first } }
+                                    val prev = order.getOrNull(at - 1)?.let { p -> rows.firstOrNull { it.key == p.first } }
+                                    if (next != null && dragOffset > next.size / 2f) {
+                                        order = order.move(at, at + 1)
+                                        dragOffset -= next.size
+                                    } else if (prev != null && dragOffset < -prev.size / 2f) {
+                                        order = order.move(at, at - 1)
+                                        dragOffset += prev.size
+                                    }
+                                }
+                            },
+                        )
+                    },
                     headlineContent = { Text(item.label) },
                     supportingContent = { Text(describe(item)) },
                     trailingContent = {
-                        Row {
-                            IconButton(onClick = { onChange(BarConfig(bar.items.move(index, index - 1))) }, enabled = index > 0) {
-                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move up")
-                            }
-                            IconButton(onClick = { onChange(BarConfig(bar.items.move(index, index + 1))) }, enabled = index < bar.items.size - 1) {
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move down")
-                            }
-                            IconButton(onClick = { onChange(BarConfig(bar.items.filterIndexed { i, _ -> i != index })) }, enabled = bar.items.size > 1) {
-                                Icon(Icons.Default.Delete, contentDescription = "Remove")
-                            }
+                        IconButton(onClick = { commit(order.filter { it.first != id }) }, enabled = order.size > 1) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove")
                         }
                     },
+                    tonalElevation = if (lifted) 6.dp else 0.dp,
+                    modifier = Modifier
+                        .zIndex(if (lifted) 1f else 0f)
+                        .graphicsLayer { translationY = if (lifted) dragOffset else 0f }
+                        .then(if (lifted) Modifier.shadow(6.dp) else Modifier)
+                        .semantics {
+                            // Without dragging (TalkBack): move up and down from the item's actions.
+                            customActions = listOfNotNull(
+                                if (index > 0) CustomAccessibilityAction("Move up") { commit(order.move(index, index - 1)); true } else null,
+                                if (index < order.size - 1) CustomAccessibilityAction("Move down") { commit(order.move(index, index + 1)); true } else null,
+                            )
+                        },
                 )
                 HorizontalDivider()
             }

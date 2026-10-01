@@ -468,8 +468,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   settings screens wear it too. This replaces the System/Light/Dark choice and the Dynamic color switch.
 - **Sounds**: the system's own key-click effects via `AudioManager.playSoundEffect`; no bundled audio.
 - **Haptics**: `VibrationEffect.createOneShot` at 8/12/18 ms and amplitude 60/140/255 for light/medium/strong.
-- **Bar editor**: reorder with up/down buttons, remove, add key/modifier/snippet, import/export JSON through
-  the system document picker. Import validates the JSON and rejects unknown keycodes or item types.
+- **Bar editor**: reorder by dragging an item's handle (rows swap as it passes their middle; the order is
+  saved when the finger lifts; R3, replacing up/down buttons), with Move up and Move down as accessibility
+  actions for TalkBack; remove, add key/modifier/snippet, import/export JSON through the system document
+  picker. Import validates the JSON and rejects unknown keycodes or item types.
 - **Build order**: the four phases were built in one pass because the service integrates the bar, dictionary
   and glide from the start; the git history groups the work by layer (core logic, IME and UI, docs) with each
   commit building.
