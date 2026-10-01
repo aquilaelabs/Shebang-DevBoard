@@ -42,6 +42,7 @@ class FixPreviousGlideTest {
     ).also {
         it.clock = { now }
         it.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
+        it.predictionModel = dictionary to lm
     }
 
     private fun idx(w: String) = dictionary.indexOfLower(w).also { assertTrue("$w missing", it >= 0) }
@@ -66,6 +67,20 @@ class FixPreviousGlideTest {
         val ctx = glide("the", revised = "from")
         assertEquals(1, ctx.history.size)
         assertEquals("from the", ic.toString())
+    }
+
+    @Test
+    fun aPairPeopleDoNotWriteNeverReplacesTheWordBefore() {
+        // Seen on a friend's phone: "to work" became "to dirk" when "pretty" was glided next, because after a
+        // word as rare as "dirk" any next word looks as likely as anywhere.
+        type("it seems to ")
+        glide("work", listOf("dirk", "return"))
+        glide("pretty", revised = "dirk")
+        assertEquals("it seems to work pretty", ic.toString())
+    }
+
+    private fun type(s: String) {
+        for (c in s) if (c == ' ') controller.space() else controller.typeText(c.toString())
     }
 
     @Test

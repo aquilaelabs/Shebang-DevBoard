@@ -81,6 +81,7 @@ class GlideOnTest {
         c.clock = { now }
         c.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
         c.settings = c.settings.copy(fixPreviousGlide = fix, autocorrect = false)
+        c.predictionModel = dictionary to lm
         val swipeAt = rs.associateBy { it.wordIdx }
         val tokens = rs.first().sentence.split(' ').filter { it.isNotEmpty() }
         val glidedAt = ArrayList<Int>()

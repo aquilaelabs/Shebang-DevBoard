@@ -1365,7 +1365,12 @@ class TextInputController(
         revisable = null
         if (target != null || result.firstRevised != 0 || result.history.size != 1) return
         val w = result.history[0]
-        if (w < 0 || w == r.word.word.word) return
+        if (w < 0 || w == r.word.word.word || result.words.isEmpty()) return
+        // Only when the new pair is one people write: after a rare word nothing is known about what follows,
+        // so any next word looks no less likely there than anywhere, which would favour rare words ("to work
+        // pretty" became "to dirk pretty").
+        val lm = predictionModel?.second ?: return
+        if (!lm.seenPair(w, result.words[0])) return
         val text = GlideText.matchCase(r.word.text, dictionary.words[w])
         if (ic.getTextBeforeCursor(r.tail.length, 0)?.toString() != r.tail) return
         val after = r.tail.substring(r.word.text.length)

@@ -293,7 +293,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   anything (`GlideOnTest`), words right at the end go from 91.9% to 92.8%: 34 fixed, 1 broken. Margins of 3,
   4 and 6 broke none but fixed 14, 12 and 3. In `FrictionTest`, where every misread is fixed at once, the
   fixing can only change words already right: 2 of 400 sentences end with one wrong word (98.5% exact,
-  99.0% without). Setting: Fix the last glided word.
+  99.0% without). Setting: Fix the last glided word. Only when the new pair has been seen (in the corpora
+  or the user's own pairs): after a word as rare as "dirk" nothing is known about what follows, so any next
+  word looks as likely there as anywhere, and on a friend's phone "to work" became "to dirk" when "pretty"
+  came next. With that check, gliding on fixes 33 and breaks 1, and `FrictionTest` is back to 99.0%.
 - **Redoing a word in the field** (changed at the user's request, after a preview row was tried): the
   keyboard does not rewrite text on its own beyond fixing the word before (above). An earlier design rewrote up to four glided words in place when
   a later glide made another reading likelier, which changed text the user had already seen go in. A

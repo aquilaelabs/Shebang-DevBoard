@@ -54,3 +54,4 @@
 - The setup screen has one settings button instead of two (ef17318)
 - Tapping a word in the suggestion strip gives the same feedback (vibration, click) as a key (c3b3a8a)
 - Typing on at the end of a word (after backspacing into it, or when the app dropped the word being typed) takes in the whole word, so the underline and a suggestion cover all of it rather than only the new letters (f981e15)
+- Fixing the last glided word no longer swaps a right word for a rare one ('to work pretty' could become 'to dirk pretty') (b4e6ef5)

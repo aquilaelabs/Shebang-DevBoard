@@ -276,6 +276,20 @@ class NgramModel private constructor(
         out
     }
 
+    /**
+     * Whether [word] has been seen right after [first] (dictionary indices), in the corpus's pairs or the
+     * user's own. A pair never seen gets its odds from how common [word] is overall, which says nothing
+     * about the pair.
+     */
+    fun seenPair(first: Int, word: Int): Boolean {
+        if (first !in lmIdOfWord.indices || word !in lmIdOfWord.indices) return false
+        val a = lmIdOfWord[first]
+        val b = lmIdOfWord[word]
+        if (a != 0 && b != 0 && pairCount(a, b) > 0) return true
+        val pairs = personalPairs ?: return false
+        return pairs[LongIntMap.pair(first, word)] > 0
+    }
+
     private fun pairCount(lmCtx: Int, w: Int): Int {
         if (w == 0) return 0
         var lo = data.offsets[lmCtx]
