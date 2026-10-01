@@ -46,6 +46,11 @@ class TextInputController(
         /** Words for the strip, best first; empty clears it. */
         fun showCandidates(words: List<String>)
         fun setComposing(composing: Boolean)
+        /**
+         * Space will autocorrect [typed] to [fix]: the strip offers [typed] with a check mark to keep it, the
+         * correction marked as the one that will go in, and [other].
+         */
+        fun showCorrection(typed: String, fix: String, other: String?) = showCandidates(listOfNotNull(typed, fix, other))
     }
 
     /** What the keyboard learns from; implementations apply the user's settings. */
@@ -1027,13 +1032,24 @@ class TextInputController(
         val typed = word.toString()
         val gen = ++suggestGeneration
         val taps = currentTaps()
-        val context = connection()?.let { currentContext(it) }
+        val ic = connection()
+        val context = ic?.let { currentContext(it) }
+        // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
+        // on the main thread).
+        val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
+            val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed } else null
             postToMain {
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
                 candidatesFor = typed
+                if (fix != null) {
+                    val other = result.map { it.word }.firstOrNull { !it.equals(fix, ignoreCase = true) && !it.equals(typed, ignoreCase = true) }
+                    ui.showCorrection(typed, fix, other)
+                    return@postToMain
+                }
                 // An identifier from the text that starts with what was typed leads.
                 val ids = identifiers.filter { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }.take(1)
                 val ranked = (ids + result.map { it.word }).distinctBy { it.lowercase() }.take(3)
@@ -1130,6 +1146,8 @@ class TextInputController(
                 recent.remove(g)
             }
             reopened = null
+            // Picking the word exactly as typed (the strip's check mark) keeps it from autocorrect from now on.
+            if (chosen == word.toString()) keptAsTyped += chosen.lowercase()
             learnTyped(ic, chosen)
             ic.commitText("$chosen ", 1)
             word.setLength(0)

@@ -743,6 +743,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         strip?.suggestions?.show(words)
     }
 
+    override fun showCorrection(typed: String, fix: String, other: String?) {
+        strip?.suggestions?.showCorrection(typed, fix, other)
+    }
+
     override fun setComposing(composing: Boolean) {
         strip?.setComposing(composing)
     }

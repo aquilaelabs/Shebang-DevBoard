@@ -288,7 +288,7 @@ This page's own rules:
 
 Applies to: strip, suggestion, bar
 
-In Auto mode the bar is replaced by suggestions while a word is being composed and returns once it is committed; code mode always shows the bar. Two rows stacks bar over suggestions.
+In Auto mode the bar is replaced by suggestions while a word is being composed and returns once it is committed; code mode always shows the bar. Two rows stacks bar over suggestions. When space would autocorrect the word being typed, the strip shows that word on the left with a check mark (tapping it keeps the word as typed, and autocorrect leaves it alone from then on), the correction space will write in the middle in bold accent, and another candidate on the right. Autofill chips from the password manager take the bar's row (in Auto mode, the suggestions' row) while no word is composed, styled with key-functional and strip-text.
 
 ##### keyboard-text/glide-preview
 

@@ -257,6 +257,13 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
   adaptation, with its daily limits and snapshots.
+- **Check mark before autocorrect** (the user's request, after Samsung's keyboard): while a word is typed
+  that space would autocorrect, the strip shows the change ahead of time, in the middle in bold accent,
+  with the word as typed on the left behind a check mark and another candidate on the right. The decision
+  is worked out with the suggestions, under the same conditions space uses (autocorrect on, not code-like,
+  not a word that stands elsewhere in the text, not one kept before). Tapping the check mark writes the
+  word as typed with a space, and autocorrect leaves that word alone for the rest of the field. With
+  autocorrect off the strip is as before.
 - **Typed words ranked by the words before** (R13): the strip's suggestions and autocorrect weigh each
   candidate by the three-word model (mixed with the user's own word pairs) at 0.75 against how common the
   word is overall at 0.25, as glide does, so "haie" after "cut my" becomes "hair" rather than "have" and
