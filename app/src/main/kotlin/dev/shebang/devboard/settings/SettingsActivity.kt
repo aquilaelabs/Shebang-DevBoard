@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -133,7 +134,7 @@ fun SettingsScreen(
             navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
         )
     }) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
             item { SectionHeader("Appearance") }
             item { ThemePicker(settings.palette) { v -> update { it.copy(palette = v) } } }
             item {
@@ -304,7 +305,7 @@ fun BarEditorScreen(
             },
         )
     }) { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding()) {
             item {
                 ListItem(
                     headlineContent = { Text(if (app == null) "Bar for all apps" else "Bar for ${appName(app)}") },

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -87,7 +88,9 @@ fun SetupScreen(onOpenSettings: () -> Unit) {
 
     Scaffold(topBar = { TopAppBar(title = { Text("Shebang DevBoard") }) }) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp).verticalScroll(rememberScrollState()),
+            // Padded for the keyboard: the page scrolls the test field into view instead of the window
+            // panning up under the status bar.
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding().padding(16.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("A keyboard for developers: text mode with glide typing, a code mode with every symbol, and a terminal bar.", style = MaterialTheme.typography.bodyMedium)
