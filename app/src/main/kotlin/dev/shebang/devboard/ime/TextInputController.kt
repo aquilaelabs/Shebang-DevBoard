@@ -120,6 +120,20 @@ class TextInputController(
         }
     }
 
+    /** The two words before the composing word, for ranking its candidates; null without a language model. */
+    private fun currentContext(ic: InputConnection): Suggester.Context? {
+        val (dictionary, lm) = predictionModel ?: return null
+        val n = word.length
+        val text = ic.getTextBeforeCursor(CONTEXT_CHARS + n, 0) ?: return null
+        if (text.length < n) return null
+        val before = text.subSequence(0, text.length - n)
+        val w1 = GlideText.contextWord(before)
+        val c1 = GlideText.contextId(w1, dictionary, lm)
+        val w2 = GlideText.contextWord2(before)
+        val c2 = if (w1 == GlideText.SENTENCE_START || w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
+        return Suggester.Context(c2, c1)
+    }
+
     /** The composing word's taps for [SlipCost], or null when they are not all in step with it. */
     private fun currentTaps(): SlipCost.Taps? {
         val m = tapModel ?: return null
@@ -863,6 +877,7 @@ class TextInputController(
     private fun endWord(ic: InputConnection, after: String, correct: Boolean, deferOk: Boolean) {
         val typed = word.toString()
         val taps = currentTaps()
+        val before = currentContext(ic)
         val tapsSeen = tapObservations(typed)
         val context = learningContext(ic)
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
@@ -873,7 +888,7 @@ class TextInputController(
         var commit = typed
         var defer = false
         if (canCorrect) {
-            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps)?.let { commit = it }
+            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps, before)?.let { commit = it }
             else defer = deferOk && suggester != null
             // A word that stands elsewhere in the text as typed is a name the user means (an identifier,
             // a handle), not a slip.
@@ -900,7 +915,7 @@ class TextInputController(
         }
         val s = suggester ?: return
         background.execute {
-            val fix = s.autocorrect(typed, taps)
+            val fix = s.autocorrect(typed, taps, before)
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
@@ -1012,8 +1027,9 @@ class TextInputController(
         val typed = word.toString()
         val gen = ++suggestGeneration
         val taps = currentTaps()
+        val context = connection()?.let { currentContext(it) }
         background.execute {
-            val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps)
+            val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
             postToMain {
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result

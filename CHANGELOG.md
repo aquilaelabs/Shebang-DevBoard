@@ -40,6 +40,7 @@
 - With the number row on, the top-row letters no longer show or hold the digits (ef17318)
 - Autocorrect leaves code alone: words like getUser, max_retries or user2, and any word already used in the text around the cursor (04cb7b0)
 - Glide reads the two words before it, not one, from a larger language model (Tatoeba plus Common Voice's public-domain sentences): real swipes right first time 88.9% -> 91.0%, phrase glides 90.9% -> 91.2%. The app is 5.6 MB larger (8e1d2ae)
+- Typed suggestions and autocorrect take the words before into account, as glide does: 'cut my haie' becomes 'hair', 'she can vook' becomes 'cook'. Words you typed right are still never changed (d3eb58e)
 
 ### Fixed
 

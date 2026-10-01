@@ -257,6 +257,14 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
   adaptation, with its daily limits and snapshots.
+- **Typed words ranked by the words before** (R13): the strip's suggestions and autocorrect weigh each
+  candidate by the three-word model (mixed with the user's own word pairs) at 0.75 against how common the
+  word is overall at 0.25, as glide does, so "haie" after "cut my" becomes "hair" rather than "have" and
+  "vook" after "she can" becomes "cook" rather than "book". Weights of 0, 0.5, 0.75 and 1 fixed 88.5%,
+  93.9%, 94.3% and 94.5% of synthetic slips, and 77.0%, 77.7%, 77.7% and 77.5% of TSI's real-tap typos;
+  0.75 is the best on real taps. A word the dictionary knows is still never changed, and nothing changes
+  an earlier typed word: correcting real words by context ("if" for "of") was considered and left out at
+  the user's request.
 - **Autocorrect by where the taps landed** (R12): each typed letter keeps where its tap came down, and a
   wrong letter costs by how much less likely that tap was meant for the word's letter than for the key it
   hit, in place of a flat cost for neighbouring keys. Taps scatter around where a key is aimed at with a
@@ -268,7 +276,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   same cost when the taps are known, and words of four letters or more may then be two slips away. On TSI's
   6,338 phrase words typed as the keys nearest their first taps (1,244 typos), autocorrect fixes 77.0%
   instead of 71.0%, makes another word of 9.2% instead of 11.3%, and changes none of the words typed right.
-  Of the typos it leaves, 86 are themselves words (the word before would have to tell, R13) and 129 lack
+  Of the typos it leaves, 86 are themselves words (left alone by design) and 129 lack
   the word meant among the six candidates.
 - **Fixing the word before** (the user's request, after the in-field design below): a glide may fix the
   glided word right before it, and only that one, when the decoder reads the pair otherwise by its margin
@@ -351,9 +359,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   after an autocorrect puts back what was typed, and that word is not corrected again in the field. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
-  (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe): 88.5% fixed, 9.9%
-  changed to another word (mostly real ambiguities such as "tht" for "that" or "the"), 1.6% left alone; no
-  correctly typed word changed. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
+  (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the
+  two words before it: 94.3% fixed, 4.7% changed to another word, 1.1% left alone; no correctly typed word
+  changed. Ranked by how common words are overall, without the words before: 88.5%, 9.9% and 1.6%. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
   and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
   Autocorrect (off by default).
 - **Walking back with backspace**: when backspace removes the space or punctuation after a word, that word

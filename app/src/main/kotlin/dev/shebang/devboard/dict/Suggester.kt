@@ -18,10 +18,28 @@ class Suggester(
      * frequency tiers where counts are missing, and the user's own words). Null ranks by tiers alone.
      */
     private val frequency: FloatArray? = null,
+    /** The language model, for ranking by the words before ([Context]); null ranks by [frequency] alone. */
+    private val lm: NgramModel? = null,
 ) {
-    /** How common word [i] is, raised for words the user uses: 1 use x1.35, 10 uses x2.2. */
-    private fun weight(i: Int): Double {
-        val base = frequency?.getOrNull(i)?.toDouble() ?: dict.weight(i)
+    /**
+     * The two words before the word being typed, as [NgramModel] context ids ([NgramModel.SENTENCE_START],
+     * [NgramModel.UNKNOWN] or [NgramModel.contextOf]).
+     */
+    class Context(val context2: Int, val context1: Int)
+
+    /**
+     * How likely word [i] is here, raised for words the user uses: 1 use x1.35, 10 uses x2.2. With [context],
+     * the three-word model (mixed with the user's own word pairs) counts [CONTEXT_WEIGHT] against how common
+     * the word is overall.
+     */
+    private fun weight(i: Int, context: Context? = null): Double {
+        val model = lm
+        val base = if (context != null && model != null && context.context1 != NgramModel.UNKNOWN) {
+            val cost = CONTEXT_WEIGHT * model.cost3(i, context.context2, context.context1) + (1 - CONTEXT_WEIGHT) * model.unigramCost(i)
+            kotlin.math.exp(-cost.toDouble())
+        } else {
+            frequency?.getOrNull(i)?.toDouble() ?: dict.weight(i)
+        }
         val pc = personalCounts?.getOrNull(i) ?: 0
         return if (pc > 0) base * (1.0 + 0.5 * kotlin.math.ln(1.0 + pc)) else base
     }
@@ -32,8 +50,9 @@ class Suggester(
      * @param limit how many results to return.
      * @param taps where the typed letters were tapped, when known: corrections then rank by how likely the
      *   taps were meant for them ([SlipCost] with taps) rather than by plain edit distance.
+     * @param context the two words before, when known: candidates then rank by how likely they are there.
      */
-    fun suggest(typed: String, limit: Int = 3, taps: SlipCost.Taps? = null): List<Suggestion> {
+    fun suggest(typed: String, limit: Int = 3, taps: SlipCost.Taps? = null, context: Context? = null): List<Suggestion> {
         if (typed.isEmpty()) return emptyList()
         val lower = typed.lowercase()
         val out = ArrayList<Suggestion>(limit * 4)
@@ -46,7 +65,7 @@ class Suggester(
             for (i in range.first until range.first + take) {
                 val extra = dict.lower[i].length - lower.length
                 val exact = extra == 0
-                val score = weight(i) * (if (exact) 3.0 else 1.0 / (1.0 + 0.35 * extra))
+                val score = weight(i, context) * (if (exact) 3.0 else 1.0 / (1.0 + 0.35 * extra))
                 scored.add(Suggestion(matchCase(typed, dict.words[i]), score, false))
             }
             scored.sortByDescending { it.score }
@@ -67,9 +86,9 @@ class Suggester(
                 // A wrong first letter is a stronger signal of a different word.
                 val firstPenalty = if (w[0] != lower[0]) 0.5 else 1.0
                 val score = if (taps != null) {
-                    weight(i) * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
+                    weight(i, context) * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
                 } else {
-                    weight(i) * firstPenalty / (1.0 + 1.5 * d)
+                    weight(i, context) * firstPenalty / (1.0 + 1.5 * d)
                 }
                 corrections.add(Suggestion(matchCase(typed, dict.words[i]), score, true))
             }
@@ -87,7 +106,7 @@ class Suggester(
                 val idx = dict.indexOf(lower.substring(0, i) + "'" + lower.substring(i))
                 if (idx < 0) continue
                 val word = matchCase(typed, dict.words[idx])
-                if (out.none { it.word.equals(word, ignoreCase = true) }) out.add(Suggestion(word, weight(idx) / 1.3, true))
+                if (out.none { it.word.equals(word, ignoreCase = true) }) out.add(Suggestion(word, weight(idx, context) / 1.3, true))
             }
         }
 
@@ -116,8 +135,8 @@ class Suggester(
     }
 
     /** The single best correction for autocorrect-on-space, or null when the typed word is fine. */
-    fun autocorrect(typed: String, taps: SlipCost.Taps? = null): String? =
-        autocorrectFrom(typed, suggest(typed, AUTOCORRECT_CANDIDATES, taps), taps)
+    fun autocorrect(typed: String, taps: SlipCost.Taps? = null, context: Context? = null): String? =
+        autocorrectFrom(typed, suggest(typed, AUTOCORRECT_CANDIDATES, taps, context), taps, context)
 
     /** Whether the dictionary has [word] as it is spelled. */
     fun knows(word: String): Boolean = dict.indexOf(word) >= 0
@@ -132,7 +151,7 @@ class Suggester(
      * user uses) are corrected to. A two-letter word is only corrected by adding a letter it dropped, so
      * abbreviations such as "js" or "ui" are not turned into other two-letter words.
      */
-    fun autocorrectFrom(typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null): String? {
+    fun autocorrectFrom(typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null, context: Context? = null): String? {
         if (typed.length < 2) return null
         val known = dict.indexOf(typed)
         if (known >= 0) return contractionFor(typed, known, candidates)
@@ -151,7 +170,7 @@ class Suggester(
             if (d < 1) continue
             // How likely a finger makes this slip, against how common the word is.
             val firstPenalty = if (w[0] != lower[0]) 0.35 else 1.0
-            val score = weight(idx) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
+            val score = weight(idx, context) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
             if (score > bestScore) {
                 bestScore = score
                 best = c.word
@@ -167,6 +186,8 @@ class Suggester(
         private const val CONTRACTION_RATIO = 50.0
         /** How strongly an unlikely slip counts against a common word (per unit of [SlipCost]). */
         var SLIP_WEIGHT = 6.0
+        /** How much the words before count, against how common a word is overall (0..1). */
+        var CONTEXT_WEIGHT = 0.75f
         /** With tap positions, words from this length may be two slips away (else from six letters). */
         private const val TAP_TWO_SLIPS_FROM = 4
 

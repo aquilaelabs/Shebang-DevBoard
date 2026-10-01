@@ -23,10 +23,11 @@ class TapBenchmarkTest {
     private val dictionary get() = GlideBenchmarkTest.dictionary
     private val suggester by lazy {
         val lm = GlideBenchmarkTest.lm
-        Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() })
+        Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm)
     }
 
-    class Word(val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray)
+    /** A phrase word: what was meant, the keys nearest its taps, the taps, and the two words meant before it. */
+    class Word(val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray, val before1: String? = null, val before2: String? = null)
 
     companion object {
         /** TSI's Pixel 6 Pro: 1440 px across 411 dp. */
@@ -92,7 +93,9 @@ class TapBenchmarkTest {
                         val xs = FloatArray(j - i) { pts[it]!!.first }
                         val ys = FloatArray(j - i) { pts[it]!!.second }
                         val typed = String(CharArray(j - i) { nearest(xs[it], ys[it]) })
-                        out += Word(prompt.substring(i, j).lowercase(), typed, xs, ys)
+                        val prev = Regex("[A-Za-z]+").findAll(prompt.substring(0, i)).map { it.value.lowercase() }.toList()
+                        // A sentence start counts as no word before (null); a phrase is one sentence.
+                        out += Word(prompt.substring(i, j).lowercase(), typed, xs, ys, prev.getOrNull(prev.size - 1), prev.getOrNull(prev.size - 2))
                     }
                     i = j
                 }
@@ -100,6 +103,13 @@ class TapBenchmarkTest {
             return out
         }
     }
+
+    private fun ctxId(w: String?): Int = when (w) {
+        null -> NgramModel.SENTENCE_START
+        else -> dictionary.indexOfLower(w).let { if (it < 0) NgramModel.UNKNOWN else GlideBenchmarkTest.lm.contextOf(it) }
+    }
+
+    private fun contextOf(w: Word) = Suggester.Context(if (w.before1 == null) NgramModel.UNKNOWN else ctxId(w.before2), ctxId(w.before1))
 
     @Test
     fun autocorrectOnRealTaps() {
@@ -114,13 +124,16 @@ class TapBenchmarkTest {
         val realWord = typos.count { dictionary.contains(it.typed) }
         val notOffered = typos.count { w -> !dictionary.contains(w.typed) && suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES).none { it.word.equals(w.meant, ignoreCase = true) } }
         println("TAPS   of the typos: ${realWord} are themselves words, ${notOffered} more lack the word meant among the candidates")
-        for (useTaps in listOf(false, true)) {
+        val weights = if (System.getenv("AUTOCORRECT_SWEEP") != null) listOf(0f, 0.5f, 0.75f, 1f) else listOf(Suggester.CONTEXT_WEIGHT)
+        for ((useTaps, useContext, weight) in listOf(Triple(false, false, 0f), Triple(true, false, 0f)) + weights.map { Triple(true, true, it) }) {
+            Suggester.CONTEXT_WEIGHT = weight
             var fixed = 0
             var wrong = 0
             var left = 0
             for (w in typos) {
                 val taps = if (useTaps) SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) } else null
-                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps), taps)
+                val ctx = if (useContext) contextOf(w) else null
+                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx)
                 when {
                     fix == null -> left++
                     fix.equals(w.meant, ignoreCase = true) -> fixed++
@@ -130,10 +143,17 @@ class TapBenchmarkTest {
             var changed = 0
             for (w in right) {
                 val taps = if (useTaps) SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) } else null
-                if (suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps), taps) != null) changed++
+                val ctx = if (useContext) contextOf(w) else null
+                if (suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx) != null) changed++
             }
             val pct = GlideBenchmarkTest::pct
-            println("TAPS ${if (useTaps) "with tap positions:  " else "keys only (before):  "} typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}")
+            val label = when {
+                useContext -> "taps and words before (weight $weight):"
+                useTaps -> "with tap positions:  "
+                else -> "keys only (before):  "
+            }
+            println("TAPS $label typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}")
         }
+        Suggester.CONTEXT_WEIGHT = 0.75f
     }
 }

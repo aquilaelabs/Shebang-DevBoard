@@ -15,7 +15,46 @@ class AutocorrectBenchmarkTest {
     private val dictionary get() = GlideBenchmarkTest.dictionary
     private val suggester by lazy {
         val lm = GlideBenchmarkTest.lm
-        Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() })
+        Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm)
+    }
+
+    /** Each held-out word with the two words before it. */
+    private class InContext(val word: String, val context: Suggester.Context)
+
+    private fun ctxId(w: String?): Int = when (w) {
+        null -> NgramModel.SENTENCE_START
+        else -> dictionary.indexOfLower(w).let { if (it < 0) NgramModel.UNKNOWN else GlideBenchmarkTest.lm.contextOf(it) }
+    }
+
+    private val inContext: List<InContext> by lazy {
+        GlideBenchmarkTest.heldOut.take(1500).flatMap { s ->
+            s.mapIndexedNotNull { i, w ->
+                if (w.length >= 3 && w.all { it.isLetter() } && dictionary.contains(w)) {
+                    InContext(w, Suggester.Context(if (i == 0) NgramModel.UNKNOWN else ctxId(s.getOrNull(i - 2)), ctxId(s.getOrNull(i - 1))))
+                } else null
+            }
+        }
+    }
+
+    /** Autocorrect on the same slips with the words before them, at several context weights. */
+    @Test
+    fun contextWeightSweep() {
+        org.junit.Assume.assumeTrue(System.getenv("AUTOCORRECT_SWEEP") != null)
+        for (k in listOf(0f, 0.5f, 0.75f, 1f)) {
+            Suggester.CONTEXT_WEIGHT = k
+            val rnd = Random(4)
+            var n = 0
+            var fixed = 0
+            var wrong = 0
+            for (w in inContext) {
+                val t = slip(w.word, rnd) ?: continue
+                n++
+                val fix = suggester.autocorrectFrom(t, suggester.suggest(t, Suggester.AUTOCORRECT_CANDIDATES, context = w.context), context = w.context)
+                if (fix.equals(w.word, ignoreCase = true)) fixed++ else if (fix != null) wrong++
+            }
+            println("AUTOCORRECT SWEEP context weight $k: fixed ${GlideBenchmarkTest.pct(fixed, n)}, another word ${GlideBenchmarkTest.pct(wrong, n)}")
+        }
+        Suggester.CONTEXT_WEIGHT = 0.75f
     }
 
     private val rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
@@ -69,17 +108,19 @@ class AutocorrectBenchmarkTest {
 
     @Test
     fun autocorrectOnSlips() {
-        val words = GlideBenchmarkTest.heldOut.take(1500).flatten().filter { it.length >= 3 && it.all { c -> c.isLetter() } && dictionary.contains(it) }
+        // Each word with the two words before it, as the keyboard sees them.
+        val words = inContext
         val rnd = Random(4)
         var n = 0
         var fixed = 0
         var wrong = 0
         var untouched = 0
         val misses = HashMap<String, Int>()
-        for (w in words) {
+        for (wc in words) {
+            val w = wc.word
             val t = slip(w, rnd) ?: continue
             n++
-            val fix = suggester.autocorrectFrom(t, suggester.suggest(t, Suggester.AUTOCORRECT_CANDIDATES))
+            val fix = suggester.autocorrectFrom(t, suggester.suggest(t, Suggester.AUTOCORRECT_CANDIDATES, context = wc.context), context = wc.context)
             when {
                 fix == null -> {
                     untouched++
@@ -93,8 +134,8 @@ class AutocorrectBenchmarkTest {
             }
         }
         var changedRight = 0
-        val right = words.distinct()
-        for (w in right) if (suggester.autocorrectFrom(w, suggester.suggest(w, Suggester.AUTOCORRECT_CANDIDATES)) != null) changedRight++
+        val right = words.distinctBy { it.word }
+        for (wc in right) if (suggester.autocorrectFrom(wc.word, suggester.suggest(wc.word, Suggester.AUTOCORRECT_CANDIDATES, context = wc.context), context = wc.context) != null) changedRight++
         val pct = GlideBenchmarkTest::pct
         println("AUTOCORRECT $n slips: fixed ${pct(fixed, n)}, changed to another word ${pct(wrong, n)}, left alone ${pct(untouched, n)}")
         println("AUTOCORRECT ${right.size} words typed right: changed ${pct(changedRight, right.size)}")
