@@ -130,6 +130,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         adaptation = GlideAdaptation.get(filesDir)
         tapAdaptation = GlideAdaptation.getTaps(filesDir)
         background.execute { adaptation.load() }
+        // Where this user's taps land, learned in earlier sessions: the tap model picks it up once read.
+        background.execute {
+            tapAdaptation.load()
+            main.post { refreshTapModel() }
+        }
         languageLoader = LanguageLoader(
             this,
             personal,
