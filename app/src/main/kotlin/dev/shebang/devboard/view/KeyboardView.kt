@@ -1,5 +1,6 @@
 package dev.shebang.devboard.view
 
+import dev.shebang.devboard.glide.TapModel
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -123,6 +124,21 @@ class KeyboardView(context: Context) : View(context) {
     // Per-pointer touch state (index = pointer id, capped at MAX_POINTERS).
     private val pointerKey = arrayOfNulls<Key>(MAX_POINTERS)
     private val pointerDownX = FloatArray(MAX_POINTERS)
+
+    /**
+     * Where this user's taps land on the letter keys. When set, a touch on a letter key means the letter
+     * whose usual landing spot is nearest, so a habitual lean (taps a little left of each key) still types
+     * the key meant. Other keys go by their drawn edges.
+     */
+    var tapModel: TapModel? = null
+
+    private fun resolveLetter(hit: Key, x: Float, y: Float): Key {
+        if (hit.letter == 0.toChar()) return hit
+        val g = geometry ?: return hit
+        val c = tapModel?.nearestLetter(x, y) ?: return hit
+        if (c == hit.letter) return hit
+        return g.letterKey(c) ?: hit
+    }
 
     /** Where the finger came down for the tap being reported to [Listener.onKeyTap], in view pixels. */
     var lastTapX = Float.NaN
@@ -362,7 +378,7 @@ class KeyboardView(context: Context) : View(context) {
                 }
                 val x = event.getX(idx)
                 val y = event.getY(idx)
-                val key = g.keyAt(x, y) ?: return true
+                val key = resolveLetter(g.keyAt(x, y) ?: return true, x, y)
                 pointerKey[id] = key
                 pointerDownX[id] = x
                 pointerDownY[id] = y

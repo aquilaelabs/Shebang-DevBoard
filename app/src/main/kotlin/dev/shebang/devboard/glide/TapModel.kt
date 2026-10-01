@@ -68,6 +68,23 @@ class TapModel(
     }
 
     /**
+     * The letter a tap at x,y most likely meant: the one whose aim (its centre, nudged by the lean and this
+     * user's offsets) is nearest, among [letters]; null when none has a key.
+     */
+    fun nearestLetter(x: Float, y: Float, letters: Iterable<Char> = 'a'..'z'): Char? {
+        var best: Char? = null
+        var bestCost = Double.MAX_VALUE
+        for (c in letters) {
+            val n = nats(x, y, c) ?: continue
+            if (n < bestCost) {
+                bestCost = n
+                best = c
+            }
+        }
+        return best
+    }
+
+    /**
      * Where a tap meant for [c] landed relative to where this model aims, as an observation triple for the
      * adaptation (letter, du, dv in key pitches); null without a key.
      */

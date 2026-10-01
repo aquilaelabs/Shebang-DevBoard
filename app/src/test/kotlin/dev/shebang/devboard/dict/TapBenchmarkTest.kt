@@ -27,7 +27,7 @@ class TapBenchmarkTest {
     }
 
     /** A phrase word: what was meant, the keys nearest its taps, the taps, and the two words meant before it. */
-    class Word(val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray, val before1: String? = null, val before2: String? = null)
+    class Word(val meant: String, val typed: String, val xs: FloatArray, val ys: FloatArray, val before1: String? = null, val before2: String? = null, val person: String = "", val task: Int = 0)
 
     companion object {
         /** TSI's Pixel 6 Pro: 1440 px across 411 dp. */
@@ -81,7 +81,8 @@ class TapBenchmarkTest {
                 if (layout.centerX[i].isNaN()) Float.MAX_VALUE else (x - layout.centerX[i]).let { it * it } + (y - layout.centerY[i]).let { it * it }
             }
             val out = ArrayList<Word>()
-            for ((trial, prompt) in prompts) {
+            // In the order each person typed them.
+            for ((trial, prompt) in prompts.entries.sortedBy { e -> e.key.split('/').let { "${it[0]}/${it[1]}/" + it[2].padStart(3, '0') } }.map { it.key to it.value }) {
                 val t = taps[trial] ?: continue
                 var i = 0
                 while (i < prompt.length) {
@@ -95,7 +96,9 @@ class TapBenchmarkTest {
                         val typed = String(CharArray(j - i) { nearest(xs[it], ys[it]) })
                         val prev = Regex("[A-Za-z]+").findAll(prompt.substring(0, i)).map { it.value.lowercase() }.toList()
                         // A sentence start counts as no word before (null); a phrase is one sentence.
-                        out += Word(prompt.substring(i, j).lowercase(), typed, xs, ys, prev.getOrNull(prev.size - 1), prev.getOrNull(prev.size - 2))
+                        val parts = trial.split('/')
+                        out += Word(prompt.substring(i, j).lowercase(), typed, xs, ys, prev.getOrNull(prev.size - 1), prev.getOrNull(prev.size - 2),
+                            parts[0], parts[1].removePrefix("task").toIntOrNull() ?: 0)
                     }
                     i = j
                 }
@@ -155,5 +158,52 @@ class TapBenchmarkTest {
             println("TAPS $label typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}")
         }
         Suggester.CONTEXT_WEIGHT = 0.75f
+    }
+
+    /**
+     * Which key a tap hits, on the same phrase words: the key under the finger, the nearest after the overall
+     * lean, and the nearest after the lean and each person's own offsets, learned as they type (from words
+     * that came out right, through the same adaptation as the phone's, one day per task block).
+     */
+    @Test
+    fun keysOnRealTaps() {
+        val dir = System.getenv("TSI_DIR")?.let { File(it) }
+        assumeTrue("TSI_DIR not set", dir != null && File(dir, "touch_data.csv").isFile)
+        val layout = layout(dir!!)
+        val words = words(dir, layout)
+        val lean = TapModel(layout, TSI_DENSITY)
+        var letters = 0
+        val right = IntArray(3)
+        val wordsRight = IntArray(3)
+        for ((person, theirs) in words.groupBy { it.person }) {
+            var day = 0
+            val adaptation = dev.shebang.devboard.glide.GlideAdaptation(null) { day }
+            for (w in theirs) {
+                day = w.task
+                val own = TapModel(layout, TSI_DENSITY, adaptation.offsets())
+                val reads = arrayOf(
+                    w.typed,
+                    String(CharArray(w.meant.length) { lean.nearestLetter(w.xs[it], w.ys[it]) ?: '?' }),
+                    String(CharArray(w.meant.length) { own.nearestLetter(w.xs[it], w.ys[it]) ?: '?' }),
+                )
+                letters += w.meant.length
+                for (k in 0..2) {
+                    right[k] += w.meant.indices.count { reads[k][it] == w.meant[it] }
+                    if (reads[k] == w.meant) wordsRight[k]++
+                }
+                // The phone learns from words that came out right and that it knows.
+                if (reads[2] == w.meant && dictionary.contains(w.meant)) {
+                    val obs = w.meant.indices.flatMap { i -> own.observation(w.xs[i], w.ys[i], w.meant[i])!!.toList() }.toFloatArray()
+                    adaptation.learn(obs)
+                }
+            }
+            if (System.getenv("TAPS_PEOPLE") != null) {
+                val o = adaptation.offsets()
+                println("TAPS   $person learned lean: across %+.2f, down %+.2f (key pitches, mean of letters)".format(o.take(26).average(), o.drop(26).average()))
+            }
+        }
+        val pct = GlideBenchmarkTest::pct
+        val names = listOf("key under the finger (before)", "nearest after the overall lean", "nearest after lean and own offsets")
+        for (k in 0..2) println("TAPS KEYS ${names[k].padEnd(36)} letters ${pct(right[k], letters)}, words typed right ${pct(wordsRight[k], words.size)}")
     }
 }

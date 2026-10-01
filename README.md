@@ -272,6 +272,14 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   0.75 is the best on real taps. A word the dictionary knows is still never changed, and nothing changes
   an earlier typed word: correcting real words by context ("if" for "of") was considered and left out at
   the user's request.
+- **Keys follow where the user taps** (R14): a touch on a letter key types the letter whose usual landing
+  spot is nearest: its centre nudged by the overall lean and this user's learned offsets (the same tap
+  adaptation as R12, capped at 0.35 of a key). Other keys go by their drawn edges, and the key preview
+  shows the letter that will be typed. Prompted by a friend's recording whose typos were almost all the
+  key to the left of the one meant. On TSI's phrase words, replayed per person with the offsets learned as
+  they type (from words that came out right, a day per task block): letters typed as meant 94.9% by drawn
+  edges, 95.5% after the overall lean, 97.0% with each person's offsets; words typed right 81.2%, 82.8% and
+  87.9%. This helps with autocorrect off too.
 - **Autocorrect by where the taps landed** (R12): each typed letter keeps where its tap came down, and a
   wrong letter costs by how much less likely that tap was meant for the word's letter than for the key it
   hit, in place of a flat cost for neighbouring keys. Taps scatter around where a key is aimed at with a

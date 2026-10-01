@@ -364,7 +364,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     /** The tap model for the current keys and this user's learned tap offsets (read once per field). */
     private fun refreshTapModel() {
         val g = geometry ?: return
-        text.tapModel = TapModel(glideModelFor(g), resources.displayMetrics.density, if (settings.adaptTaps) tapAdaptation.offsets() else null)
+        val model = TapModel(glideModelFor(g), resources.displayMetrics.density, if (settings.adaptTaps) tapAdaptation.offsets() else null)
+        text.tapModel = model
+        keyboard?.tapModel = model
     }
 
     private fun glideModelFor(g: KeyboardGeometry): KeyLayoutModel {

@@ -52,4 +52,19 @@ class TapModelTest {
         assertEquals(0f, o[1], 1e-4f)
         assertEquals(0f, o[2], 1e-4f)
     }
+
+    @Test
+    fun aTapGoesToTheKeyWhoseLandingSpotIsNearest() {
+        // On the drawn line between o and p, a little to the o side: o, until this user is known to tap p low
+        // and to the left.
+        val x = (x('o') + x('p')) / 2 - 0.1f * model.pitchX
+        assertEquals('o', model.nearestLetter(x, y('o')))
+        val leansLeft = FloatArray(52).also { it['p' - 'a'] = -0.3f }
+        assertEquals('p', TapModel(layout, density, leansLeft).nearestLetter(x, y('o')))
+    }
+
+    @Test
+    fun aTapInTheMiddleOfAKeyIsThatKey() {
+        for (c in 'a'..'z') if (layout.hasLetter(c)) assertEquals(c, model.nearestLetter(x(c), y(c)))
+    }
 }
