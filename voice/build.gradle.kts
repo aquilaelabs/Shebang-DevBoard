@@ -38,6 +38,8 @@ android {
     // The model is read through a file copy; storing it uncompressed keeps the copy a plain stream.
     androidResources { noCompress += "bin" }
 
+    buildFeatures { buildConfig = true }
+
     buildTypes {
         release {
             isMinifyEnabled = false

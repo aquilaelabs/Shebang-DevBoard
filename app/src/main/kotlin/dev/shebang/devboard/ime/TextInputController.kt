@@ -161,6 +161,24 @@ class TextInputController(
         }
     }
 
+    /**
+     * Writes a piece of dictation at the cursor: the word being typed is ended first, and a space goes before
+     * it after a word, as for a glide. Whisper's own capitals and punctuation are kept.
+     */
+    fun insertDictation(text: String) {
+        val ic = connection() ?: return
+        val t = text.trim()
+        if (t.isEmpty()) return
+        if (isComposing) endWord(ic, "", correct = false, deferOk = false)
+        settle()
+        lastGlide = null
+        dropTarget()
+        clearCandidates()
+        ownEdit()
+        ic.commitText(if (needsLeadingSpace(ic)) " $t" else t, 1)
+        lastActionWasSpace = false
+    }
+
     /** Whether [typed] begins a code-like identifier in the text around ("max" of "maxRetries"): not a slip. */
     private fun startsAnIdentifier(typed: String): Boolean =
         typed.isNotEmpty() && identifiers.any { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }

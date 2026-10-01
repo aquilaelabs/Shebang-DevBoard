@@ -20,7 +20,13 @@ object KeyIcons {
     /** The caret with a bar under it: shift is on. */
     private const val SHIFT_ON = "$SHIFT M6.5 17.5 H17.5 V19.5 H6.5 Z"
 
+    /** A microphone: a capsule on a cradle and stand, with a block cursor as its foot. */
+    private const val MIC = "M12 3 A3 3 0 0 1 15 6 V11 A3 3 0 0 1 9 11 V6 A3 3 0 0 1 12 3 Z " +
+        "M5.5 11 H7.5 A4.5 4.5 0 0 0 16.5 11 H18.5 A6.5 6.5 0 0 1 13 17.4 V19 H11 V17.4 A6.5 6.5 0 0 1 5.5 11 Z " +
+        "M9 19.5 H15 V21.5 H9 Z"
+
     val backspace: Path = PathParser.createPathFromPathData(BACKSPACE)
+    val mic: Path = PathParser.createPathFromPathData(MIC)
     val enter: Path = PathParser.createPathFromPathData(RETURN)
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
     val shiftOn: Path = PathParser.createPathFromPathData(SHIFT_ON)

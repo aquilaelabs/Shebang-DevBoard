@@ -32,6 +32,7 @@
 - Keys follow where you tap: the keyboard learns your lean (say, a little left of each key) and types the key you meant, even with autocorrect off. On real taps, words typed right go from 81% to 88% (bddf074)
 - Taps between keys go to the letter that makes a word: after 'th', a tap on the edge of w types e. Words come out right as tapped 97% of the time on real taps, up from 88%, before autocorrect does anything. Not in password, email, URL or code fields (0da0ba7)
 - A chip offers to paste what you copied in the last few minutes (dots for passwords); tap to paste, swipe sideways to put it away (fc07c2f)
+- Voice typing through the new Shebang Voice add-on (a separate download): a mic at the end of the strip; speech is turned into text on the phone, sentence by sentence, and the keyboard itself never uses the microphone (3430117)
 
 ### Changed
 

@@ -493,6 +493,17 @@ transcribes a public-domain recording on a device: on the emulator (2 cores, AVX
 comes out word for word in 15 s, against 28 s without AVX2. Speed on phones is still to be measured and
 tuned (ARM instruction sets chosen at runtime).
 
+How it works: the keyboard shows a mic at the right end of the strip once the add-on is installed (in text
+mode, in fields that take typed words); otherwise Settings > Voice typing links to the GitHub releases. A tap
+binds the add-on's service with BIND_INCLUDE_CAPABILITIES, which lends it the keyboard's foreground status so
+Android does not silence its microphone. The add-on answers only apps signed with its own key, so the
+keyboard needs no permission entry for it (a `<queries>` entry lets it see the add-on). It records,
+cuts the audio at 700 ms pauses, and transcribes each piece as it comes, so text arrives sentence by sentence;
+it stops after 8 s without speech, when the mic is tapped again, or when a key is typed (what was said is
+still written). Without the microphone permission the add-on's own screen asks for it, since a keyboard
+cannot. On the emulator, with the Kennedy sample standing in for the microphone (debug builds of the add-on
+only), the three pieces arrived in the field 7, 7 and 12 s after each was spoken.
+
 ## Licence
 
 MIT (see `LICENSE`). The data and libraries it builds on keep their own licences, all permissive or public

@@ -1,6 +1,7 @@
 package dev.shebang.devboard.view
 
 import android.content.Context
+import android.view.View
 import android.widget.LinearLayout
 import dev.shebang.devboard.settings.StripMode
 
@@ -14,7 +15,10 @@ class TopStripView(context: Context) : LinearLayout(context) {
     val bar = TerminalBarView(context)
     val suggestions = SuggestionStripView(context)
     val autofill = AutofillStripView(context)
+    /** Voice typing, at the end of the top row; hidden unless the Shebang Voice add-on is installed. */
+    val mic = MicButton(context)
     val rowHeight = (44 * resources.displayMetrics.density).toInt()
+    private val rows = LinearLayout(context).apply { orientation = VERTICAL }
     private var mode = StripMode.AUTO
     private var composing = false
     private var codeMode = false
@@ -25,10 +29,13 @@ class TopStripView(context: Context) : LinearLayout(context) {
     var onChipsDismissed: (() -> Unit)? = null
 
     init {
-        orientation = VERTICAL
-        addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
-        addView(suggestions, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
-        addView(autofill, 0, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
+        orientation = HORIZONTAL
+        rows.addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
+        rows.addView(suggestions, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
+        rows.addView(autofill, 0, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
+        addView(rows, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
+        addView(mic, LayoutParams(rowHeight, rowHeight))
+        mic.visibility = View.GONE
         autofill.onDismiss = {
             autofillDismissed = true
             hasAutofill = false
@@ -44,6 +51,12 @@ class TopStripView(context: Context) : LinearLayout(context) {
         setBackgroundColor(t.background)
         bar.setTheme(t)
         suggestions.setTheme(t)
+        mic.setTheme(t)
+    }
+
+    /** Shows the voice typing button (the add-on is installed and this field takes typed words). */
+    fun setMicShown(shown: Boolean) {
+        mic.visibility = if (shown) View.VISIBLE else View.GONE
     }
 
     fun setMode(m: StripMode) {

@@ -7,8 +7,15 @@
 
 #define TAG "ShebangVoice"
 
+// whisper.cpp and ggml write their log to stderr, which Android drops: send warnings and errors to logcat.
+static void log_to_logcat(enum ggml_log_level level, const char *text, void *user) {
+    (void) user;
+    if (level >= GGML_LOG_LEVEL_WARN) __android_log_print(level >= GGML_LOG_LEVEL_ERROR ? ANDROID_LOG_ERROR : ANDROID_LOG_WARN, TAG, "%s", text);
+}
+
 JNIEXPORT jlong JNICALL
 Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path) {
+    whisper_log_set(log_to_logcat, NULL);
     const char *p = (*env)->GetStringUTFChars(env, path, NULL);
     struct whisper_context_params cp = whisper_context_default_params();
     cp.use_gpu = false;

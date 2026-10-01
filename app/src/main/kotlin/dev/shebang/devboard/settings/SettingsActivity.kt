@@ -69,6 +69,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.shebang.devboard.ime.VoiceClient
 import dev.shebang.devboard.layout.BarConfig
 import dev.shebang.devboard.layout.BarItem
 import dev.shebang.devboard.layout.KeyCodeNames
@@ -180,6 +181,27 @@ fun SettingsScreen(
                     headlineContent = { Text("Record glides") },
                     supportingContent = { Text("Glide prompted words to measure accuracy on your own fingers. Kept on this phone.") },
                     modifier = Modifier.clickable(onClick = onRecordGlides),
+                )
+            }
+            item {
+                // Voice typing is a separate app (it holds the microphone permission; the keyboard does not).
+                val context = LocalContext.current
+                val installed = remember {
+                    context.packageManager.queryIntentServices(
+                        android.content.Intent("dev.shebang.devboard.voice.LISTEN").setPackage(VoiceClient.PACKAGE), 0,
+                    ).isNotEmpty()
+                }
+                ListItem(
+                    headlineContent = { Text("Voice typing") },
+                    supportingContent = {
+                        Text(
+                            if (installed) "Shebang Voice is installed: tap the mic at the end of the strip. Speech stays on this phone."
+                            else "Get the Shebang Voice add-on from GitHub (about 60 MB). It turns speech into text on this phone; the keyboard itself never uses the microphone."
+                        )
+                    },
+                    modifier = if (installed) Modifier else Modifier.clickable {
+                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(VoiceClient.RELEASES_URL)))
+                    },
                 )
             }
             item { SectionHeader("Learning") }

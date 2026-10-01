@@ -80,7 +80,10 @@ class VoiceService : Service() {
             send(VoiceProtocol.ERROR, VoiceProtocol.ERROR_NO_PERMISSION)
             return
         }
-        session = Session(MicSource()).also { it.begin() }
+        // Debug builds only: a WAV left in the add-on's files stands in for the microphone (the emulator has none).
+        val testInput = java.io.File(filesDir, TEST_INPUT)
+        val source = if (BuildConfig.DEBUG && testInput.isFile) WavSource(testInput) else MicSource()
+        session = Session(source).also { it.begin() }
     }
 
     /** One listening session: a recording thread feeding [Utterances], and transcription on [transcriber]. */
@@ -98,10 +101,13 @@ class VoiceService : Service() {
                     main.post { send(VoiceProtocol.ERROR, VoiceProtocol.ERROR_MODEL) }
                     return@execute
                 }
-                val text = runCatching { model.transcribe(audio) }.getOrNull().orEmpty()
+                val t0 = System.nanoTime()
+                val text = runCatching { model.transcribe(audio) }.onFailure { Log.e(TAG, "transcription failed", it) }.getOrNull().orEmpty()
+                Log.i(TAG, "%.1f s of speech in %d ms".format(audio.size / 16000.0, (System.nanoTime() - t0) / 1_000_000))
                 main.post {
                     if (keep && text.isNotBlank() && !isNoise(text)) send(VoiceProtocol.TEXT, text = text)
-                    send(VoiceProtocol.STATE, if (running) VoiceProtocol.STATE_LISTENING else VoiceProtocol.STATE_IDLE)
+                    // Idle is sent once, after the last piece (queued when the recording ends).
+                    if (running) send(VoiceProtocol.STATE, VoiceProtocol.STATE_LISTENING)
                 }
             }
         }
@@ -163,6 +169,25 @@ class VoiceService : Service() {
         fun close()
     }
 
+    /** A 16 kHz mono WAV played at the pace of speech, then a few seconds of quiet. Debug builds only. */
+    private class WavSource(private val file: java.io.File) : AudioSource {
+        private var samples = FloatArray(0)
+        private var at = 0
+        private val tail = Utterances.RATE * 2
+
+        override fun open(): Boolean = runCatching { samples = Wav.read16kMono(file.readBytes()) }.isSuccess
+
+        override fun read(frame: FloatArray): Boolean {
+            if (at >= samples.size + tail) return false
+            for (i in frame.indices) frame[i] = samples.getOrElse(at + i) { 0f }
+            at += frame.size
+            Thread.sleep(Utterances.FRAME_MS.toLong())
+            return true
+        }
+
+        override fun close() = Unit
+    }
+
     private class MicSource : AudioSource {
         private var record: AudioRecord? = null
         private val buf = ShortArray(Utterances.FRAME)
@@ -206,5 +231,6 @@ class VoiceService : Service() {
         private const val TAG = "ShebangVoice"
         /** Listening stops after this long without speech. */
         const val IDLE_STOP_MS = 8_000L
+        private const val TEST_INPUT = "test_input.wav"
     }
 }

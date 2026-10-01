@@ -55,6 +55,7 @@ import dev.shebang.devboard.layout.LayoutDef
 import dev.shebang.devboard.settings.AppProfiles
 import dev.shebang.devboard.settings.Settings
 import dev.shebang.devboard.settings.SettingsRepository
+import dev.shebang.devboard.view.MicButton
 import dev.shebang.devboard.view.ImeRootView
 import dev.shebang.devboard.view.KeyPopup
 import dev.shebang.devboard.view.KeyboardTheme
@@ -121,6 +122,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var glideTrailingSpace = false
     private var autoShifted = false
 
+    /** Voice typing through the Shebang Voice add-on, when it is installed. */
+    private lateinit var voice: VoiceClient
+
     /** What the clipboard chip offers, if anything. */
     private lateinit var clipChip: ClipboardChip
     private var clipOffer: ClipboardChip.Offer? = null
@@ -128,6 +132,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onCreate() {
         super.onCreate()
         clipChip = ClipboardChip(this)
+        voice = VoiceClient(this, object : VoiceClient.Listener {
+            override fun onVoiceState(state: Int, level: Int) = showVoiceState(state, level)
+            override fun onVoiceText(text: String) {
+                this@DevBoardService.text.insertDictation(text)
+                afterEdit()
+            }
+            override fun onVoiceError(code: Int) = voiceError(code)
+        })
         clipChip.listen { if (isInputViewShown) updateClipChip() }
         layouts = LayoutRepository(this)
         glideSession = GlideSession(this)
@@ -304,6 +316,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         applyTheme()
         barConfig?.let { s.bar.setConfig(it) }
         s.onChipsDismissed = { clipOffer?.let { clipChip.markHandled(it.stamp) }; clipOffer = null }
+        s.mic.setOnClickListener {
+            feedback.keyPress()
+            if (voice.active) voice.stop() else voice.start()
+        }
         s.setMode(settings.stripMode)
         k.keyPreviewEnabled = settings.keyPreview
         k.glideTrailEnabled = settings.glideTrail
@@ -409,6 +425,52 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         updateAutoCaps()
         text.refreshLetterPrior()
         updateClipChip()
+        updateMic()
+    }
+
+    /** The mic shows where words are typed (text mode, not passwords or terminals) once the add-on is installed. */
+    private fun updateMic() {
+        strip?.setMicShown(mode == Mode.TEXT && field.allowsComposing && voice.installed())
+    }
+
+    /** The mic and the strip follow the add-on: listening (with the voice level), writing, or idle. */
+    private fun showVoiceState(state: Int, level: Int) {
+        val s = strip ?: return
+        s.mic.state = when (state) {
+            VoiceClient.STATE_LISTENING, VoiceClient.STATE_HEARING -> MicButton.State.LISTENING
+            VoiceClient.STATE_TRANSCRIBING -> MicButton.State.WRITING
+            else -> MicButton.State.IDLE
+        }
+        s.mic.level = if (state == VoiceClient.STATE_HEARING) level else 0
+        if (state == VoiceClient.STATE_IDLE) {
+            s.suggestions.clear()
+            s.setComposing(text.isComposing)
+            return
+        }
+        s.setComposing(true)
+        s.suggestions.showPreview(
+            when (state) {
+                VoiceClient.STATE_TRANSCRIBING -> "Writing\u2026"
+                else -> "Listening \u2014 tap the mic to stop"
+            }
+        )
+    }
+
+    private fun voiceError(code: Int) {
+        showVoiceState(VoiceClient.STATE_IDLE, 0)
+        when (code) {
+            VoiceClient.ERROR_NO_PERMISSION -> voice.askForMicrophone()
+            else -> android.widget.Toast.makeText(
+                this,
+                when (code) {
+                    VoiceClient.ERROR_MIC -> "The microphone is in use or unavailable"
+                    VoiceClient.ERROR_MODEL -> "Shebang Voice could not load its speech model"
+                    VoiceClient.ERROR_NOT_ALLOWED -> "Shebang Voice only works with the DevBoard it was released with"
+                    else -> "Shebang Voice is not available"
+                },
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     /** Offers a chip for pasting text copied in the last few minutes (not in terminals). */
@@ -438,6 +500,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         autofillGeneration++
         strip?.resetAutofill()
         strip?.setClip(null)
+        if (::voice.isInitialized) voice.cancel()
         clipOffer = null
         text.finishComposing()
         persistLearning()
@@ -556,6 +619,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onKeyTap(key: Key, shift: ShiftState) {
+        // Typing while listening ends the dictation; what was said is still written.
+        if (voice.active) voice.stop()
         when (key.action) {
             KeyAction.SHIFT -> return
             KeyAction.BACKSPACE -> {
@@ -641,6 +706,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onGlideStart(points: FloatArray, times: LongArray, count: Int) {
+        if (voice.active) voice.stop()
         val g = geometry ?: return
         val lang = glideLanguage ?: return
         if (!isGlideAllowed() || count == 0) return
@@ -745,6 +811,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         autoShifted = false
         rebuildGeometry()
         updateAutoCaps()
+        if (m == Mode.CODE) voice.cancel()
+        updateMic()
     }
 
     // ---- TerminalBarView.Listener --------------------------------------------------------------------

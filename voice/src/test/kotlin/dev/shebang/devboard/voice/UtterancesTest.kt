@@ -57,6 +57,26 @@ class UtterancesTest {
     }
 
     @Test
+    fun aReusedFrameBufferIsCopied() {
+        // The recording loop fills one buffer over and over; each utterance must keep what each frame held.
+        val audio = noise(600) + voice(1500) + noise(1200)
+        var got: FloatArray? = null
+        val u = Utterances { got = it }
+        val buf = FloatArray(Utterances.FRAME)
+        var i = 0
+        while (i + buf.size <= audio.size) {
+            System.arraycopy(audio, i, buf, 0, buf.size)
+            u.feed(buf)
+            i += buf.size
+        }
+        u.flush()
+        val out = got!!
+        // The utterance holds the voice and the room noise around it, not the last frame repeated.
+        val distinctFrames = (0 until out.size / Utterances.FRAME).map { f -> out[f * Utterances.FRAME + 7] }.distinct().size
+        assertTrue("frames all alike", distinctFrames > out.size / Utterances.FRAME / 2)
+    }
+
+    @Test
     fun speechStillInProgressAtStopIsKept() {
         assertEquals(1, run(noise(300), voice(1200)).size)
     }

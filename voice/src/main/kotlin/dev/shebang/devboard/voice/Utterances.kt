@@ -27,8 +27,10 @@ class Utterances(
     /** Whether speech is being heard now. */
     val hearing: Boolean get() = speaking
 
-    fun feed(samples: FloatArray) {
-        require(samples.size == frame)
+    /** Takes the next frame; it is copied, so the caller may reuse its buffer. */
+    fun feed(frameIn: FloatArray) {
+        require(frameIn.size == frame)
+        val samples = frameIn.copyOf()
         var sum = 0.0
         for (s in samples) sum += s * s
         val rms = sqrt(sum / frame).toFloat()
