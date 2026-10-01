@@ -56,6 +56,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -314,13 +317,55 @@ fun BarEditorScreen(
             },
         )
     }) { padding ->
-        // The items as they stand while one is dragged, each with an id that follows it through the moves; the
-        // new order is saved when the finger lifts.
-        var order by remember(bar) { mutableStateOf(bar.items.mapIndexed { i, item -> i.toLong() to item }) }
+        // The items as they stand while one is dragged, each with an id that follows it through the moves and
+        // survives saving (a fresh id only for an item that is new), so the list never mistakes one row for
+        // another. The new order is saved when the finger lifts.
+        val ids = remember { IdSource() }
+        var order by remember { mutableStateOf(ids.assign(bar.items, emptyList())) }
+        LaunchedEffect(bar) { if (bar.items != order.map { it.second }) order = ids.assign(bar.items, order) }
+        // The row being dragged, and where its top should be: under the finger, in the list's own pixels.
         var dragging by remember { mutableStateOf<Long?>(null) }
-        var dragOffset by remember { mutableFloatStateOf(0f) }
+        var dragTop by remember { mutableFloatStateOf(0f) }
         val listState = rememberLazyListState()
+        val edge = with(LocalDensity.current) { 72.dp.toPx() }
         fun commit(items: List<Pair<Long, BarItem>>) = onChange(BarConfig(items.map { it.second }))
+        fun rowOf(id: Long) = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == id }
+        // The dragged row swaps with a neighbour once its middle passes the neighbour's; the list keeps its
+        // scroll position rather than following the first visible row when that one moves.
+        fun swapIfPassed() {
+            val id = dragging ?: return
+            val row = rowOf(id) ?: return
+            val middle = dragTop + row.size / 2f
+            val at = order.indexOfFirst { it.first == id }
+            val next = order.getOrNull(at + 1)?.let { rowOf(it.first) }
+            val prev = order.getOrNull(at - 1)?.let { rowOf(it.first) }
+            val to = when {
+                next != null && middle > next.offset + next.size / 2f -> at + 1
+                prev != null && middle < prev.offset + prev.size / 2f -> at - 1
+                else -> return
+            }
+            val first = listState.firstVisibleItemIndex
+            val firstOffset = listState.firstVisibleItemScrollOffset
+            order = order.move(at, to)
+            listState.requestScrollToItem(first, firstOffset)
+        }
+        // Held near the top or bottom edge, the list scrolls, faster the closer to the edge.
+        LaunchedEffect(dragging) {
+            val id = dragging ?: return@LaunchedEffect
+            while (dragging == id) {
+                withFrameNanos { }
+                val row = rowOf(id) ?: continue
+                val info = listState.layoutInfo
+                val top = info.viewportStartOffset + edge
+                val bottom = info.viewportEndOffset - edge
+                val step = when {
+                    dragTop < top -> -(top - dragTop)
+                    dragTop + row.size > bottom -> dragTop + row.size - bottom
+                    else -> 0f
+                }.coerceIn(-edge, edge) * 0.25f
+                if (step != 0f && listState.scrollBy(step) != 0f) swapIfPassed()
+            }
+        }
         LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(), state = listState) {
             item {
                 ListItem(
@@ -348,29 +393,21 @@ fun BarEditorScreen(
                 val lifted = dragging == id
                 ListItem(
                     leadingContent = {
-                        // Drag the handle to move the item; rows swap as it passes their middle.
+                        // Drag the handle to move the item.
                         Icon(
                             Icons.Default.Menu,
                             contentDescription = "Drag to reorder",
                             modifier = Modifier.pointerInput(id) {
                                 detectDragGestures(
-                                    onDragStart = { dragging = id; dragOffset = 0f },
-                                    onDragEnd = { dragging = null; dragOffset = 0f; commit(order) },
-                                    onDragCancel = { dragging = null; dragOffset = 0f; order = bar.items.mapIndexed { i, it -> i.toLong() to it } },
+                                    onDragStart = { rowOf(id)?.let { dragTop = it.offset.toFloat(); dragging = id } },
+                                    onDragEnd = { dragging = null; commit(order) },
+                                    onDragCancel = { dragging = null; order = ids.assign(bar.items, order) },
                                 ) { change, amount ->
                                     change.consume()
-                                    dragOffset += amount.y
-                                    val at = order.indexOfFirst { it.first == id }
-                                    val rows = listState.layoutInfo.visibleItemsInfo
-                                    val next = order.getOrNull(at + 1)?.let { n -> rows.firstOrNull { it.key == n.first } }
-                                    val prev = order.getOrNull(at - 1)?.let { p -> rows.firstOrNull { it.key == p.first } }
-                                    if (next != null && dragOffset > next.size / 2f) {
-                                        order = order.move(at, at + 1)
-                                        dragOffset -= next.size
-                                    } else if (prev != null && dragOffset < -prev.size / 2f) {
-                                        order = order.move(at, at - 1)
-                                        dragOffset += prev.size
-                                    }
+                                    val info = listState.layoutInfo
+                                    val size = rowOf(id)?.size ?: 0
+                                    dragTop = (dragTop + amount.y).coerceIn(info.viewportStartOffset - size / 2f, info.viewportEndOffset - size / 2f)
+                                    swapIfPassed()
                                 }
                             },
                         )
@@ -385,8 +422,12 @@ fun BarEditorScreen(
                     tonalElevation = if (lifted) 6.dp else 0.dp,
                     modifier = Modifier
                         .zIndex(if (lifted) 1f else 0f)
-                        .graphicsLayer { translationY = if (lifted) dragOffset else 0f }
-                        .then(if (lifted) Modifier.shadow(6.dp) else Modifier)
+                        // The lifted row is drawn under the finger wherever the list has laid it out; the others
+                        // slide to their new places.
+                        .then(
+                            if (lifted) Modifier.graphicsLayer { translationY = rowOf(id)?.let { dragTop - it.offset } ?: 0f }.shadow(6.dp)
+                            else Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                        )
                         .semantics {
                             // Without dragging (TalkBack): move up and down from the item's actions.
                             customActions = listOfNotNull(
@@ -413,6 +454,22 @@ private fun describe(item: BarItem): String = when {
         if (item.mods.isNotEmpty()) append(item.mods.joinToString("+") { it.replaceFirstChar(Char::uppercase) }).append("+")
         append(item.code)
         if (item.repeat) append(" (repeats)")
+    }
+}
+
+/**
+ * Ids for bar items in the editor: an item keeps its id when the list is saved and comes back the same, and
+ * an item that is new gets one never used before.
+ */
+private class IdSource {
+    private var next = 0L
+
+    fun assign(items: List<BarItem>, previous: List<Pair<Long, BarItem>>): List<Pair<Long, BarItem>> {
+        val free = previous.toMutableList()
+        return items.map { item ->
+            val i = free.indexOfFirst { it.second == item }
+            if (i >= 0) free.removeAt(i) else (next++ to item)
+        }
     }
 }
 

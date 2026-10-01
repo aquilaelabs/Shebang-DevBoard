@@ -51,6 +51,7 @@
 - Autofill chips sit centred in the strip, and a sideways swipe puts them away so the terminal bar is back (0171d36)
 - The enter key always shows the enter icon; it no longer turns into an oversized 'Search', 'Go' or 'Send' label (it still does what the field asks) (bbf878b)
 - Reorder the terminal bar by dragging an item's handle in the bar editor, instead of up and down buttons (335456f)
+- Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (c7bba27)
 
 ### Fixed
 
