@@ -20,3 +20,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Shebang-DevBoard"
 include(":app")
+include(":voice")

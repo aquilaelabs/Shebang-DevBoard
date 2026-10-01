@@ -80,6 +80,18 @@ Princeton University and LICENSEE agrees to preserve same.
   <https://creativecommons.org/licenses/by/4.0/>. Changes: only summary statistics (two spreads and two
   offsets) are used.
 
+### OpenAI Whisper base.en model, as quantised by the whisper.cpp project (Shebang Voice add-on)
+- Used for: `voice/src/main/assets/models/ggml-base.en-q5_1.bin` (fetched by `tools/fetch_voice_model.sh`,
+  not kept in git), the speech model the Shebang Voice add-on ships with.
+- Source: OpenAI Whisper, <https://github.com/openai/whisper>; converted and quantised to 5 bits by the
+  whisper.cpp project, <https://huggingface.co/ggerganov/whisper.cpp>, downloaded 2026-10-01.
+- Licence: MIT (Whisper's weights and code; the whisper.cpp model repository states MIT).
+
+### Kennedy inaugural address sample (test only)
+- Used for: `voice/src/androidTest/assets/jfk.wav`, 11 seconds of President Kennedy's 1961 inaugural address,
+  taken from whisper.cpp's `samples/`, to check transcription end to end.
+- Licence: a work of the United States government, in the public domain.
+
 ### FUTO swipe dataset (swipe.futo.org)
 - Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the
   decoder's default parameters (`GlideParams`) were chosen on its dev split. No part of the data is in this
@@ -135,6 +147,8 @@ other artwork are original to this project.
 | Jetpack Compose (BOM 2026.06.01) incl. Material 3 | 1.11.x / 1.4.0 | settings app only |
 | AndroidX DataStore Preferences | 1.2.1 | settings storage |
 | AndroidX Autofill | 1.3.0 | the style autofill services read to draw their chips in the strip |
+| whisper.cpp and ggml (The ggml authors), MIT | 1.9.4 | the Shebang Voice add-on's speech engine, vendored and trimmed to the CPU build in `voice/src/main/cpp/whisper.cpp` (see `VENDORED.md` there) |
+| AndroidX Test runner and JUnit extension | 1.7.0 / 1.3.0 | device tests of the add-on only, not shipped |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |
 
 ## Research

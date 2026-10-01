@@ -1,0 +1,71 @@
+// Shebang Voice: speech typing for the keyboard, as an add-on app of its own (R15). It holds the microphone
+// permission so the keyboard does not have to; neither has network access.
+import java.io.File
+
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+android {
+    namespace = "dev.shebang.devboard.voice"
+    compileSdk = 36
+    ndkVersion = "29.0.14206865"
+
+    defaultConfig {
+        applicationId = "dev.shebang.devboard.voice"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = rootProject.file("VERSION").readText().trim()
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Phones, and the emulator.
+        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        externalNativeBuild {
+            cmake {
+                // Optimised even in debug builds: unoptimised, speech takes many times longer than it lasts.
+                arguments += listOf("-DCMAKE_BUILD_TYPE=Release", "-DANDROID_STL=c++_static")
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "4.1.2"
+        }
+    }
+
+    // The model is read through a file copy; storing it uncompressed keeps the copy a plain stream.
+    androidResources { noCompress += "bin" }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = false
+        disable += setOf("OldTargetApi", "GradleDependency", "AndroidGradlePluginVersion")
+    }
+}
+
+// The model is not kept in git (57 MB): tools/fetch_voice_model.sh puts it in the assets.
+val modelPath: String = file("src/main/assets/models/ggml-base.en-q5_1.bin").path
+tasks.named("preBuild") {
+    val path = modelPath
+    doFirst {
+        if (!File(path).isFile) throw GradleException("Missing $path: run tools/fetch_voice_model.sh first")
+    }
+}
+
+dependencies {
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
+}

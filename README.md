@@ -483,6 +483,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   API 36 emulator right after install (not yet compiled ahead of time); the keyboard appears at once and
   glide starts working when both are in.
 
+## Shebang Voice (add-on, in progress: R15)
+
+Speech typing comes as a separate app, `voice/`, so the keyboard keeps VIBRATE as its only permission and
+has no network code; the add-on will hold the microphone permission and has no network access either. It
+runs OpenAI's Whisper (base.en, 5-bit, 57 MB, MIT) through whisper.cpp (vendored, CPU only). Fetch the
+model before building it: `tools/fetch_voice_model.sh`. `./gradlew :voice:connectedDebugAndroidTest`
+transcribes a public-domain recording on a device: on the emulator (2 cores, AVX2) the 11 s Kennedy sample
+comes out word for word in 15 s, against 28 s without AVX2. Speed on phones is still to be measured and
+tuned (ARM instruction sets chosen at runtime).
+
 ## Licence
 
 MIT (see `LICENSE`). The data and libraries it builds on keep their own licences, all permissive or public
