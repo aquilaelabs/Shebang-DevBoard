@@ -121,8 +121,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var glideTrailingSpace = false
     private var autoShifted = false
 
+    /** What the clipboard chip offers, if anything. */
+    private lateinit var clipChip: ClipboardChip
+    private var clipOffer: ClipboardChip.Offer? = null
+
     override fun onCreate() {
         super.onCreate()
+        clipChip = ClipboardChip(this)
+        clipChip.listen { if (isInputViewShown) updateClipChip() }
         layouts = LayoutRepository(this)
         glideSession = GlideSession(this)
         personal = PersonalWords.get(filesDir)
@@ -297,6 +303,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         popup = p
         applyTheme()
         barConfig?.let { s.bar.setConfig(it) }
+        s.onChipsDismissed = { clipOffer?.let { clipChip.markHandled(it.stamp) }; clipOffer = null }
         s.setMode(settings.stripMode)
         k.keyPreviewEnabled = settings.keyPreview
         k.glideTrailEnabled = settings.glideTrail
@@ -401,12 +408,37 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         applyPendingBundle()
         updateAutoCaps()
         text.refreshLetterPrior()
+        updateClipChip()
+    }
+
+    /** Offers a chip for pasting text copied in the last few minutes (not in terminals). */
+    private fun updateClipChip() {
+        val s = strip ?: return
+        val offer = if (field.isTerminal) null else clipChip.offer(masked = field.isPassword)
+        clipOffer = offer
+        if (offer == null) {
+            s.setClip(null)
+            return
+        }
+        val t = theme ?: return
+        val height = s.rowHeight - (8 * resources.displayMetrics.density).toInt()
+        s.setClip(clipChip.chipView(offer, t, height) {
+            feedback.keyPress()
+            text.finishComposing()
+            ic?.commitText(offer.text, 1)
+            clipChip.markHandled(offer.stamp)
+            clipOffer = null
+            s.setClip(null)
+            afterEdit()
+        })
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
         strip?.resetAutofill()
+        strip?.setClip(null)
+        clipOffer = null
         text.finishComposing()
         persistLearning()
         keyboard?.cancelAllTouches()

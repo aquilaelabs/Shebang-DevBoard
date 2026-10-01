@@ -184,6 +184,14 @@ its own, locally:
 
 ## Decisions
 
+- **Clipboard chip** (the user's request): text copied in the last three minutes gets a chip in the strip's
+  top row (the autofill row, ahead of any autofill chips) while no word is composed: "Paste" and the clip's
+  first 28 characters, or dots when the copying app marked it sensitive (Android 13+, as password managers
+  do) or the field is a password field. A tap pastes it; a sideways swipe puts it away with the autofill
+  chips. A clip pasted or swiped away is not offered again. The clipboard is read only while the keyboard is
+  up, when a field opens or the clip changes, and nothing of it is kept or learned. Freshness goes by when
+  the keyboard saw the clip change, else by the clip's own timestamp (its clock differs between releases,
+  so either is accepted). Terminals get no chip.
 - **Enter key**: always the enter icon, whatever the field asks for (search, go, send, done); it still
   performs that action. Labels such as "Search" were drawn on the key until the user found them too big and
   preferred the icon not to change.

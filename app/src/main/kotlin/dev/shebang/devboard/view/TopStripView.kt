@@ -7,7 +7,8 @@ import dev.shebang.devboard.settings.StripMode
 /**
  * The area above the keys: the terminal bar, the suggestion strip, or both, per the strip setting.
  * In AUTO mode the bar is replaced by suggestions while a word is being composed. Autofill chips from a
- * password manager take the bar's row while no word is being composed, so the strip keeps its height.
+ * password manager, and a chip for pasting what was just copied, take the bar's row while no word is being
+ * composed, so the strip keeps its height.
  */
 class TopStripView(context: Context) : LinearLayout(context) {
     val bar = TerminalBarView(context)
@@ -20,6 +21,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
     private var hasAutofill = false
     /** The user swiped the chips away in this field; new suggestions for it stay hidden. */
     private var autofillDismissed = false
+    /** The chips were swiped away: the clipboard chip's clip counts as handled. */
+    var onChipsDismissed: (() -> Unit)? = null
 
     init {
         orientation = VERTICAL
@@ -29,8 +32,10 @@ class TopStripView(context: Context) : LinearLayout(context) {
         autofill.onDismiss = {
             autofillDismissed = true
             hasAutofill = false
+            autofill.setClip(null)
             apply()
             autofill.clear()
+            onChipsDismissed?.invoke()
         }
         apply()
     }
@@ -55,6 +60,12 @@ class TopStripView(context: Context) : LinearLayout(context) {
     fun setComposing(c: Boolean) {
         if (composing == c) return
         composing = c
+        apply()
+    }
+
+    /** The clipboard chip, or null to remove it; it shares the autofill chips' row and its swipe. */
+    fun setClip(chip: android.view.View?) {
+        autofill.setClip(chip)
         apply()
     }
 
@@ -95,7 +106,7 @@ class TopStripView(context: Context) : LinearLayout(context) {
             }
         }
         // Chips take the bar's row, or the suggestions' in Auto mode when no word is composed.
-        val showAutofill = hasAutofill && !composing && (showBar || showSuggestions)
+        val showAutofill = (hasAutofill || autofill.hasClip) && !composing && (showBar || showSuggestions)
         autofill.visibility = if (showAutofill) VISIBLE else GONE
         bar.visibility = if (showBar && !showAutofill) VISIBLE else GONE
         suggestions.visibility = if (showSuggestions && !(showAutofill && !showBar)) VISIBLE else GONE

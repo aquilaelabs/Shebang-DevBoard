@@ -11,7 +11,7 @@ import kotlin.math.abs
 
 /**
  * Autofill suggestions from the user's password manager or autofill service (Android 11+), as the chips the
- * service drew in the keyboard's style, centred in the strip (scrolling when there are more than fit). The
+ * service drew in the keyboard's style, after a chip for pasting what was just copied, centred in the strip (scrolling when there are more than fit). The
  * keyboard only places them: what they say and what tapping one fills in are the service's, and nothing
  * about them is read or learned. A sideways swipe puts them away ([onDismiss]); when they scroll, only a
  * swipe on past the end of the row does.
@@ -37,9 +37,26 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
         addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
     }
 
+    private var autofillChips: List<View> = emptyList()
+    private var clipChip: View? = null
+
+    /** The autofill service's chips (after the clipboard chip, when there is one). */
     fun show(chips: List<View>) {
+        autofillChips = chips
+        rebuild()
+    }
+
+    /** A chip for pasting what was just copied, ahead of any autofill chips; null removes it. */
+    fun setClip(chip: View?) {
+        clipChip = chip
+        rebuild()
+    }
+
+    val hasClip: Boolean get() = clipChip != null
+
+    private fun rebuild() {
         row.removeAllViews()
-        for (c in chips) {
+        for (c in listOfNotNull(clipChip) + autofillChips) {
             // The platform sizes each chip to what the service drew; a chip has no content size of its own to wrap.
             val lp = c.layoutParams?.let { LinearLayout.LayoutParams(it.width, it.height) }
                 ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -50,7 +67,11 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
         scrollTo(0, 0)
     }
 
-    fun clear() = row.removeAllViews()
+    /** Removes the autofill chips (the clipboard chip stays). */
+    fun clear() {
+        autofillChips = emptyList()
+        rebuild()
+    }
 
     /**
      * Whether the swipe so far puts the chips away: sideways, past a short distance, in a direction the row
