@@ -18,12 +18,20 @@ class TopStripView(context: Context) : LinearLayout(context) {
     private var composing = false
     private var codeMode = false
     private var hasAutofill = false
+    /** The user swiped the chips away in this field; new suggestions for it stay hidden. */
+    private var autofillDismissed = false
 
     init {
         orientation = VERTICAL
         addView(bar, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         addView(suggestions, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         addView(autofill, 0, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
+        autofill.onDismiss = {
+            autofillDismissed = true
+            hasAutofill = false
+            apply()
+            autofill.clear()
+        }
         apply()
     }
 
@@ -50,8 +58,15 @@ class TopStripView(context: Context) : LinearLayout(context) {
         apply()
     }
 
+    /** A new field: its chips show even if the last field's were swiped away. */
+    fun resetAutofill() {
+        autofillDismissed = false
+        setAutofill(emptyList())
+    }
+
     /** Shows the autofill chips (or removes them when [chips] is empty). */
     fun setAutofill(chips: List<android.view.View>) {
+        if (autofillDismissed) return
         hasAutofill = chips.isNotEmpty()
         // The row is shown before the chips go in: a chip attached while hidden gives up its surface for good.
         apply()

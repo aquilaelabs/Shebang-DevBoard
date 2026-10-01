@@ -407,7 +407,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onFinishInputView(finishingInput: Boolean) {
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
-        strip?.setAutofill(emptyList())
+        strip?.resetAutofill()
         text.finishComposing()
         persistLearning()
         keyboard?.cancelAllTouches()

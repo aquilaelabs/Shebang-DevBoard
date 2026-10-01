@@ -47,6 +47,7 @@
 - Holding backspace (or any repeating key) buzzes once when pressed instead of on every repeat; the key sound still repeats (1a78b83)
 - Autocorrect is on by default (it was off unless switched on in Settings); a word that begins a name in the code around, like 'max' of 'maxRetries', is left alone (07c5515)
 - Autocorrect fixes a few more typos and picks the wrong word less often (real taps: 78.4% of typos fixed instead of 77.7%); taps leave unusual words such as names alone a little more (75fd1a3)
+- Autofill chips sit centred in the strip, and a sideways swipe puts them away so the terminal bar is back (0171d36)
 
 ### Fixed
 
