@@ -4,6 +4,7 @@
 #include <string.h>
 #include <android/log.h>
 #include "whisper.h"
+#include "ggml-backend.h"
 
 #define TAG "ShebangVoice"
 
@@ -14,8 +15,21 @@ static void log_to_logcat(enum ggml_log_level level, const char *text, void *use
 }
 
 JNIEXPORT jlong JNICALL
-Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path) {
+Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path, jstring libDir) {
     whisper_log_set(log_to_logcat, NULL);
+#ifdef VOICE_BACKEND_DL
+    // Phones: load the best of ggml's CPU variants this CPU supports, from the app's native library folder.
+    static int loaded = 0;
+    if (!loaded) {
+        const char *dir = (*env)->GetStringUTFChars(env, libDir, NULL);
+        ggml_backend_load_all_from_path(dir);
+        (*env)->ReleaseStringUTFChars(env, libDir, dir);
+        loaded = 1;
+        for (size_t i = 0; i < ggml_backend_reg_count(); i++) {
+            __android_log_print(ANDROID_LOG_INFO, TAG, "backend: %s", ggml_backend_reg_name(ggml_backend_reg_get(i)));
+        }
+    }
+#endif
     const char *p = (*env)->GetStringUTFChars(env, path, NULL);
     struct whisper_context_params cp = whisper_context_default_params();
     cp.use_gpu = false;

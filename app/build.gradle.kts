@@ -12,8 +12,10 @@ android {
         applicationId = "dev.shebang.devboard"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // From VERSION (major.minor.patch): 1.2.3 is 1002003, so every release installs over the one before.
         versionName = rootProject.file("VERSION").readText().trim()
+        versionCode = versionName!!.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+            .let { (it.getOrElse(0) { 0 } * 1_000_000) + (it.getOrElse(1) { 0 } * 1_000) + it.getOrElse(2) { 0 } }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

@@ -19,7 +19,7 @@ class WhisperTest {
         val target = InstrumentationRegistry.getInstrumentation().targetContext
         val testAssets = InstrumentationRegistry.getInstrumentation().context.assets
         val samples = Wav.read16kMono(testAssets.open("jfk.wav").use { it.readBytes() })
-        val whisper = Whisper.load(Models.file(target).path)
+        val whisper = Whisper.load(Models.file(target).path, target.applicationInfo.nativeLibraryDir)
         assertNotNull("model did not load", whisper)
         val t0 = System.nanoTime()
         val text = whisper!!.use { it.transcribe(samples) }

@@ -15,8 +15,10 @@ android {
         applicationId = "dev.shebang.devboard.voice"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // From VERSION (major.minor.patch): 1.2.3 is 1002003, so every release installs over the one before.
         versionName = rootProject.file("VERSION").readText().trim()
+        versionCode = versionName!!.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+            .let { (it.getOrElse(0) { 0 } * 1_000_000) + (it.getOrElse(1) { 0 } * 1_000) + it.getOrElse(2) { 0 } }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Phones, and the emulator.
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
@@ -37,6 +39,10 @@ android {
 
     // The model is read through a file copy; storing it uncompressed keeps the copy a plain stream.
     androidResources { noCompress += "bin" }
+
+    // The engine's CPU variants are found by listing the native library folder, so the libraries are unpacked
+    // there at install rather than read from inside the APK.
+    packaging { jniLibs { useLegacyPackaging = true } }
 
     buildFeatures { buildConfig = true }
 

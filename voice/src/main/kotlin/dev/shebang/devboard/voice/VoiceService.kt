@@ -96,7 +96,7 @@ class VoiceService : Service() {
             transcriber.execute {
                 if (!keep) return@execute
                 main.post { send(VoiceProtocol.STATE, VoiceProtocol.STATE_TRANSCRIBING) }
-                val model = whisper ?: Whisper.load(Models.file(this@VoiceService).path).also { whisper = it }
+                val model = whisper ?: Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir).also { whisper = it }
                 if (model == null) {
                     main.post { send(VoiceProtocol.ERROR, VoiceProtocol.ERROR_MODEL) }
                     return@execute
@@ -120,7 +120,7 @@ class VoiceService : Service() {
             }
             send(VoiceProtocol.STATE, VoiceProtocol.STATE_LISTENING)
             // Load the model while the user starts talking.
-            transcriber.execute { if (whisper == null) whisper = Whisper.load(Models.file(this@VoiceService).path) }
+            transcriber.execute { if (whisper == null) whisper = Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir) }
             thread.start()
             Handler(thread.looper).post { loop() }
         }

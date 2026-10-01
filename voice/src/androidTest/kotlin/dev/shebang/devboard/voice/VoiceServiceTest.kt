@@ -38,7 +38,7 @@ class VoiceServiceTest {
         }
         u.flush()
         assertTrue("no utterances", pieces.isNotEmpty())
-        val text = Whisper.load(Models.file(target).path)!!.use { w -> pieces.joinToString(" ") { w.transcribe(it) } }
+        val text = Whisper.load(Models.file(target).path, target.applicationInfo.nativeLibraryDir)!!.use { w -> pieces.joinToString(" ") { w.transcribe(it) } }
         android.util.Log.i("ShebangVoice", "${pieces.size} utterances: $text")
         val words = text.lowercase().replace(Regex("[^a-z ]"), " ").split(Regex(" +")).toSet()
         for (w in listOf("americans", "ask", "country")) assertTrue("'$w' missing from: $text", w in words)

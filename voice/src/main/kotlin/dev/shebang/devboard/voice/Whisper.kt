@@ -22,13 +22,16 @@ class Whisper private constructor(private var handle: Long) : Closeable {
             System.loadLibrary("shebangvoice")
         }
 
-        /** Loads the model file at [path]; null when it cannot be read as a Whisper model. */
-        fun load(path: String): Whisper? = nativeInit(path).takeIf { it != 0L }?.let { Whisper(it) }
+        /**
+         * Loads the model file at [path]; null when it cannot be read as a Whisper model. [libDir] is the app's
+         * native library folder, where phones find the CPU variants of the engine.
+         */
+        fun load(path: String, libDir: String): Whisper? = nativeInit(path, libDir).takeIf { it != 0L }?.let { Whisper(it) }
 
         /** Big cores only, roughly: half the processors, at least two, at most four. */
         fun defaultThreads(): Int = (Runtime.getRuntime().availableProcessors() / 2).coerceIn(2, 4)
 
-        @JvmStatic private external fun nativeInit(path: String): Long
+        @JvmStatic private external fun nativeInit(path: String, libDir: String): Long
         @JvmStatic private external fun nativeFree(handle: Long)
         @JvmStatic private external fun nativeTranscribe(handle: Long, samples: FloatArray, threads: Int): String?
     }
