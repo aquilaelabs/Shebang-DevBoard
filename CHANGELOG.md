@@ -65,3 +65,4 @@
 - Typing on at the end of a word (after backspacing into it, or when the app dropped the word being typed) takes in the whole word, so the underline and a suggestion cover all of it rather than only the new letters (f981e15)
 - Fixing the last glided word no longer swaps a right word for a rare one ('to work pretty' could become 'to dirk pretty') (b4e6ef5)
 - The setup screen's title no longer slides under the status bar when the keyboard opens (9d68563)
+- The keyboard height setting shows 110% (not 109%) and the other steps exactly (9c9b1ac)

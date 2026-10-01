@@ -150,7 +150,11 @@ fun SettingsScreen(
             item { SectionHeader("Appearance") }
             item { ThemePicker(settings.palette) { v -> update { it.copy(palette = v) } } }
             item {
-                SliderRow("Keyboard height", "${(settings.heightScale * 100).toInt()}%", settings.heightScale, 0.7f..1.4f, steps = 6) { v -> update { it.copy(heightScale = v) } }
+                // Rounded, not cut off: 1.1 is stored as 1.0999999 and read as 109%. Stored snapped to the
+                // slider's 10% steps.
+                SliderRow("Keyboard height", "${kotlin.math.round(settings.heightScale * 100).toInt()}%", settings.heightScale, 0.7f..1.4f, steps = 6) { v ->
+                    update { it.copy(heightScale = kotlin.math.round(v * 10) / 10f) }
+                }
             }
             item { SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } } }
             item { SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } } }
