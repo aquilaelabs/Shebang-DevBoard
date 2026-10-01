@@ -52,6 +52,7 @@
 - The enter key always shows the enter icon; it no longer turns into an oversized 'Search', 'Go' or 'Send' label (it still does what the field asks) (bbf878b)
 - Reorder the terminal bar by dragging an item's handle in the bar editor, instead of up and down buttons (335456f)
 - Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (c7bba27)
+- Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (c5808bd)
 
 ### Fixed
 

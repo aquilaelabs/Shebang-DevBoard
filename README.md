@@ -202,8 +202,10 @@ its own, locally:
   "no suggestions in password fields" is about the keyboard's own words. Each chip is a surface the service
   draws: it keeps the size the platform gives it and goes into a row that is already visible, since a chip
   attached while hidden gives up its surface for good. The chips are centred (the row scrolls when there are
-  more than fit), and a sideways swipe puts them away for the field and brings the bar back (the user's
-  request; a swipe down was tried first). When the row scrolls, only a swipe on past its end does. A swipe
+  more than fit), and a sideways swipe carries them with the finger, fading, then past a third of the strip
+  (or flung) they slide off and the bar comes back for the field; let go sooner and they spring back (the
+  user's request; a swipe down that made them vanish was tried first). A service's chip moves with the row
+  but does not fade: its surface is the service's. When the row scrolls, only a swipe on past its end does. A swipe
   that starts on a chip reaches the keyboard too, because the platform hands a drag on a chip back to it. A known limit: the platform asks for the chip style
   once per app screen, and if that happens before the keyboard's window has ever been shown in a fresh
   keyboard process, it cannot draw the chips on that screen; the next screen has them.
