@@ -66,6 +66,7 @@ tasks.named("preBuild") {
 }
 
 dependencies {
+    testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
 }

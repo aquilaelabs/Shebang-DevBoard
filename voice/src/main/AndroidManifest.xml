@@ -1,7 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shebang Voice: speech typing for Shebang DevBoard, on the phone. No INTERNET permission. -->
+<!-- Shebang Voice: speech typing for Shebang DevBoard, on the phone. The microphone is its only permission:
+     no INTERNET. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <application
         android:allowBackup="false"
-        android:label="Shebang Voice" />
+        android:label="Shebang Voice">
+
+        <!-- Exported for the keyboard; every message's sender is checked against this app's signature. -->
+        <service
+            android:name=".VoiceService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="dev.shebang.devboard.voice.LISTEN" />
+            </intent-filter>
+        </service>
+
+        <activity
+            android:name=".MicPermissionActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
 </manifest>
