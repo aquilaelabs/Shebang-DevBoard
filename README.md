@@ -504,6 +504,16 @@ still written). Without the microphone permission the add-on's own screen asks f
 cannot. On the emulator, with the Kennedy sample standing in for the microphone (debug builds of the add-on
 only), the three pieces arrived in the field 7, 7 and 12 s after each was spoken.
 
+## About and updates
+
+Settings > About shows the version, the licence and the credits (`LICENSE` and `THIRD_PARTY_NOTICES.md`,
+copied into the app's assets at build time by the `copyAboutDocs` task, so the app always carries the real
+list), links to the source on GitHub, and Check for updates, which opens the GitHub releases page. The app
+does not download or install anything itself: that would need network access and the install-packages
+permission, which together are what Android's malware scanning looks for in a keyboard. Installing a newer
+APK over the old one updates it in place, keeping settings and learned words, as long as both were signed
+with the same key.
+
 ## Licence
 
 MIT (see `LICENSE`). The data and libraries it builds on keep their own licences, all permissive or public

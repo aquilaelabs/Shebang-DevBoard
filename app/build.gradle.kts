@@ -46,6 +46,28 @@ android {
     }
 }
 
+
+/** The licence and the third-party notices, copied into the app's assets for Settings > About. */
+abstract class CopyAboutDocs : DefaultTask() {
+    @get:InputFiles abstract val docs: ConfigurableFileCollection
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile.resolve("about")
+        out.mkdirs()
+        docs.forEach { it.copyTo(out.resolve(it.name), overwrite = true) }
+    }
+}
+
+val copyAboutDocs = tasks.register<CopyAboutDocs>("copyAboutDocs") {
+    docs.from(rootProject.file("LICENSE"), rootProject.file("THIRD_PARTY_NOTICES.md"))
+}
+
+androidComponents {
+    onVariants { variant -> variant.sources.assets?.addGeneratedSourceDirectory(copyAboutDocs, CopyAboutDocs::outputDir) }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

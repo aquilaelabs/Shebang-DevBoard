@@ -88,8 +88,14 @@ class SettingsActivity : ComponentActivity() {
             val profiles = remember { AppProfiles(this@SettingsActivity) }
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
+            // A document from the About section (asset path and title), while it is open.
+            var aboutDoc by remember { mutableStateOf<Pair<String, String>?>(null) }
             DevBoardTheme(settings.palette) {
-                if (personalWords) {
+                val doc = aboutDoc
+                if (doc != null) {
+                    BackHandler { aboutDoc = null }
+                    AboutDocScreen(title = doc.second, asset = doc.first, onBack = { aboutDoc = null })
+                } else if (personalWords) {
                     BackHandler { personalWords = false }
                     PersonalWordsScreen(onBack = { personalWords = false })
                 } else if (recording) {
@@ -123,6 +129,7 @@ class SettingsActivity : ComponentActivity() {
                         onEditBar = { editingBar = true },
                         onRecordGlides = { recording = true },
                         onPersonalWords = { personalWords = true },
+                        onDoc = { asset, title -> aboutDoc = asset to title },
                         onBack = { finish() },
                     )
                 }
@@ -139,8 +146,11 @@ fun SettingsScreen(
     onEditBar: () -> Unit,
     onRecordGlides: () -> Unit,
     onPersonalWords: () -> Unit,
+    onDoc: (asset: String, title: String) -> Unit,
     onBack: () -> Unit,
 ) {
+    val context = LocalContext.current
+    fun open(url: String) = runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("DevBoard settings") },
@@ -237,6 +247,36 @@ fun SettingsScreen(
                     headlineContent = { Text("Edit terminal bar") },
                     supportingContent = { Text(if (settings.barJson == null) "Default bar" else "Customized") },
                     modifier = Modifier.clickable(onClick = onEditBar),
+                )
+            }
+            item { SectionHeader("About") }
+            item {
+                val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "" }
+                ListItem(
+                    headlineContent = { Text("Shebang DevBoard $version") },
+                    supportingContent = { Text("A keyboard for developers. Everything it learns stays on this phone; it has no network access. MIT licence.") },
+                    modifier = Modifier.clickable { onDoc("about/LICENSE", "Licence") },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Check for updates") },
+                    supportingContent = { Text("Opens the releases on GitHub. Install a newer APK over this one to update; your settings and words stay.") },
+                    modifier = Modifier.clickable { open(VoiceClient.RELEASES_URL) },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Source code") },
+                    supportingContent = { Text(REPO_URL.removePrefix("https://")) },
+                    modifier = Modifier.clickable { open(REPO_URL) },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Credits") },
+                    supportingContent = { Text("The word lists, sentences, swipe and tap data, models and libraries this keyboard is built on, with their licences") },
+                    modifier = Modifier.clickable { onDoc("about/THIRD_PARTY_NOTICES.md", "Credits") },
                 )
             }
         }
@@ -680,3 +720,6 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
         )
     }
 }
+
+/** Where the project lives. */
+private const val REPO_URL = "https://github.com/aquilaelabs/Shebang-DevBoard"
