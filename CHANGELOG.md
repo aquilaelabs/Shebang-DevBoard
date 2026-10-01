@@ -46,6 +46,7 @@
 - Typed suggestions and autocorrect take the words before into account, as glide does: 'cut my haie' becomes 'hair', 'she can vook' becomes 'cook'. Words you typed right are still never changed (d3eb58e)
 - Holding backspace (or any repeating key) buzzes once when pressed instead of on every repeat; the key sound still repeats (1a78b83)
 - Autocorrect is on by default (it was off unless switched on in Settings); a word that begins a name in the code around, like 'max' of 'maxRetries', is left alone (07c5515)
+- Autocorrect fixes a few more typos and picks the wrong word less often (real taps: 78.4% of typos fixed instead of 77.7%); taps leave unusual words such as names alone a little more (75fd1a3)
 
 ### Fixed
 

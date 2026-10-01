@@ -241,4 +241,84 @@ class TapBenchmarkTest {
         for (v in names.indices) println("TAPS KEYS ${names[v].padEnd(44)} letters ${pct(right[v], letters)}, words typed right ${pct(wordsRight[v], words.size)}; of $unknown not in the dictionary ${pct(unknownRight[v], unknown)}")
         println("TAPS KEYS frequency prior: %.2f ms per letter".format((System.nanoTime() - t0) / 1e6 / maxOf(1, priors) / 4))
     }
+
+    /** Autocorrect's slip weight on real taps with their positions and the words before. TAPS_SWEEP=1. */
+    @Test
+    fun slipWeightOnRealTaps() {
+        assumeTrue(System.getenv("TAPS_SWEEP") != null)
+        val savedSlipWeight = Suggester.SLIP_WEIGHT
+        val dir = File(System.getenv("TSI_DIR") ?: return)
+        val layout = layout(dir)
+        val model = TapModel(layout, TSI_DENSITY)
+        val words = words(dir, layout).filter { it.meant.length >= 2 && dictionary.contains(it.meant) }
+        val typos = words.filter { it.typed != it.meant }
+        val right = words.filter { it.typed == it.meant }
+        for (k in listOf(3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0)) {
+            Suggester.SLIP_WEIGHT = k
+            var fixed = 0
+            var wrong = 0
+            for (w in typos) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val ctx = contextOf(w)
+                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx)
+                if (fix.equals(w.meant, ignoreCase = true)) fixed++ else if (fix != null) wrong++
+            }
+            var changed = 0
+            for (w in right) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val ctx = contextOf(w)
+                if (suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx) != null) changed++
+            }
+            val pct = GlideBenchmarkTest::pct
+            println("TAPS SWEEP slip weight $k: typos fixed ${pct(fixed, typos.size)}, another word ${pct(wrong, typos.size)}, right changed ${pct(changed, right.size)}")
+        }
+        Suggester.SLIP_WEIGHT = savedSlipWeight
+    }
+
+    /** The letter odds' floor and weight for key resolution, with learned offsets. TAPS_SWEEP=1. */
+    @Test
+    fun letterOddsSweep() {
+        assumeTrue(System.getenv("TAPS_SWEEP") != null)
+        val savedFloor = LetterPrior.FLOOR
+        val dir = File(System.getenv("TSI_DIR") ?: return)
+        val layout = layout(dir)
+        val words = words(dir, layout)
+        val lm = GlideBenchmarkTest.lm
+        for (floor in listOf(0.01f, 0.02f, 0.05f, 0.1f, 0.2f)) for (weight in listOf(0.75, 1.0, 1.25)) {
+            LetterPrior.FLOOR = floor
+            var letters = 0
+            var right = 0
+            var wordsRight = 0
+            var unknown = 0
+            var unknownRight = 0
+            for ((_, theirs) in words.groupBy { it.person }) {
+                var day = 0
+                val adaptation = dev.shebang.devboard.glide.GlideAdaptation(null) { day }
+                for (w in theirs) {
+                    day = w.task
+                    val own = TapModel(layout, TSI_DENSITY, adaptation.offsets())
+                    val c1 = w.before1?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
+                    val c2 = if (w.before1 == null) NgramModel.UNKNOWN else w.before2?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
+                    val prior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it)).toDouble()) }
+                    val sb = StringBuilder()
+                    for (i in w.meant.indices) sb.append(own.nearestLetter(w.xs[i], w.ys[i], prior = prior.next(sb.toString()), priorWeight = weight) ?: '?')
+                    val read = sb.toString()
+                    letters += w.meant.length
+                    right += w.meant.indices.count { read[it] == w.meant[it] }
+                    val known = dictionary.contains(w.meant)
+                    if (!known) unknown++
+                    if (read == w.meant) {
+                        wordsRight++
+                        if (!known) unknownRight++
+                    }
+                    // Learn from what the keys alone (with offsets) got right, as in keysOnRealTaps.
+                    val plain = String(CharArray(w.meant.length) { own.nearestLetter(w.xs[it], w.ys[it]) ?: '?' })
+                    if (plain == w.meant && known) adaptation.learn(w.meant.indices.flatMap { i -> own.observation(w.xs[i], w.ys[i], w.meant[i])!!.toList() }.toFloatArray())
+                }
+            }
+            val pct = GlideBenchmarkTest::pct
+            println("TAPS SWEEP floor $floor weight $weight: letters ${pct(right, letters)}, words ${pct(wordsRight, words.size)}, not in the dictionary ${pct(unknownRight, unknown)}")
+        }
+        LetterPrior.FLOOR = savedFloor
+    }
 }

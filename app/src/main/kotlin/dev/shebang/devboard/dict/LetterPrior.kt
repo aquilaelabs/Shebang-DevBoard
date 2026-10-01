@@ -32,7 +32,7 @@ class LetterPrior(
 
     companion object {
         /** A share of the odds spread evenly, so names and words the dictionary lacks can still be typed. */
-        const val FLOOR = 0.05f
+        var FLOOR = 0.1f
 
         /** -ln of how likely letter [c] is next under [prior] (null: no opinion, 0). */
         fun cost(prior: FloatArray?, c: Char): Double {

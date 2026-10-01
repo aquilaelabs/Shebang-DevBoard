@@ -234,6 +234,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   counts where a word has no Tatoeba count. Glide and typed suggestions both rank by the language model's
   word probability (Tatoeba counts, these tiers where counts are missing, and the user's own words), so "the"
   outranks "tea" although both are tier 10.
+- **Glide parameters after the three-word model** (1 Oct): re-tuned on FUTO's dev split with the new
+  model, the search reached 92.2% there (from 91.3%) but 90.7% on the test split against 91.0% for the
+  values kept, so the earlier values stay.
 - **Glide decoder**: the streaming decoder replaced the whole-word SHARK2 decoder in the app, because it is
   far more accurate on realistic strokes (see Glide typing) and needs no wait after lift. The spec's
   ideal-path LRU cache has no counterpart any more: per-geometry work is one table of states per tree node,
@@ -274,8 +277,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   the user's request.
 - **Keys weigh the next letter's odds**: on top of where the finger landed, a tap on a letter key weighs how
   likely each letter is next: the dictionary words that start with what has been typed, each weighted by
-  the three-word model with the words before (as autocorrect does), summed by their next letter, with 5%
-  of the odds spread evenly so words the dictionary lacks can still be typed. Worked out in the background
+  the three-word model with the words before (as autocorrect does), summed by their next letter, with 10%
+  of the odds spread evenly so words the dictionary lacks can still be typed (floors of 1%, 2%, 5%, 10% and
+  20% gave 97.4%, 97.4%, 97.3%, 97.2% and 97.0% of words right, and 90.4%, 91.6%, 94.0%, 95.2% and 95.2% of
+  the words the dictionary lacks; 10% gives up a little on common words for names and code). Worked out in the background
   after each edit (0.4 ms per letter on the JVM) and cleared at once on every edit, so a tap never uses odds
   for another prefix. Only in plain text fields outside code mode: not in password, email, URL, number or
   terminal fields. On TSI's phrase words with each person's learned offsets: letters typed as meant 97.0%
@@ -389,8 +394,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
   (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the
-  two words before it: 94.3% fixed, 4.7% changed to another word, 1.1% left alone; no correctly typed word
-  changed. Ranked by how common words are overall, without the words before: 88.5%, 9.9% and 1.6%. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
+  two words before it: 94.6% fixed, 4.3% changed to another word, 1.1% left alone; no correctly typed word
+  changed (slip weight 8; it was 6, which gave 94.3% and 4.7%, and on TSI's real taps 77.7% against 78.4%
+  now; weights from 3 to 10 never changed a correct word). Ranked by how common words are overall, without the words before: 88.5%, 9.9% and 1.6%. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
   and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
   Autocorrect, on by default since a friend's recording showed every typo left in (it was off by default
   until then, with no reason recorded). A word that begins an identifier in the text around ("max" of

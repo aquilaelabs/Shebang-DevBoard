@@ -185,7 +185,7 @@ class Suggester(
         /** How much more common a contraction must be than the word typed without its apostrophe. */
         private const val CONTRACTION_RATIO = 50.0
         /** How strongly an unlikely slip counts against a common word (per unit of [SlipCost]). */
-        var SLIP_WEIGHT = 6.0
+        var SLIP_WEIGHT = 8.0
         /** How much the words before count, against how common a word is overall (0..1). */
         var CONTEXT_WEIGHT = 0.75f
         /** With tap positions, words from this length may be two slips away (else from six letters). */

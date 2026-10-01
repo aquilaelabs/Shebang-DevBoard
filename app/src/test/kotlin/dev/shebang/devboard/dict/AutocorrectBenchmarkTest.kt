@@ -90,20 +90,25 @@ class AutocorrectBenchmarkTest {
     @Test
     fun slipWeightSweep() {
         org.junit.Assume.assumeTrue(System.getenv("AUTOCORRECT_SWEEP") != null)
-        val words = GlideBenchmarkTest.heldOut.take(1500).flatten().filter { it.length >= 3 && it.all { c -> c.isLetter() } && dictionary.contains(it) }
-        for (k in listOf(0.0, 1.0, 2.0, 3.0, 4.0, 6.0, 8.0)) {
+        val savedSlipWeight = Suggester.SLIP_WEIGHT
+        for (k in listOf(3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0)) {
             Suggester.SLIP_WEIGHT = k
             val rnd = Random(4)
             var n = 0
             var fixed = 0
-            for (w in words) {
-                val t = slip(w, rnd) ?: continue
+            var wrong = 0
+            for (w in inContext) {
+                val t = slip(w.word, rnd) ?: continue
                 n++
-                if (suggester.autocorrectFrom(t, suggester.suggest(t, Suggester.AUTOCORRECT_CANDIDATES)).equals(w, ignoreCase = true)) fixed++
+                val fix = suggester.autocorrectFrom(t, suggester.suggest(t, Suggester.AUTOCORRECT_CANDIDATES, context = w.context), context = w.context)
+                if (fix.equals(w.word, ignoreCase = true)) fixed++ else if (fix != null) wrong++
             }
-            println("AUTOCORRECT SWEEP slip weight $k: fixed ${GlideBenchmarkTest.pct(fixed, n)}")
+            var changed = 0
+            val right = inContext.distinctBy { it.word }
+            for (w in right) if (suggester.autocorrectFrom(w.word, suggester.suggest(w.word, Suggester.AUTOCORRECT_CANDIDATES, context = w.context), context = w.context) != null) changed++
+            println("AUTOCORRECT SWEEP slip weight $k: fixed ${GlideBenchmarkTest.pct(fixed, n)}, another word ${GlideBenchmarkTest.pct(wrong, n)}, right words changed ${GlideBenchmarkTest.pct(changed, right.size)}")
         }
-        Suggester.SLIP_WEIGHT = 6.0
+        Suggester.SLIP_WEIGHT = savedSlipWeight
     }
 
     @Test
