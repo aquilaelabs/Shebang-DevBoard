@@ -96,13 +96,13 @@ class VoiceService : Service() {
             transcriber.execute {
                 if (!keep) return@execute
                 main.post { send(VoiceProtocol.STATE, VoiceProtocol.STATE_TRANSCRIBING) }
-                val model = whisper ?: Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir).also { whisper = it }
+                val model = whisper ?: Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir, flashAttn = true).also { whisper = it }
                 if (model == null) {
                     main.post { send(VoiceProtocol.ERROR, VoiceProtocol.ERROR_MODEL) }
                     return@execute
                 }
                 val t0 = System.nanoTime()
-                val text = runCatching { model.transcribe(audio) }.onFailure { Log.e(TAG, "transcription failed", it) }.getOrNull().orEmpty()
+                val text = runCatching { model.transcribe(audio, fallback = false) }.onFailure { Log.e(TAG, "transcription failed", it) }.getOrNull().orEmpty()
                 Log.i(TAG, "%.1f s of speech in %d ms".format(audio.size / 16000.0, (System.nanoTime() - t0) / 1_000_000))
                 main.post {
                     if (keep && text.isNotBlank() && !isNoise(text)) send(VoiceProtocol.TEXT, text = text)
@@ -120,7 +120,7 @@ class VoiceService : Service() {
             }
             send(VoiceProtocol.STATE, VoiceProtocol.STATE_LISTENING)
             // Load the model while the user starts talking.
-            transcriber.execute { if (whisper == null) whisper = Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir) }
+            transcriber.execute { if (whisper == null) whisper = Whisper.load(Models.file(this@VoiceService).path, applicationInfo.nativeLibraryDir, flashAttn = true) }
             thread.start()
             Handler(thread.looper).post { loop() }
         }

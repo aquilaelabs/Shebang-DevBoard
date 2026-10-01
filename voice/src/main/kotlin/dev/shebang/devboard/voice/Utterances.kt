@@ -9,7 +9,7 @@ import kotlin.math.sqrt
  * frame so soft starts are not clipped. Feed it 30 ms frames; it calls [onUtterance] with each one.
  */
 class Utterances(
-    private val pauseMs: Int = 700,
+    private val pauseMs: Int = 500,
     private val maxMs: Int = 25_000,
     private val onUtterance: (FloatArray) -> Unit,
 ) {

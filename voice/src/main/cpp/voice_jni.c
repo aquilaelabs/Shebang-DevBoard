@@ -15,7 +15,7 @@ static void log_to_logcat(enum ggml_log_level level, const char *text, void *use
 }
 
 JNIEXPORT jlong JNICALL
-Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path, jstring libDir) {
+Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstring path, jstring libDir, jboolean flashAttn) {
     whisper_log_set(log_to_logcat, NULL);
 #ifdef VOICE_BACKEND_DL
     // Phones: load the best of ggml's CPU variants this CPU supports, from the app's native library folder.
@@ -33,6 +33,7 @@ Java_dev_shebang_devboard_voice_Whisper_nativeInit(JNIEnv *env, jclass cls, jstr
     const char *p = (*env)->GetStringUTFChars(env, path, NULL);
     struct whisper_context_params cp = whisper_context_default_params();
     cp.use_gpu = false;
+    cp.flash_attn = flashAttn;
     struct whisper_context *ctx = whisper_init_from_file_with_params(p, cp);
     (*env)->ReleaseStringUTFChars(env, path, p);
     if (ctx == NULL) __android_log_print(ANDROID_LOG_ERROR, TAG, "could not load the model");
@@ -46,7 +47,8 @@ Java_dev_shebang_devboard_voice_Whisper_nativeFree(JNIEnv *env, jclass cls, jlon
 
 // English, greedy decoding, no timestamps; the text of every segment, joined.
 JNIEXPORT jstring JNICALL
-Java_dev_shebang_devboard_voice_Whisper_nativeTranscribe(JNIEnv *env, jclass cls, jlong handle, jfloatArray samples, jint threads) {
+Java_dev_shebang_devboard_voice_Whisper_nativeTranscribe(JNIEnv *env, jclass cls, jlong handle, jfloatArray samples, jint threads,
+                                                         jint audioCtx, jboolean fallback) {
     struct whisper_context *ctx = (struct whisper_context *) (intptr_t) handle;
     if (ctx == NULL) return NULL;
     jsize n = (*env)->GetArrayLength(env, samples);
@@ -62,6 +64,12 @@ Java_dev_shebang_devboard_voice_Whisper_nativeTranscribe(JNIEnv *env, jclass cls
     p.print_special = false;
     p.print_timestamps = false;
     p.suppress_blank = true;
+    // Each piece of speech stands alone: no earlier text as a prompt.
+    p.no_context = true;
+    // The encoder's window: 0 is Whisper's full 30 s; less, for short speech, is much faster.
+    p.audio_ctx = audioCtx;
+    // Without fallback, an unsure piece is not decoded again at higher temperatures.
+    if (!fallback) p.temperature_inc = 0.0f;
 
     int rc = whisper_full(ctx, p, pcm, n);
     (*env)->ReleaseFloatArrayElements(env, samples, pcm, JNI_ABORT);
