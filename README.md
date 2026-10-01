@@ -373,7 +373,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   two words before it: 94.3% fixed, 4.7% changed to another word, 1.1% left alone; no correctly typed word
   changed. Ranked by how common words are overall, without the words before: 88.5%, 9.9% and 1.6%. Before: 58.4% fixed, because autocorrect looked only at the first suggestion
   and gave up whenever a typo was also the start of some rare word ("helo" starts "helot"). Setting:
-  Autocorrect (off by default).
+  Autocorrect, on by default since a friend's recording showed every typo left in (it was off by default
+  until then, with no reason recorded). A word that begins an identifier in the text around ("max" of
+  "maxRetries") is never autocorrected, so the identifier keeps its place in the strip.
 - **Walking back with backspace**: when backspace removes the space or punctuation after a word, that word
   becomes the composing word again (underlined) and the strip offers what else it could be: its runners-up
   if it was glided lately, suggestions for it otherwise. A strip pick or a glide replaces it (a correction,

@@ -125,6 +125,10 @@ class TextInputController(
         }
     }
 
+    /** Whether [typed] begins a code-like identifier in the text around ("max" of "maxRetries"): not a slip. */
+    private fun startsAnIdentifier(typed: String): Boolean =
+        typed.isNotEmpty() && identifiers.any { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }
+
     /** The two words before the composing word, for ranking its candidates; null without a language model. */
     private fun currentContext(ic: InputConnection): Suggester.Context? {
         val (dictionary, lm) = predictionModel ?: return null
@@ -889,7 +893,7 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
@@ -1037,7 +1041,8 @@ class TextInputController(
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && (ic == null || !appearsInText(ic, typed))
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
+            (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
             val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed } else null

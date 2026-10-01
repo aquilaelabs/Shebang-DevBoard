@@ -43,6 +43,7 @@
 - Glide reads the two words before it, not one, from a larger language model (Tatoeba plus Common Voice's public-domain sentences): real swipes right first time 88.9% -> 91.0%, phrase glides 90.9% -> 91.2%. The app is 5.6 MB larger (8e1d2ae)
 - Typed suggestions and autocorrect take the words before into account, as glide does: 'cut my haie' becomes 'hair', 'she can vook' becomes 'cook'. Words you typed right are still never changed (d3eb58e)
 - Holding backspace (or any repeating key) buzzes once when pressed instead of on every repeat; the key sound still repeats (1a78b83)
+- Autocorrect is on by default (it was off unless switched on in Settings); a word that begins a name in the code around, like 'max' of 'maxRetries', is left alone (07c5515)
 
 ### Fixed
 

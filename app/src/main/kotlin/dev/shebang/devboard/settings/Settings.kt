@@ -36,7 +36,7 @@ data class Settings(
     val adaptGlide: Boolean = true,
     /** Autocorrect learns where this user's taps land on each key. */
     val adaptTaps: Boolean = true,
-    val autocorrect: Boolean = false,
+    val autocorrect: Boolean = true,
     val autoCaps: Boolean = true,
     val doubleSpacePeriod: Boolean = true,
     /** A glide may fix the glided word right before it, when the two together clearly read otherwise. */
