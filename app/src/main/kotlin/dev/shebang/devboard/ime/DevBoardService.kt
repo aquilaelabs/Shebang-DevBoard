@@ -135,7 +135,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         voice = VoiceClient(this, object : VoiceClient.Listener {
             override fun onVoiceState(state: Int, level: Int) = showVoiceState(state, level)
             override fun onVoiceText(text: String) {
-                this@DevBoardService.text.insertDictation(text)
+                val t = this@DevBoardService.text
+                if (settings.tidyDictation) {
+                    val tidy = DictationCleanup.tidy(text)
+                    if (tidy.dropPrevious) t.dropLastDictation()
+                    t.insertDictation(tidy.text)
+                } else {
+                    t.insertDictation(text)
+                }
                 afterEdit()
             }
             override fun onVoiceError(code: Int) = voiceError(code)

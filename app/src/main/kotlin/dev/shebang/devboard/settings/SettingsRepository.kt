@@ -50,6 +50,7 @@ class SettingsRepository(context: Context) {
             doubleSpacePeriod = p[Keys.DOUBLE_SPACE_PERIOD] ?: d.doubleSpacePeriod,
             pairBrackets = p[Keys.PAIR_BRACKETS] ?: d.pairBrackets,
             nextWord = p[Keys.NEXT_WORD] ?: d.nextWord,
+            tidyDictation = p[Keys.TIDY_DICTATION] ?: d.tidyDictation,
             fixPreviousGlide = p[Keys.FIX_PREVIOUS_GLIDE] ?: d.fixPreviousGlide,
             stripMode = p[Keys.STRIP_MODE]?.let { runCatching { StripMode.valueOf(it) }.getOrNull() } ?: d.stripMode,
             barJson = p[Keys.BAR_JSON],
@@ -77,6 +78,7 @@ class SettingsRepository(context: Context) {
         p[Keys.DOUBLE_SPACE_PERIOD] = s.doubleSpacePeriod
         p[Keys.PAIR_BRACKETS] = s.pairBrackets
         p[Keys.NEXT_WORD] = s.nextWord
+        p[Keys.TIDY_DICTATION] = s.tidyDictation
         p[Keys.FIX_PREVIOUS_GLIDE] = s.fixPreviousGlide
         p[Keys.STRIP_MODE] = s.stripMode.name
         if (s.barJson == null) p.remove(Keys.BAR_JSON) else p[Keys.BAR_JSON] = s.barJson
@@ -103,6 +105,7 @@ class SettingsRepository(context: Context) {
         val DOUBLE_SPACE_PERIOD = booleanPreferencesKey("double_space_period")
         val PAIR_BRACKETS = booleanPreferencesKey("pair_brackets")
         val NEXT_WORD = booleanPreferencesKey("next_word")
+        val TIDY_DICTATION = booleanPreferencesKey("tidy_dictation")
         val FIX_PREVIOUS_GLIDE = booleanPreferencesKey("fix_previous_glide")
         val STRIP_MODE = stringPreferencesKey("strip_mode")
         val BAR_JSON = stringPreferencesKey("bar_json")

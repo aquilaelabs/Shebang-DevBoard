@@ -175,8 +175,23 @@ class TextInputController(
         dropTarget()
         clearCandidates()
         ownEdit()
-        ic.commitText(if (needsLeadingSpace(ic)) " $t" else t, 1)
+        val written = if (needsLeadingSpace(ic)) " $t" else t
+        ic.commitText(written, 1)
+        lastDictation = written
         lastActionWasSpace = false
+    }
+
+    /** The last piece of dictation as written, for "scratch that" to take back. */
+    private var lastDictation: String? = null
+
+    /** Takes back the last piece of dictation, if it still stands right before the cursor. */
+    fun dropLastDictation() {
+        val ic = connection() ?: return
+        val last = lastDictation ?: return
+        if (ic.getTextBeforeCursor(last.length, 0)?.toString() != last) return
+        ownEdit()
+        ic.deleteSurroundingText(last.length, 0)
+        lastDictation = null
     }
 
     /** Whether [typed] begins a code-like identifier in the text around ("max" of "maxRetries"): not a slip. */

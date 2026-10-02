@@ -504,6 +504,17 @@ still written). Without the microphone permission the add-on's own screen asks f
 cannot. On the emulator, with the Kennedy sample standing in for the microphone (debug builds of the add-on
 only), the three pieces arrived in the field 7, 7 and 12 s after each was spoken.
 
+Tidy dictation (setting, on by default; R16): each piece is tidied by rules before it is written
+(`DictationCleanup`). Hesitations ("um", "uh", "er", "hmm") go with the commas around them; a word or
+phrase of up to three words said twice in a row is written once ("we should, we should go"), except
+doubles people mean ("had had", "that that"). A spoken correction (", no wait,", ", sorry,", ", I mean,",
+", or rather,") replaces what came just before it: from the word it repeats ("on Tuesday, no wait, on
+Wednesday"), or else the last word ("forty, sorry, fifty"); the words used plainly ("I mean it", "Sorry
+I'm late", "I'd rather stay") are left alone. "Scratch that" drops the sentence before it, and said at the
+start of a piece takes back the previous piece while it still stands before the cursor. Nothing is
+reworded beyond that; a small language model was the other option, at 300 MB to 1 GB and seconds per
+piece, and is left until the rules fall short.
+
 ## About and updates
 
 Settings > About shows the version, the licence and the credits (`LICENSE` and `THIRD_PARTY_NOTICES.md`,
