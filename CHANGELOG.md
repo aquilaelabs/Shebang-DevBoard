@@ -36,6 +36,8 @@
 - Settings > About: version, licence, credits for everything the keyboard is built on, the source on GitHub, and Check for updates (opens the GitHub releases) (d025d9f)
 - Tidy dictation: um and uh, stutters and repeats are dropped, and spoken corrections work ('Tuesday, no wait, Wednesday'; 'scratch that'). On by default; Settings > Tidy dictation (3029383)
 - The dictionary knows names, places, brands and abbreviations (Paris, GitHub, YouTube, iPhone, URL, McDonald's), and a name typed in lowercase gets its capitals (012e58f)
+- Personal words has a search field: type part of a word to find it among the words the keyboard learned (a36a242)
+- Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
 
 ### Changed
 
@@ -61,6 +63,11 @@
 - Autocorrect keeps the letters of a word you typed an apostrophe into (only the apostrophe may move), and leaves words joined by punctuation alone (f-droid, node.js) (6d500e2)
 - Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (5d8d5f1)
 - A word typed without its apostrophe gets one from the words before it: "I think its" becomes "I think it's", while "the dog wagged its" stays (d2da3d2)
+- Code mode's symbols are laid out like the usual phone symbol page (? and ! at the right of the third row), with backspace, comma, period and enter where they are in text mode; % and ^ are held on 5 and 6 (1e952c8)
+- Glide forgives stopping short at turns, the way thumbs actually move: 91.0% of real swipes right instead of 90.6% (3e8a5ab)
+- Glide reads strokes with a model trained on 900,000 real swipes: 93.7% of words right first time instead of 91.0% (2d0f189)
+- Suggestions after a space read the whole sentence with a model trained on the GPU: the next word is among the three 39% of the time instead of 36%, and glide gets the word right a little more often (c128635)
+- Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (4afa886)
 
 ### Fixed
 
@@ -79,3 +86,4 @@
 - A glide deleted by swiping left from backspace is no longer learned, so a wrong glide removed that way does not make the same mistake likelier next time (0e07792)
 - A glided word you back up to and fix a few words later is no longer learned as the wrong word (369c718)
 - On a taller keyboard the letters no longer grow into the number and accent hints; the bar's fade by the mic is shorter (3d7052c)
+- A correction that arrives after you have started the next word is no longer lost: it goes in ahead of the word you are typing (1484317)

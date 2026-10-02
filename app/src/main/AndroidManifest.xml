@@ -27,6 +27,18 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.DevBoard">
 
+        <!-- Hands a copied picture from the clipboard history to the app it is inserted into; nothing else is
+             shared, and only for the one insertion (the keyboard grants read access per picture). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="dev.shebang.devboard.clips"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clip_images" />
+        </provider>
+
         <service
             android:name=".ime.DevBoardService"
             android:exported="true"

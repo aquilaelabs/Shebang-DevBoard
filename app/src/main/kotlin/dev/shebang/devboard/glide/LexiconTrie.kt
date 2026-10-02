@@ -174,10 +174,24 @@ class LexiconTrie private constructor(
     }
 }
 
-/** Everything the streaming decoder needs about language, built once off the main thread. */
-class GlideLanguage(val dictionary: Dictionary, val lm: NgramModel, val trie: LexiconTrie) {
+/**
+ * Everything the streaming decoder needs about language, built once off the main thread, and the learned
+ * reading of strokes ([GlideModel]) when the app has one.
+ */
+class GlideLanguage(
+    val dictionary: Dictionary,
+    val lm: NgramModel,
+    val trie: LexiconTrie,
+    val model: GlideModel? = null,
+    val nextWord: dev.shebang.devboard.dict.NextWordModel? = null,
+) {
+    /** The next-word model's id of each dictionary word (by its lowercase form), -1 where it has none. */
+    val nextWordIds: IntArray = IntArray(dictionary.size) { i ->
+        nextWord?.idOf(dictionary.lower[i])?.takeIf { it != dev.shebang.devboard.dict.NextWordModel.UNK } ?: -1
+    }
+
     companion object {
-        fun build(dictionary: Dictionary, lm: NgramModel): GlideLanguage =
-            GlideLanguage(dictionary, lm, LexiconTrie.build(dictionary, lm))
+        fun build(dictionary: Dictionary, lm: NgramModel, model: GlideModel? = null, nextWord: dev.shebang.devboard.dict.NextWordModel? = null): GlideLanguage =
+            GlideLanguage(dictionary, lm, LexiconTrie.build(dictionary, lm), model, nextWord)
     }
 }

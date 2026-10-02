@@ -97,6 +97,9 @@ class TextInputController(
 
     /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
     var predictionModel: Pair<Dictionary, NgramModel>? = null
+
+    /** The next-word model for the strip's predictions, this controller's own copy (used on [background]). */
+    var nextWordModel: dev.shebang.devboard.dict.NextWordModel? = null
     /** Next words the strip offers now (after a space); empty when it offers something else. */
     private var predictions: List<String> = emptyList()
     private var predictGeneration = 0
@@ -681,13 +684,16 @@ class TextInputController(
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
         val w2 = GlideText.contextWord2(before)
+        val sentence = sentenceBefore(ic)
+        val nextWord = nextWordModel
         val gen = ++predictGeneration
         background.execute {
             val (dictionary, lm) = model
             val c1 = GlideText.contextId(w1, dictionary, lm)
             val c2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
             val start = w1 == GlideText.SENTENCE_START
-            val words = lm.predict(c2, c1, 3).map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
+            val words = dev.shebang.devboard.dict.WordPredictions.predict(dictionary, lm, nextWord, sentence, c2, c1, 3)
+                .map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
             postToMain {
                 if (gen != predictGeneration || isComposing || words.isEmpty()) return@postToMain
                 predictions = words
@@ -1028,7 +1034,8 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
+            !capitalisedOnPurpose(ic, typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
@@ -1063,15 +1070,21 @@ class TextInputController(
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
-                if (late != null && ic2 != null && !isComposing &&
-                    ic2.getTextBeforeCursor(typed.length + after.length, 0)?.toString() == typed + after
+                // The next word may already be under way: the fix goes in front of it, which stays composing.
+                val next = if (isComposing) word.toString() else ""
+                val expected = typed + after + next
+                if (late != null && ic2 != null && ic2.getSelectedText(0).isNullOrEmpty() &&
+                    ic2.getTextBeforeCursor(expected.length, 0)?.toString() == expected
                 ) {
                     ownEdit()
                     ic2.beginBatchEdit()
-                    ic2.deleteSurroundingText(typed.length + after.length, 0)
+                    if (next.isNotEmpty()) ic2.finishComposingText()
+                    ic2.deleteSurroundingText(expected.length, 0)
                     ic2.commitText(late + after, 1)
+                    if (next.isNotEmpty()) ic2.setComposingText(next, 1)
                     ic2.endBatchEdit()
-                    lastAutocorrect = Autocorrected(typed, late, after)
+                    // Backspace's undo of a correction only applies while it is the last thing typed.
+                    if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
@@ -1099,6 +1112,19 @@ class TextInputController(
      * Whether the word being typed is joined to what comes before by punctuation, with no space ("f-droid",
      * "node.js", "and/or", "user@host"): part of a name or an address, which autocorrect leaves alone.
      */
+    /**
+     * A word the dictionary lacks, typed in capitals ("NASA", "GPU"), or with a capital in the middle of a
+     * sentence where the keyboard would not give one ("Kaito"): a name or an acronym meant as typed.
+     */
+    private fun capitalisedOnPurpose(ic: InputConnection, typed: String): Boolean {
+        if (typed.isEmpty() || !typed[0].isUpperCase()) return false
+        if (suggester?.knows(typed) != false) return false
+        if (typed.length >= 2 && typed.all { !it.isLetter() || it.isUpperCase() }) return true
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return false
+        val rest = if (before.endsWith(typed)) before.subSequence(0, before.length - typed.length) else before
+        return GlideText.contextWord(rest) != GlideText.SENTENCE_START
+    }
+
     private fun gluedToPrevious(ic: InputConnection, typed: String): Boolean {
         val before = ic.getTextBeforeCursor(typed.length + 2, 0) ?: return false
         if (before.length < typed.length + 2) return false
@@ -1213,7 +1239,7 @@ class TextInputController(
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
-            (ic == null || !gluedToPrevious(ic, typed)) &&
+            (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
@@ -1353,12 +1379,20 @@ class TextInputController(
             val head = (ic.getTextBeforeCursor(CONTEXT_CHARS + r.tail.length, 0) ?: "").let { it.subSequence(0, it.length - r.tail.length) }
             val w2 = GlideText.contextWord2(head)
             val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
-            return GlideContext(GlideText.contextId(GlideText.contextWord(head), dictionary, lm), history = listOf(r.word.word), context2 = context2)
+            return GlideContext(GlideText.contextId(GlideText.contextWord(head), dictionary, lm), history = listOf(r.word.word), context2 = context2, sentence = sentenceBefore(ic))
         }
         val before = textBeforeTarget(ic)
         val w2 = GlideText.contextWord2(before)
         val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
-        return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2)
+        return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2, sentence = sentenceBefore(ic))
+    }
+
+    /** The sentence before where a word would go (before the targeted word, if any), for the next-word model. */
+    private fun sentenceBefore(ic: InputConnection): List<String?> {
+        val t = target
+        val skip = if (t != null && !t.selection) t.before else 0
+        val before = ic.getTextBeforeCursor(SENTENCE_CHARS + skip, 0) ?: return emptyList()
+        return GlideText.sentenceWords(before.subSequence(0, maxOf(0, before.length - skip)))
     }
 
     /**
@@ -1658,6 +1692,8 @@ class TextInputController(
         private const val AROUND_CHARS = 4000
         /** Characters read before the cursor for the word before it. */
         private const val CONTEXT_CHARS = 64
+        /** Text read before the cursor for the next-word model's sentence. */
+        private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
         /** Glided words remembered for redoing. */

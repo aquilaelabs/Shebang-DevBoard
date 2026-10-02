@@ -331,7 +331,8 @@ class KeyboardView(context: Context) : View(context) {
                 val label = if (shifted) key.shiftedLabel else key.label
                 val scale = if (label.length > 1) 0.7f else 1f
                 drawLabel(canvas, label, fg, scale)
-                if (key.alternates.isNotEmpty() && key.letter != 0.toChar()) {
+                // Letters show their first alternate; so do code mode's keys (5 holds %, 6 holds ^).
+                if (key.alternates.isNotEmpty() && (key.letter != 0.toChar() || geometry?.layout?.mode == "code")) {
                     hintPaint.color = theme.keyTextSecondary
                     canvas.drawText(key.alternates[0], rect.right - 5 * density, rect.top + hintSize + 3 * density, hintPaint)
                 }

@@ -7,8 +7,10 @@ An Android keyboard (IME) for developers, written in Kotlin.
   into account; tap inside a word (or double-tap it) and glide to redo it; the keyboard learns your words
   and how you swipe, on the phone; and (optionally) one stroke can write several words by dipping into the
   space bar between them.
-- **Code mode** (`#!` key): every digit and printable ASCII symbol on one page, plus arrow keys. No shift,
-  no long-press, no autocorrect.
+- **Code mode** (`#!` key): every digit and printable ASCII symbol on one page, plus arrow keys. The two rows
+  under the digits are the usual phone symbol page's (`@ # $ _ & - + ( ) /`, then `= * " ' : ; ! ? < >`), the
+  code extras (`` ` ~ | \ [ ] { } ``) the row below, and backspace, comma, space, period and enter sit where
+  they do in text mode; `%` and `^` are held on 5 and 6. No shift, no autocorrect.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
   snippets...) that sends real `KeyEvent`s, so Termux and other terminals receive them. Sticky modifiers let
   `Ctrl` then `c` on the main keyboard send Ctrl+C.
@@ -22,6 +24,15 @@ An Android keyboard (IME) for developers, written in Kotlin.
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
   deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
   no-suggestion fields, or fields that ask for no learning.
+
+## Screenshots
+
+| | | |
+|---|---|---|
+| <img src="docs/screenshots/suggestions.png" width="270" alt="Suggestions after a space"> | <img src="docs/screenshots/glide.png" width="270" alt="Gliding with the trail and a live preview"> | <img src="docs/screenshots/code-mode.png" width="270" alt="Code mode"> |
+| Next-word suggestions from the whole sentence | Glide typing: the trail, and the word read before you lift | Code mode: every symbol on one page |
+| <img src="docs/screenshots/emoji.png" width="270" alt="Emoji panel"> | <img src="docs/screenshots/clipboard.png" width="270" alt="Clipboard history"> | <img src="docs/screenshots/settings.png" width="180" alt="Settings"> |
+| The emoji panel, from the terminal bar | Clipboard history with pins and pictures | Settings (Night theme) |
 
 ## Build and install
 
@@ -48,6 +59,30 @@ tools/build_wordlist.py /path/to/scowl-2020.12.07
 tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
+The glide model is trained on the GPU with PyTorch (`python-ml` from the toolchain store's `pytorch`) on
+FUTO's training split, then exported as the app's asset with test vectors for the Kotlin port
+(`GlideModelTest`); `score.py` picks its weight on the dev split from a decoder dump
+(`FUTO_DUMP=... ./gradlew testDebugUnitTest --tests '*FutoSwipesTest.futoDump'`):
+
+```sh
+python-ml tools/glide_model/prep.py /path/to/futo/train.jsonl train.npz
+python-ml tools/glide_model/prep.py /path/to/futo/dev.jsonl dev.npz
+bb gpu run -- python-ml tools/glide_model/train.py train.npz dev.npz glide.pt --hidden 64 --conv 64
+python-ml tools/glide_model/score.py glide.pt cands-dev.jsonl cands-test.jsonl
+python-ml tools/glide_model/export.py glide.pt app/src/main/assets/glide/glide_model.bin --vectors dev.npz app/src/test/resources/glide/glide_model_vectors.txt
+```
+
+The next-word model is trained the same way on the n-gram model's sentences plus English Wikinews (its
+sentences go in the Common Voice folder), then exported with 8-bit word tables:
+
+```sh
+python3 tools/lm_model/wikinews.py enwikinews-latest-pages-articles.xml.bz2 /path/to/cv-en/zz_wikinews.txt
+python-ml tools/lm_model/prep.py /path/to/eng_sentences.tsv /path/to/cv-en corpus.npz --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
+bb gpu run -- python-ml tools/lm_model/train.py corpus.npz lm.pt --futo /path/to/futo/test.jsonl --emb 128 --hidden 384 --epochs 8 --batch 128 --bptt 32
+python-ml tools/lm_model/glide_context.py lm.pt cands-dev.jsonl cands-test.jsonl
+python-ml tools/lm_model/export.py lm.pt app/src/main/assets/dict/en_next_word.bin --vectors app/src/test/resources/dict/next_word_vectors.txt
+```
+
 ## Layout of the code
 
 | Package (`dev.shebang.devboard.`) | What lives there |
@@ -56,12 +91,13 @@ tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclu
 | `layout` | JSON models (`LayoutDef`, `KeyDef`, `BarItem`), `LayoutParser`, `KeyboardGeometry` (pixel positions computed at runtime), `KeyCodeNames` |
 | `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `TerminalBarView`, `SuggestionStripView`, `TopStripView`, `KeyboardTheme` |
 | `input` | `ModifierState` (sticky modifier state machine), `KeyEventMapper`/`CharKeyCodes` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
-| `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideSession` (decoder thread fed by a lock-free ring), `GlideTrace` (recorded glides), `KeyLayoutModel` |
-| `dict` | `Dictionary` (sorted word list with tiers), `NgramModel` (word and word-pair statistics), `Suggester` (prefix completion + edit-distance correction) |
+| `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideModel` (the learned reading of strokes), `GlideSession` (decoder thread fed by a lock-free ring), `GlideAdaptation` and `TapModel` (where this user's glides and taps land), `GlideTrace` (recorded glides), `KeyLayoutModel` |
+| `dict` | `Dictionary` (sorted word list with tiers), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |
 | `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `GlideRecorderView`, `GlideTraceStore` |
 
 Layouts live in `app/src/main/assets/layouts/*.json`, the default terminal bar in `assets/bar/default.json`,
-the word list in `assets/dict/en_words.txt` and the n-gram model in `assets/dict/en_ngrams.bin`.
+the word list in `assets/dict/en_words.txt`, the n-gram model in `assets/dict/en_ngrams.bin`, the next-word model
+in `assets/dict/en_next_word.bin` and the glide model in `assets/glide/glide_model.bin`.
 
 ## Glide typing
 
@@ -80,9 +116,10 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
 3. **Live preview.** Every 40 ms the strip shows the word (or words) the glide would write if the finger
    lifted now.
 4. **After lift.** The best 48 candidates are re-aligned exactly (dynamic time warping over the same model,
-   with the gesture's final speed statistics) and scored with the language model given the two words before
-   them.
-   The result is ready well within a millisecond on the JVM; the emulator logs 2 to 55 ms.
+   with the gesture's final speed statistics); the best 16 are then read again by the glide model, a small
+   network trained on real swipes, and weighed with the next-word model's reading of the sentence and the
+   three-word model given the two words before them (see the Decisions). The emulator logs a median of 9 ms
+   after lift.
 5. **Into the field, and redoing a word.** Glided words go straight into the field, with a space before them
    after a word and a space after them before one; a letter typed right after a glide starts a new word.
    To redo a word, tap inside it (or double-tap to select it, which also works for "a" and "I"): it is
@@ -104,8 +141,8 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    space bar after a dip adds a trailing space. The words of one stroke are decoded together, each scored
    with the two words before it, so a later word can change an earlier one before anything is written.
 7. **Next-word suggestions** (setting, on by default). After a space the strip offers the three words most
-   likely to come next, from the two words before the cursor (the three-word model mixed with the user's
-   own word pairs), capitalised at a sentence start. Tapping one writes it with a space and offers the next;
+   likely to come next: the next-word model's reading of the whole sentence, mixed with the three-word
+   model and the user's own word pairs (see the Decisions), capitalised at a sentence start. Tapping one writes it with a space and offers the next;
    typing a letter replaces them with that word's suggestions. None in code mode, password fields or fields
    that ask for no suggestions.
 
@@ -229,6 +266,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
   "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
   searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+- **A word the dictionary lacks may be meant as typed** (the owner's request: autocorrect should judge
+  whether an unknown word is a slip or intended, without the check mark). A correction of a word the
+  dictionary lacks now has to be likely enough to beat keeping it: its score (how common the correction is
+  after the words before, times how likely the real taps made that slip, so cleanly hit keys count as
+  intent) must reach 2e-8. Measured on TSI's real taps, with each correctly typed phrase word decided as if
+  the dictionary lacked it (standing in for names, terms and handles): words meant as typed kept 29.1% before
+  and 65.7% now; typos fixed 77.7% to 75.9%, typos turned into another wrong word 8.4% to 4.3% (a wrong
+  correction costs more than a typo left), and words in the dictionary still never changed. Thresholds of
+  1e-9 to 1e-7 traded these off (43% to 76% kept, 77.4% to 72.8% fixed). An unknown word in capitals ("GPU")
+  or with a capital mid-sentence where the keyboard gave none (a name) is always left as typed.
 - **"its" or "it's" from the words before** (the owner's request): a word typed without its apostrophe that is
   a word either way ("its", "were", "well", "ill", "cant") becomes the contraction only when, after the two
   words before it, the contraction is at least 20 times likelier. On 923 uses in sentences the model never
@@ -280,6 +327,63 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Glide parameters after the three-word model** (1 Oct): re-tuned on FUTO's dev split with the new
   model, the search reached 92.2% there (from 91.3%) but 90.7% on the test split against 91.0% for the
   values kept, so the earlier values stay.
+- **Emoji and clipboard panels on the terminal bar** (the owner's request: not a key on the keyboard, so the
+  keys stay as they are): two bar items, Emoji and Clipboard, first on the default bar and like any other item
+  movable, removable and addable again in the bar editor. Each opens a panel in place of the keys, the keys'
+  height, with ABC (back to the keys), space and backspace along its bottom (backspace buzzes once per hold).
+  The emoji panel lists Unicode's fully-qualified emoji by group (1,911, without skin-tone variants; those the
+  phone's font cannot draw are left out), Recent first, with category tabs. The clipboard panel shows the text
+  and pictures copied lately, newest first and pinned first: tap to paste, pin to keep, remove one, or Clear
+  all but the pinned. Up to 20 copies, unpinned ones for 24 hours, in the app's private files (a picture as
+  the keyboard's own copy, up to 5 MB); a copy the copying app marks sensitive (a password manager's) is never
+  kept, and only copies made while the keyboard runs are seen. A picture goes into the field through the
+  editor's content insertion (`commitContent`, read access granted for that one picture through a
+  `FileProvider` that serves only those pictures) where the field accepts its type; elsewhere the keyboard
+  says the field takes no pictures. Checked on the emulator with a copied test card (`ClipboardImageTest`,
+  `-e clipimage 1`); inserting into an app that takes pictures is still to be tried on a phone. Both bar items draw original single-colour glyphs, like the mic.
+- **A next-word model** (the owner's request to use the GPU for suggestions too): an LSTM over words (32,000
+  words, 128-wide word table shared by input and output, 384 units, 5M weights; 6.3 MB with the word table
+  in 8 bits, which cost nothing measurable) reads the whole sentence before the cursor, where the n-grams read
+  two words. Trained on the n-grams' Tatoeba and Common Voice sentences plus English Wikinews (5.5 million
+  words, CC BY 2.5): with Wikinews the same model was better on both held-out sets, while the n-grams gained
+  nothing from it and were left as they were. The n-grams stay, mixed in, because they carry the user's own
+  words and pairs. Suggestions after a space rank both models' best words by 0.5 n-gram cost + 0.5 next-word
+  cost (chosen on FUTO's dev sentences): next word among the three 36.1% to 39.3% on Tatoeba's held-out
+  sentences and 28.7% to 32.7% on FUTO's test sentences, first 21.9% to 24.2% and 16.3% to 19.4%. A glide's
+  first word gets 0.5 times its next-word cost (chosen on the dev split): FUTO test top-1 93.7% to 94.4%
+  (115 fixed, 51 broken in the candidates' sign test, p < 1e-6), words glided on in sentences 95.3% to
+  95.6%, the friction test's right first time 95.2% to 95.5%. The model reads the sentence while the finger
+  is still moving, so lifting waits for nothing: 8.6 ms median after lift on the emulator (21 glides). A
+  larger version (10M weights, 20 MB) was no better at glide. The app grows from 16 to 22 MB; language
+  loading takes 0.5 to 1.2 s on the emulator (2.4 s on the first start after installing). Plain Kotlin,
+  checked against PyTorch (`NextWordModelTest`); a word the model does not know gets its unknown word's
+  share less a little, never nothing.
+- **A learned glide model** (the owner's request to use the GPU): a small network (a convolution and two
+  bidirectional GRU layers, 138k weights, 276 KB as half floats) reads a glide point by point and says how
+  likely each key is meant there; a word's model cost is how unlikely its keys are given the whole stroke
+  (CTC). Trained on 909k swipes of FUTO's training split (12 passes, 15 minutes on the RTX 3070 Ti). It does
+  not replace the decoder: once the finger lifts, the decoder's 16 best candidates get 0.75 times the model's
+  cost added to their own (0.75 chosen on the dev split), so the model reorders what the decoder found, and
+  the dictionary, the word context and the user's aim still count. On FUTO's test split (10,000 swipes,
+  never seen in training or tuning) top-1 went from 91.0% to 93.7% through the app's own Kotlin code
+  (sign test on the scored candidates: 341 fixed, 55 broken, p < 1e-50); words glided on in sentences
+  92.7% to 95.3%; in the friction test glided words right first time 92.4% to 95.1% and those only fixable
+  by typing halved. The simulator's synthetic strokes score lower with it (91.2% to 89.2% alone, 95.3% to
+  94.8% with context), as expected of a model of real fingers reading drawn ones; real swipes decide. A
+  larger version (492k weights) scored 94.1% but took more than twice as long: 28 ms median after lift on
+  the emulator against 12 ms, so the small one ships. Written in plain Kotlin (no machine-learning library),
+  checked against PyTorch's outputs; only whole-word strokes are read (not a phrase's words, whose strokes
+  run into the space bar). Learning a user's aim still aligns strokes without it.
+- **Looser along the stroke at turns** (from the owner's question about overshooting): at a letter where the
+  stroke turns back, real fingers stop short along the way they came (FUTO dev: 0.16 key widths on average,
+  spread 0.27 along against 0.20 across), so at a turn the decoder allows twice the spread along the
+  direction of travel. Tuned on FUTO's dev split (2x to 3x all scored alike; expecting the finger short by a
+  set amount did not help), then checked once on the test split: top-1 90.6% to 91.0% on 10,000 swipes,
+  54 swipes fixed and 17 broken (sign test p < 0.0001); the friction test's glided words right first time
+  92.0% to 92.4%. The simulator's strokes, whose noise is the same every way, dip 0.1 to 0.3 points; decoding
+  costs 11% more time. Learning a user's aim still aligns strokes without it, so what is learned is where the
+  finger went. Other habits measured (the arc of each person's strokes, starting late, lifting early) stay
+  research on roadmap R20 until one is as clearly better.
 - **Glide decoder**: the streaming decoder replaced the whole-word SHARK2 decoder in the app, because it is
   far more accurate on realistic strokes (see Glide typing) and needs no wait after lift. The spec's
   ideal-path LRU cache has no counterpart any more: per-geometry work is one table of states per tree node,
@@ -435,6 +539,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   replace `,` with `/` and `@`; the space key absorbs the width difference so rows always sum to 10 units.
 - **Numeric pad**: a 4-column pad (digits, backspace, `-`, `.`, `,`/`+` for phone, `#!`, enter) with
   long-press alternates for `+ * / # ( ) : ;`. Number, phone and date fields all use it.
+- **Code mode layout** (the owner's report: "?" was where muscle memory did not look): no study says where
+  people expect symbols on a phone, so the rows follow the common phone symbol page, which is where thumbs
+  look, and the extras code needs take the fifth row. Counted in prose (Tatoeba and Common Voice) the symbols
+  are `.` 64%, `'` 17%, `,` 7%, `?` 6%; in code (this project's sources) `.` 16%, `(` `)` 12% each, `=` 9%,
+  `,` 7%, `-` 6%, while `%` `^` `` ` `` `~` are almost never typed, so `%` and `^` were the two put on a hold.
 - **Code mode height**: five rows at 86% of the text row height so the keyboard grows only a little.
 - **Mode persistence**: the text/code choice persists across fields; numeric fields force the numeric pad
   while in text mode.
@@ -526,10 +635,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   API 36 emulator right after install (not yet compiled ahead of time); the keyboard appears at once and
   glide starts working when both are in.
 
-## Shebang Voice (add-on, in progress: R15)
+## Shebang Voice (add-on)
 
 Speech typing comes as a separate app, `voice/`, so the keyboard keeps VIBRATE as its only permission and
-has no network code; the add-on will hold the microphone permission and has no network access either. It
+has no network code; the add-on holds the microphone permission and has no network access either. It works
+on the owner's Pixel (about 5 s from a pause to the text before flash attention and the shorter pause); speed
+there is still being measured (R15). It
 runs OpenAI's Whisper (base.en, 5-bit, 57 MB, MIT) through whisper.cpp (vendored, CPU only). Fetch the
 model before building it: `tools/fetch_voice_model.sh`. `./gradlew :voice:connectedDebugAndroidTest`
 transcribes a public-domain recording on a device: on the emulator (2 cores, AVX2) the 11 s Kennedy sample
@@ -541,7 +652,7 @@ mode, in fields that take typed words); otherwise Settings > Voice typing links 
 binds the add-on's service with BIND_INCLUDE_CAPABILITIES, which lends it the keyboard's foreground status so
 Android does not silence its microphone. The add-on answers only apps signed with its own key, so the
 keyboard needs no permission entry for it (a `<queries>` entry lets it see the add-on). It records,
-cuts the audio at 700 ms pauses, and transcribes each piece as it comes, so text arrives sentence by sentence;
+cuts the audio at 500 ms pauses (or at 25 s), and transcribes each piece as it comes, so text arrives sentence by sentence;
 it stops after 8 s without speech, when the mic is tapped again, or when a key is typed (what was said is
 still written). Without the microphone permission the add-on's own screen asks for it, since a keyboard
 cannot. On the emulator, with the Kennedy sample standing in for the microphone (debug builds of the add-on
@@ -571,8 +682,8 @@ with the same key.
 ## Licence
 
 MIT (see `LICENSE`). The data and libraries it builds on keep their own licences, all permissive or public
-domain, listed with their attributions in `THIRD_PARTY_NOTICES.md`; the CC BY ones (Tatoeba, TSI) ask for
-credit wherever the app or its data is redistributed.
+domain, listed with their attributions in `THIRD_PARTY_NOTICES.md`; the CC BY ones (Tatoeba, Wikinews, TSI)
+ask for credit wherever the app or its data is redistributed.
 
 ## Manual checklist
 

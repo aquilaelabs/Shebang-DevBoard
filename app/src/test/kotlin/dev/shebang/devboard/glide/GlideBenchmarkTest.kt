@@ -32,7 +32,17 @@ class GlideBenchmarkTest {
             Dictionary.parse(File(System.getenv("DEVBOARD_WORDS") ?: "src/main/assets/dict/en_words.txt").bufferedReader().readLines().asSequence())
         }
         val lm: NgramModel by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
-        val language: GlideLanguage by lazy { GlideLanguage.build(dictionary, lm) }
+        /** The learned reading of strokes the app ships (DEVBOARD_GLIDE_MODEL names another; "none" for none). */
+        val glideModel: GlideModel? by lazy {
+            val path = System.getenv("DEVBOARD_GLIDE_MODEL") ?: "src/main/assets/${GlideModel.ASSET}"
+            if (path == "none") null else File(path).takeIf { it.isFile }?.inputStream()?.use { GlideModel.load(it) }
+        }
+        /** The next-word model the app ships (DEVBOARD_NEXT_WORD names another; "none" for none). */
+        val nextWord: dev.shebang.devboard.dict.NextWordModel? by lazy {
+            val path = System.getenv("DEVBOARD_NEXT_WORD") ?: "src/main/assets/${dev.shebang.devboard.dict.NextWordModel.ASSET}"
+            if (path == "none") null else File(path).takeIf { it.isFile }?.inputStream()?.use { dev.shebang.devboard.dict.NextWordModel.load(it) }
+        }
+        val language: GlideLanguage by lazy { GlideLanguage.build(dictionary, lm, glideModel, nextWord) }
 
         /** The 1,000 most frequent glide-able words, by the n-gram model's unigram counts. */
         val commonWords: List<String> by lazy {

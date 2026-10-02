@@ -25,6 +25,8 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
         fun onBarKeyRepeat(item: BarItem)
         fun onBarModifier(item: BarItem, modifier: Modifier)
         fun onBarSnippet(item: BarItem)
+        /** A panel item: the emoji or the clipboard history in place of the keys. */
+        fun onBarPanel(item: BarItem) = Unit
         fun onBarPress()
     }
 
@@ -96,6 +98,18 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
                 v.setOnClickListener {
                     listener?.onBarPress()
                     if (mod != null) listener?.onBarModifier(item, mod)
+                }
+            }
+            item.isPanel -> {
+                // A single-colour glyph, like the mic, rather than the label.
+                val emoji = item.type == BarItem.TYPE_EMOJI
+                v.text = ""
+                val icon = IconDrawable(if (emoji) KeyIcons.emoji else KeyIcons.clipboard, theme.stripText, 20 * density)
+                v.background = android.graphics.drawable.LayerDrawable(arrayOf(chipBackground(theme.keyFunctional), icon))
+                v.contentDescription = if (emoji) "Emoji" else "Clipboard history"
+                v.setOnClickListener {
+                    listener?.onBarPress()
+                    listener?.onBarPanel(item)
                 }
             }
             item.isSnippet -> {

@@ -18,10 +18,16 @@
      "text": "4"
     },
     {
-     "text": "5"
+     "text": "5",
+     "alternates": [
+      "%"
+     ]
     },
     {
-     "text": "6"
+     "text": "6",
+     "alternates": [
+      "^"
+     ]
     },
     {
      "text": "7"
@@ -40,9 +46,6 @@
   {
    "keys": [
     {
-     "text": "!"
-    },
-    {
      "text": "@"
     },
     {
@@ -52,84 +55,53 @@
      "text": "$"
     },
     {
-     "text": "%"
-    },
-    {
-     "text": "^"
+     "text": "_"
     },
     {
      "text": "&"
     },
     {
-     "text": "*"
+     "text": "-"
+    },
+    {
+     "text": "+"
     },
     {
      "text": "("
     },
     {
      "text": ")"
+    },
+    {
+     "text": "/"
     }
    ]
   },
   {
    "keys": [
-    {
-     "text": "`"
-    },
-    {
-     "text": "~"
-    },
-    {
-     "text": "-"
-    },
-    {
-     "text": "_"
-    },
     {
      "text": "="
     },
     {
-     "text": "+"
-    },
-    {
-     "text": "["
-    },
-    {
-     "text": "]"
-    },
-    {
-     "text": "{"
-    },
-    {
-     "text": "}"
-    }
-   ]
-  },
-  {
-   "keys": [
-    {
-     "text": "\\"
-    },
-    {
-     "text": "|"
-    },
-    {
-     "text": ";"
-    },
-    {
-     "text": ":"
-    },
-    {
-     "text": "'"
+     "text": "*"
     },
     {
      "text": "\""
     },
     {
-     "text": ","
+     "text": "'"
     },
     {
-     "text": "."
+     "text": ":"
+    },
+    {
+     "text": ";"
+    },
+    {
+     "text": "!"
+    },
+    {
+     "text": "?"
     },
     {
      "text": "<"
@@ -142,16 +114,48 @@
   {
    "keys": [
     {
+     "text": "`"
+    },
+    {
+     "text": "~"
+    },
+    {
+     "text": "|"
+    },
+    {
+     "text": "\\"
+    },
+    {
+     "text": "["
+    },
+    {
+     "text": "]"
+    },
+    {
+     "text": "{"
+    },
+    {
+     "text": "}"
+    },
+    {
+     "action": "backspace",
+     "label": "⌫",
+     "width": 2,
+     "repeat": true,
+     "functional": true
+    }
+   ]
+  },
+  {
+   "keys": [
+    {
      "action": "mode_text",
      "label": "ABC",
-     "width": 1,
+     "width": 1.25,
      "functional": true
     },
     {
-     "text": "/"
-    },
-    {
-     "text": "?"
+     "text": ","
     },
     {
      "code": "DPAD_LEFT",
@@ -184,20 +188,16 @@
     {
      "action": "space",
      "label": "",
-     "width": 1.5,
+     "width": 2,
      "flex": true
     },
     {
-     "action": "backspace",
-     "label": "⌫",
-     "width": 1,
-     "repeat": true,
-     "functional": true
+     "text": "."
     },
     {
      "action": "enter",
      "label": "⏎",
-     "width": 1,
+     "width": 1.25,
      "functional": true
     }
    ]

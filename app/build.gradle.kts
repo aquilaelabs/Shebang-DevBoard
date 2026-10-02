@@ -72,6 +72,8 @@ androidComponents {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.junit)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.autofill)
     implementation(libs.androidx.lifecycle.runtime.compose)

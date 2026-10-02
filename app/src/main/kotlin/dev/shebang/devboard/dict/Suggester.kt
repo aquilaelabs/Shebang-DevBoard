@@ -154,9 +154,13 @@ class Suggester(
      * user uses) are corrected to. A two-letter word is only corrected by adding a letter it dropped, so
      * abbreviations such as "js" or "ui" are not turned into other two-letter words.
      */
-    fun autocorrectFrom(typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null, context: Context? = null): String? {
+    fun autocorrectFrom(
+        typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null, context: Context? = null,
+        /** For measuring: decide as if [typed] were not in the dictionary (a word typed on purpose that it lacks). */
+        asUnknown: Boolean = false,
+    ): String? {
         if (typed.length < 2) return null
-        val known = dict.indexOf(typed)
+        val known = if (asUnknown) -1 else dict.indexOf(typed)
         val lower = typed.lowercase()
         // A name or abbreviation the dictionary only has capitalised, typed in lowercase, is not that word yet:
         // a slip ("thar" for "that") or the name itself without its capitals ("google" for "Google").
@@ -165,10 +169,12 @@ class Suggester(
         val maxD = if (lower.length >= 6 || (taps != null && lower.length >= TAP_TWO_SLIPS_FROM)) 2 else 1
         var best: String? = null
         var bestScore = 0.0
+        var bestSame = false
         for (c in candidates) {
             val idx = dict.indexOf(c.word)
             if (idx < 0) continue
             val w = dict.lower[idx]
+            if (asUnknown && w == lower) continue
             // The name itself, given its capitals: no slip, whatever its tier. The same letters with an apostrophe
             // ("mcdonalds" for "McDonald's") count as the word too.
             val sameWord = (recase && w == lower) || (w != lower && w.replace("'", "") == lower)
@@ -184,8 +190,13 @@ class Suggester(
             if (score > bestScore) {
                 bestScore = score
                 best = c.word
+                bestSame = sameWord
             }
         }
+        // A word the dictionary lacks may be meant as typed (a name, a term, a handle): a correction must be
+        // likely enough, given where the taps landed, to beat keeping it. Giving a name its capitals is not a
+        // correction.
+        if (best != null && !bestSame && bestScore < KEEP_SCORE) return null
         return best?.let { matchCase(typed, it) }
     }
 
@@ -204,6 +215,12 @@ class Suggester(
          * away from: a lowercase name is itself a little unlikely, so a common word a slip away can win.
          */
         var RECASE_WEIGHT = 1.0
+        /**
+         * How likely a correction of a word the dictionary lacks must be (its score: how common the word is
+         * after the words before, times how likely the taps made the slip) before it beats keeping the word as
+         * typed. Chosen on TSI's taps (TapBenchmarkTest.keepingWordsMeantAsTyped).
+         */
+        var KEEP_SCORE = 2e-8
         /** How much the words before count, against how common a word is overall (0..1). */
         var CONTEXT_WEIGHT = 0.75f
         /** With tap positions, words from this length may be two slips away (else from six letters). */

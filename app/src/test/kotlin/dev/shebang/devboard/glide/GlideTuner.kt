@@ -3,7 +3,11 @@ package dev.shebang.devboard.glide
 import dev.shebang.devboard.dict.NgramModel
 
 /** A glide to replay: the word meant, the words before it, the keyboard it was made on and its points. */
-class ReplayGlide(val word: String, val context: Int, val context2: Int, val layout: KeyLayoutModel, val x: FloatArray, val y: FloatArray, val t: LongArray)
+class ReplayGlide(
+    val word: String, val context: Int, val context2: Int, val layout: KeyLayoutModel, val x: FloatArray, val y: FloatArray, val t: LongArray,
+    /** The words of its sentence before it, as typed (for the dumps the model scripts read). */
+    val before: String = "",
+)
 
 /**
  * Replays glides through the decoder and searches its parameters (coordinate descent, one parameter at a

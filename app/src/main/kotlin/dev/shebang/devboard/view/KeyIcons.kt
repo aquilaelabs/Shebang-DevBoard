@@ -25,7 +25,18 @@ object KeyIcons {
         "M5.5 11 H7.5 A4.5 4.5 0 0 0 16.5 11 H18.5 A6.5 6.5 0 0 1 13 17.4 V19 H11 V17.4 A6.5 6.5 0 0 1 5.5 11 Z " +
         "M9 19.5 H15 V21.5 H9 Z"
 
+    /** A face: a ring, two block cursors for eyes, and a smile (the ring is cut out: even-odd). */
+    private const val EMOJI = "M3 12 A9 9 0 1 0 21 12 A9 9 0 1 0 3 12 Z M5 12 A7 7 0 1 0 19 12 A7 7 0 1 0 5 12 Z " +
+        "M8.5 8.5 H10.5 V11 H8.5 Z M13.5 8.5 H15.5 V11 H13.5 Z " +
+        "M7.5 13 H9.5 A2.5 2.5 0 0 0 14.5 13 H16.5 A4.5 4.5 0 0 1 7.5 13 Z"
+
+    /** A clipboard: a board with a solid clip on top and two lines of text. */
+    private const val CLIPBOARD = "M5 5 H7 V21.5 H5 Z M17 5 H19 V21.5 H17 Z M7 19.5 H17 V21.5 H7 Z " +
+        "M7 5 H9 V7 H7 Z M15 5 H17 V7 H15 Z M9 3 H15 V8 H9 Z M9 11 H15 V12.6 H9 Z M9 14.6 H13 V16.2 H9 Z"
+
     val backspace: Path = PathParser.createPathFromPathData(BACKSPACE)
+    val emoji: Path = PathParser.createPathFromPathData(EMOJI).apply { fillType = Path.FillType.EVEN_ODD }
+    val clipboard: Path = PathParser.createPathFromPathData(CLIPBOARD)
     val mic: Path = PathParser.createPathFromPathData(MIC)
     val enter: Path = PathParser.createPathFromPathData(RETURN)
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
@@ -41,5 +52,6 @@ object KeyIcons {
         m.postTranslate(bounds.centerX() - size / 2f, bounds.centerY() - size / 2f)
         out.reset()
         src.transform(m, out)
+        out.fillType = src.fillType
     }
 }

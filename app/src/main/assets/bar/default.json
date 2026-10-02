@@ -1,6 +1,14 @@
 {
  "items": [
   {
+   "type": "emoji",
+   "label": "😀"
+  },
+  {
+   "type": "clipboard",
+   "label": "📋"
+  },
+  {
    "type": "key",
    "label": "Esc",
    "code": "ESCAPE"

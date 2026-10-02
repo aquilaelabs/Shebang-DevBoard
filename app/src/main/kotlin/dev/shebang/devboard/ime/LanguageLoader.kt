@@ -4,10 +4,12 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import dev.shebang.devboard.dict.Dictionary
+import dev.shebang.devboard.dict.NextWordModel
 import dev.shebang.devboard.dict.NgramData
 import dev.shebang.devboard.dict.PersonalSnapshot
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.dict.Suggester
+import dev.shebang.devboard.glide.GlideModel
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -28,6 +30,8 @@ class LanguageLoader(
     private val rebuildQueued = AtomicBoolean(false)
     private var base: Dictionary? = null
     private var data: NgramData? = null
+    private var glideModel: GlideModel? = null
+    private var nextWord: NextWordModel? = null
 
     /** Settings that decide what the build includes, read on the loader thread. */
     @Volatile
@@ -42,6 +46,10 @@ class LanguageLoader(
             val t1 = SystemClock.elapsedRealtime()
             onDictionary(Suggester(dict))
             data = context.assets.open(dev.shebang.devboard.dict.NgramModel.ASSET).use { NgramData.load(it) }
+            glideModel = runCatching { context.assets.open(GlideModel.ASSET).use { GlideModel.load(it) } }
+                .onFailure { Log.w(TAG, "no glide model", it) }.getOrNull()
+            nextWord = runCatching { context.assets.open(NextWordModel.ASSET).use { NextWordModel.load(it) } }
+                .onFailure { Log.w(TAG, "no next-word model", it) }.getOrNull()
             personal.load()
             buildNow("load", t1)
             Log.i(TAG, "dictionary ${dict.size} words in ${t1 - t0} ms")
@@ -65,7 +73,7 @@ class LanguageLoader(
         val counts = personal.countsVersion
         val snapshot = if (learnWords) personal.snapshot() else PersonalSnapshot.EMPTY
         val system = SystemUserDictionary.read(context)
-        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts)
+        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts, glideModel, nextWord)
         Log.i(TAG, "$why: ${bundle.dictionary.size} words (${bundle.dictionary.size - b.size} personal or system, " +
             "${bundle.systemWords} from the system dictionary), trie ${bundle.glide.trie.nodeCount} nodes in " +
             "${SystemClock.elapsedRealtime() - t0} ms")
