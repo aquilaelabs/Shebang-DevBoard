@@ -86,6 +86,17 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun theWordsBeforeDecideAnApostrophe() {
+        // With the language model, as on the device.
+        controller.suggester = Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm)
+        controller.predictionModel = dictionary to lm
+        type("i think its ")
+        assertEquals("I think it's ", ic.toString())
+        type("the dog wagged its ")
+        assertEquals("I think it's the dog wagged its ", ic.toString())
+    }
+
+    @Test
     fun aWordJoinedByPunctuationIsLeftAlone() {
         type("f-droid ")
         assertEquals("f-droid ", ic.toString())

@@ -229,6 +229,13 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
   "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
   searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+- **"its" or "it's" from the words before** (the owner's request): a word typed without its apostrophe that is
+  a word either way ("its", "were", "well", "ill", "cant") becomes the contraction only when, after the two
+  words before it, the contraction is at least 20 times likelier. On 923 uses in sentences the model never
+  counted (held-out Tatoeba and the FUTO test split), 89.2% come out as meant, against 79.6% with the old rule
+  (50 times likelier by frequency alone); 75.4% of the contractions are recovered, and 10 of 557 words meant
+  without an apostrophe got one ("its", "were" and "well" never did). Only the words before count: the word
+  after is not typed yet, and a word already passed is not changed.
 - **Punctuation in a word is on purpose** (the owner's request): a word typed with an apostrophe keeps its
   letters, and only the apostrophe may move ("ca'nt" becomes "can't", "y'all" stays); a word joined to the one
   before by a hyphen, slash, dot, @ or the like with no space ("f-droid", "node.js", "and/or") is not
