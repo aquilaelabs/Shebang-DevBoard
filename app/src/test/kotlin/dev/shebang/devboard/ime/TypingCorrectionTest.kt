@@ -166,6 +166,28 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun backspacingBackToACorrectedWordPutsBackWhatWasTyped() {
+        type("wiht cat ")
+        assertEquals("with cat ", ic.toString())
+        repeat(5) { controller.backspace() }
+        assertEquals("wiht", ic.toString())
+        // Back as typed, space leaves it so.
+        type(" ")
+        assertEquals("wiht ", ic.toString())
+    }
+
+    @Test
+    fun onlyTheCorrectedWordItselfGoesBack() {
+        type("with wiht cat ")
+        assertEquals("with with cat ", ic.toString())
+        repeat(5) { controller.backspace() }
+        assertEquals("with wiht", ic.toString())
+        // The "with" typed right before it was never corrected, and stays.
+        repeat(5) { controller.backspace() }
+        assertEquals("with", ic.toString())
+    }
+
+    @Test
     fun wordsTypedRightAreLeftAlone() {
         type("the quick brown fox is ill ")
         assertEquals("the quick brown fox is ill ", ic.toString())

@@ -257,6 +257,14 @@ class TextInputController(
     private val keptAsTyped = HashSet<String>()
 
     /**
+     * A word autocorrect changed, found again by the text before it: [upTo] is the text up to and including
+     * [corrected] as it stood after the correction ([atStart]: all of the text before it, which was short).
+     */
+    private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean)
+    /** The latest corrections in this field, oldest first: backspace back to one puts back what was typed. */
+    private val corrections = ArrayDeque<Correction>()
+
+    /**
      * The word backspace walked back into and reopened as the composing word, while it stands unchanged: a
      * glide or a strip pick replaces it (a correction), space leaves it as it was. [reopenedGlide] is the same
      * word from the glides remembered, with its runners-up and stroke.
@@ -361,6 +369,7 @@ class TextInputController(
         candidatesFor = ""
         lastAutocorrect = null
         keptAsTyped.clear()
+        corrections.clear()
         reopened = null
         reopenedGlide = null
         identifiers = emptyList()
@@ -761,6 +770,7 @@ class TextInputController(
             ic.commitText(ac.typed, 1)
             ic.endBatchEdit()
             keptAsTyped += ac.typed.lowercase()
+            corrections.removeAll { it.typed == ac.typed && it.corrected == ac.corrected }
             return
         }
         val glide = lastGlide
@@ -830,6 +840,23 @@ class TextInputController(
      */
     private fun reopenWordBeforeCursor(ic: InputConnection) {
         val text = recomposeWordBeforeCursor(ic) ?: return
+        val c = correctionEndingAtCursor(ic, text)
+        if (c != null) {
+            // Back to a word autocorrect changed: what was typed comes back, and the strip keeps the correction.
+            corrections.remove(c)
+            ic.setComposingText(c.typed, 1)
+            word.setLength(0)
+            word.append(c.typed)
+            resetTaps(c.typed.length)
+            reopened = c.typed
+            reopenedGlide = null
+            ui.setComposing(true)
+            candidates = emptyList()
+            candidatesFor = ""
+            suggestGeneration++
+            ui.showCandidates(arrangeBestMiddle(listOf(c.typed, c.corrected)))
+            return
+        }
         reopenedGlide = recentMatch(text)
         ui.setComposing(true)
         val g = reopenedGlide
@@ -844,6 +871,26 @@ class TextInputController(
         } else {
             requestSuggestions()
         }
+    }
+
+    /** Remembers that autocorrect wrote [corrected] for [typed], with [trailing] characters after it before the cursor. */
+    private fun rememberCorrection(ic: InputConnection, typed: String, corrected: String, trailing: Int) {
+        val n = CORRECTION_CONTEXT + corrected.length + trailing
+        val before = ic.getTextBeforeCursor(n, 0)?.toString() ?: return
+        val upTo = before.dropLast(trailing)
+        if (before.length < trailing || !upTo.endsWith(corrected)) return
+        corrections.addLast(Correction(typed, corrected, upTo, atStart = before.length < n))
+        if (corrections.size > MAX_CORRECTIONS) corrections.removeFirst()
+    }
+
+    /** The remembered correction that [text], the word just before the cursor, still is, in the same place. */
+    private fun correctionEndingAtCursor(ic: InputConnection, text: String): Correction? {
+        for (c in corrections.asReversed()) {
+            if (c.corrected != text) continue
+            val before = ic.getTextBeforeCursor(c.upTo.length + 1, 0)?.toString() ?: return null
+            if (if (c.atStart) before == c.upTo else before.length > c.upTo.length && before.endsWith(c.upTo)) return c
+        }
+        return null
     }
 
     /**
@@ -1055,7 +1102,10 @@ class TextInputController(
         ic.endBatchEdit()
         word.setLength(0)
         clearCandidates()
-        if (commit != pronounCase(typed)) lastAutocorrect = Autocorrected(typed, commit, after)
+        if (commit != pronounCase(typed)) {
+            lastAutocorrect = Autocorrected(typed, commit, after)
+            rememberCorrection(ic, typed, commit, after.length)
+        }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
             // A word the dictionary knows, typed and kept as it is, shows where this user's taps land.
@@ -1085,6 +1135,7 @@ class TextInputController(
                     ic2.endBatchEdit()
                     // Backspace's undo of a correction only applies while it is the last thing typed.
                     if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
+                    rememberCorrection(ic2, typed, late, after.length + next.length)
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
@@ -1696,6 +1747,10 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
+        /** Characters before a corrected word that find it again: enough to tell two of the same word apart. */
+        private const val CORRECTION_CONTEXT = 32
+        /** Corrections remembered per field for backspace to take back. */
+        private const val MAX_CORRECTIONS = 16
         /** Glided words remembered for redoing. */
         private const val MAX_RECENT = 32
         /** Glided words held back from learning, in case one turns out wrong a few words on ([held]). */

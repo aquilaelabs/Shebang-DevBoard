@@ -560,7 +560,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   Slip costs follow how fingers miss on QWERTY: a skipped apostrophe 0.2, one of a double letter dropped 0.4,
   a neighbouring key, two letters swapped or a letter doubled 0.5, another letter dropped 0.8, anything else
   1.0. Two-letter words are only corrected by a letter they dropped, so "js" and "ui" stay. Backspace right
-  after an autocorrect puts back what was typed, and that word is not corrected again in the field. When
+  after an autocorrect puts back what was typed, and that word is not corrected again in the field. Later,
+  backspacing back to the end of a corrected word (the last 16 in the field, found by the 32 characters
+  before them, so only that word and not the same word elsewhere) also brings back what was typed, as the
+  composing word with the correction on the strip; space then leaves it as typed. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
   (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the

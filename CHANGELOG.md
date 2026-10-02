@@ -39,6 +39,7 @@
 - Personal words has a search field: type part of a word to find it among the words the keyboard learned (a36a242)
 - Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
 - Hold shift for caps lock, as well as tapping it twice (2c08853)
+- Backspacing back to a word autocorrect changed brings back what you typed, even after typing on; the correction stays on the strip (cb1fddd)
 
 ### Changed
 
