@@ -9,3 +9,6 @@ captures/
 .externalNativeBuild/
 .cxx/
 dist/
+
+# Shebang Voice model (fetched by tools/fetch_voice_model.sh)
+voice/src/main/assets/models/

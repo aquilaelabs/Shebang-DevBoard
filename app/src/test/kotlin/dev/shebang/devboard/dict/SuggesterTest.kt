@@ -106,4 +106,56 @@ class SuggesterTest {
         assertEquals(10, d.tiers[d.indexOf("the")])
         for (i in 1 until d.size) assertTrue(d.lower[i - 1] <= d.lower[i])
     }
+
+    /** Names beside common words: "Thar" a slip from "that", "Rich" a name and "rich" a word, "GitHub" only a name. */
+    private val names = Dictionary.parse(
+        """
+        that	10
+        than	10
+        Thar	50
+        rich	10
+        Rich	50
+        rice	20
+        GitHub	40
+        McDonald's	40
+        """.trimIndent().lineSequence().map { it.trim() }
+    )
+    private val ns = Suggester(names)
+
+    private fun correct(typed: String) = ns.autocorrectFrom(typed, ns.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES))
+
+    @Test
+    fun aNameTypedInLowercaseCanStillBeASlip() {
+        // Corrections are looked for even though "thar" is a name; with the language model "that" then wins
+        // (TapBenchmarkTest), where tiers alone leave the two closer.
+        assertTrue(ns.suggest("thar", Suggester.AUTOCORRECT_CANDIDATES).any { it.word == "that" })
+    }
+
+    @Test
+    fun aNameTypedInLowercaseGetsItsCapitals() {
+        assertEquals("GitHub", correct("github"))
+    }
+
+    @Test
+    fun aNameTypedWithoutItsApostropheGetsIt() {
+        assertEquals("McDonald's", correct("mcdonalds"))
+    }
+
+    @Test
+    fun aWordThatIsAlsoANameIsAsCommonAsTheWord() {
+        assertEquals(10, names.bestTier(names.indexOf("rich")))
+        assertEquals("rich", correct("ricj"))
+    }
+
+    @Test
+    fun aNameTypedWithItsCapitalStaysAsTyped() {
+        assertNull(correct("Thar"))
+    }
+
+    @Test
+    fun theLowercaseSpellingIsKnownApartFromTheName() {
+        assertTrue(names.hasLowercaseSpelling("rich"))
+        assertTrue(!names.hasLowercaseSpelling("thar"))
+    }
 }
+

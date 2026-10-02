@@ -13,6 +13,11 @@
         android:name="${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
         tools:node="remove" />
 
+    <!-- Lets the keyboard see the Shebang Voice add-on (Android 11+ package visibility). Not a permission. -->
+    <queries>
+        <package android:name="dev.shebang.devboard.voice" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"

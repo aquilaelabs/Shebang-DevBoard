@@ -32,6 +32,10 @@
 - Keys follow where you tap: the keyboard learns your lean (say, a little left of each key) and types the key you meant, even with autocorrect off. On real taps, words typed right go from 81% to 88% (bddf074)
 - Taps between keys go to the letter that makes a word: after 'th', a tap on the edge of w types e. Words come out right as tapped 97% of the time on real taps, up from 88%, before autocorrect does anything. Not in password, email, URL or code fields (0da0ba7)
 - A chip offers to paste what you copied in the last few minutes (dots for passwords); tap to paste, swipe sideways to put it away (fc07c2f)
+- Voice typing through the new Shebang Voice add-on (a separate download): a mic at the end of the strip; speech is turned into text on the phone, sentence by sentence, and the keyboard itself never uses the microphone (3430117)
+- Settings > About: version, licence, credits for everything the keyboard is built on, the source on GitHub, and Check for updates (opens the GitHub releases) (d025d9f)
+- Tidy dictation: um and uh, stutters and repeats are dropped, and spoken corrections work ('Tuesday, no wait, Wednesday'; 'scratch that'). On by default; Settings > Tidy dictation (3029383)
+- The dictionary knows names, places, brands and abbreviations (Paris, GitHub, YouTube, iPhone, URL, McDonald's), and a name typed in lowercase gets its capitals (012e58f)
 
 ### Changed
 
@@ -53,6 +57,10 @@
 - Reorder the terminal bar by dragging an item's handle in the bar editor, instead of up and down buttons (335456f)
 - Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (c7bba27)
 - Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (c5808bd)
+- A tap that lands low on a letter just above the space bar types a space when the word looks finished, so thumbs that fall short of the bar still get their space (813a34f)
+- Autocorrect keeps the letters of a word you typed an apostrophe into (only the apostrophe may move), and leaves words joined by punctuation alone (f-droid, node.js) (6d500e2)
+- Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (5d8d5f1)
+- A word typed without its apostrophe gets one from the words before it: "I think its" becomes "I think it's", while "the dog wagged its" stays (d2da3d2)
 
 ### Fixed
 
@@ -67,3 +75,7 @@
 - Fixing the last glided word no longer swaps a right word for a rare one ('to work pretty' could become 'to dirk pretty') (b4e6ef5)
 - The setup screen's title no longer slides under the status bar when the keyboard opens (9d68563)
 - The keyboard height setting shows 110% (not 109%) and the other steps exactly (9c9b1ac)
+- The terminal bar fades out before the mic instead of being cut off by it (8da7014)
+- A glide deleted by swiping left from backspace is no longer learned, so a wrong glide removed that way does not make the same mistake likelier next time (0e07792)
+- A glided word you back up to and fix a few words later is no longer learned as the wrong word (369c718)
+- On a taller keyboard the letters no longer grow into the number and accent hints; the bar's fade by the mic is shorter (3d7052c)

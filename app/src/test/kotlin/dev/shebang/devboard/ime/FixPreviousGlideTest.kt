@@ -95,6 +95,7 @@ class FixPreviousGlideTest {
         glide("form", listOf("from"))
         glide("the", revised = "from")
         controller.space()
+        controller.startInput(FieldInfo.from(android.text.InputType.TYPE_CLASS_TEXT, 0))
         assertEquals(listOf("from", "the"), learned)
         // Only the new glide's offsets: the fixed word's were measured against "form".
         assertEquals(1, glidesLearned.size)

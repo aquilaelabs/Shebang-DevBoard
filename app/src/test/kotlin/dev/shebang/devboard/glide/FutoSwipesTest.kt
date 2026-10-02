@@ -29,10 +29,13 @@ class FutoSwipesTest {
         val layoutFile = System.getenv("FUTO_LAYOUT")?.let { File(it) } ?: File(file.parentFile, "qwerty.json")
         val out = ArrayList<ReplayGlide>()
         var outOfVocabulary = 0
+        // FUTO_ONLY_WORDS: only swipes whose word is in that word list, to compare dictionaries on the same swipes.
+        val only = System.getenv("FUTO_ONLY_WORDS")?.let { f -> File(f).readLines().map { it.substringBefore('\t').lowercase() }.toHashSet() }
         // Read more than asked for: words the test cannot use are skipped.
         for (r in FutoData.read(file, limit * 2, layoutFile)) {
             if (out.size >= limit) break
             if (r.word.length < 2 || !r.word.all { it.isLetter() || it == '\'' }) continue
+            if (only != null && r.word !in only) continue
             if (dictionary.indexOfLower(r.word) < 0) {
                 outOfVocabulary++
                 continue

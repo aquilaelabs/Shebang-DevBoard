@@ -40,24 +40,34 @@ class Dictionary(
         return byEnds[f * 26 + l] ?: EMPTY
     }
 
-    /** Index of [word] (case-insensitive) or -1. */
-    fun indexOf(word: String): Int {
-        val target = word.lowercase()
-        var lo = 0
-        var hi = lower.size - 1
-        while (lo <= hi) {
-            val mid = (lo + hi) ushr 1
-            val c = lower[mid].compareTo(target)
-            when {
-                c < 0 -> lo = mid + 1
-                c > 0 -> hi = mid - 1
-                else -> return mid
-            }
-        }
-        return -1
-    }
+    /** Index of [word] (case-insensitive) or -1: its spelling to write, as [indexOfLower]. */
+    fun indexOf(word: String): Int = indexOfLower(word.lowercase())
 
     fun contains(word: String): Boolean = indexOf(word) >= 0
+
+    /** The commonest tier among all spellings of the word at [index] ("rich" and the name "Rich" alike). */
+    fun bestTier(index: Int): Int {
+        val l = lower[index]
+        var i = index
+        while (i > 0 && lower[i - 1] == l) i--
+        var best = tiers[i]
+        while (i < size && lower[i] == l) {
+            if (tiers[i] < best) best = tiers[i]
+            i++
+        }
+        return best
+    }
+
+    /** Whether [lowerWord] (lowercase) is itself one of the spellings, not only a capitalised name ("Google"). */
+    fun hasLowercaseSpelling(lowerWord: String): Boolean {
+        var i = indexOfLower(lowerWord)
+        if (i < 0) return false
+        while (i < size && lower[i] == lowerWord) {
+            if (words[i] == lowerWord) return true
+            i++
+        }
+        return false
+    }
 
     /** Index of the first entry whose lowercase form equals [lowerWord] (already lowercase), or -1. */
     fun indexOfLower(lowerWord: String): Int {
@@ -151,14 +161,16 @@ class Dictionary(
                 words.add(line.substring(0, tab))
                 tiers.add(line.substring(tab + 1).trim().toIntOrNull() ?: 60)
             }
-            // Sort by lowercase so binary search on `lower` is valid whatever the input order. The bundled list
-            // is written in this order already, so the (slow, boxing) sort is skipped when it isn't needed.
-            // Lowercase once up front; doing it inside the comparator allocates on every comparison.
+            // Sort by lowercase so binary search on `lower` is valid whatever the input order, and within one
+            // lowercase form put the spelling to write first (the commonest tier, then the all-lowercase one:
+            // "wood" before the name "Wood"), so a lookup by lowercase finds it. The bundled list is written in
+            // this order already, so the (slow, boxing) sort is skipped when it isn't needed. Lowercase once up
+            // front; doing it inside the comparator allocates on every comparison.
             val lowered = Array(words.size) { words[it].lowercase() }
+            val order0 = compareBy<Int>({ lowered[it] }, { tiers[it] }, { if (words[it] == lowered[it]) 0 else 1 }, { words[it] })
             var sorted = true
             for (i in 1 until words.size) {
-                val c = lowered[i - 1].compareTo(lowered[i])
-                if (c > 0 || (c == 0 && words[i - 1] > words[i])) {
+                if (order0.compare(i - 1, i) > 0) {
                     sorted = false
                     break
                 }
@@ -166,7 +178,7 @@ class Dictionary(
             if (sorted) {
                 return Dictionary(words.toTypedArray(), lowered, tiers.toIntArray())
             }
-            val order = words.indices.sortedWith(compareBy({ lowered[it] }, { words[it] }))
+            val order = words.indices.sortedWith(order0)
             val w = Array(order.size) { words[order[it]] }
             val l = Array(order.size) { lowered[order[it]] }
             val t = IntArray(order.size) { tiers[order[it]] }

@@ -29,7 +29,7 @@ class GlideBenchmarkTest {
             geometry.letterKey(c)?.let { it.centerX to it.centerY }
         }
         val dictionary: Dictionary by lazy {
-            Dictionary.parse(File("src/main/assets/dict/en_words.txt").bufferedReader().readLines().asSequence())
+            Dictionary.parse(File(System.getenv("DEVBOARD_WORDS") ?: "src/main/assets/dict/en_words.txt").bufferedReader().readLines().asSequence())
         }
         val lm: NgramModel by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
         val language: GlideLanguage by lazy { GlideLanguage.build(dictionary, lm) }

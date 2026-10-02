@@ -77,6 +77,40 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun aWordTypedWithAnApostropheKeepsItsLetters() {
+        // The apostrophe is on purpose: it may move, but no letter changes.
+        type("ca'nt ")
+        assertEquals("can't ", ic.toString())
+        type("y'all ")
+        assertEquals("can't y'all ", ic.toString())
+    }
+
+    @Test
+    fun theWordsBeforeDecideAnApostrophe() {
+        // With the language model, as on the device.
+        controller.suggester = Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm)
+        controller.predictionModel = dictionary to lm
+        type("i think its ")
+        assertEquals("I think it's ", ic.toString())
+        type("the dog wagged its ")
+        assertEquals("I think it's the dog wagged its ", ic.toString())
+    }
+
+    @Test
+    fun aWordJoinedByPunctuationIsLeftAlone() {
+        type("f-droid ")
+        assertEquals("f-droid ", ic.toString())
+        type("node.js ")
+        assertEquals("f-droid node.js ", ic.toString())
+        // Even where the part alone would be a slip.
+        type("x-teh ")
+        assertEquals("f-droid node.js x-teh ", ic.toString())
+        // After a space a dash is not a joiner.
+        type("- wiht ")
+        assertEquals("f-droid node.js x-teh - with ", ic.toString())
+    }
+
+    @Test
     fun aSlipIsCorrectedOnSpace() {
         type("wiht ")
         assertEquals("with ", ic.toString())

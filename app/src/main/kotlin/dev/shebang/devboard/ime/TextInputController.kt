@@ -55,6 +55,8 @@ class TextInputController(
         fun showCorrection(typed: String, fix: String, other: String?) = showCandidates(listOfNotNull(typed, fix, other))
         /** How likely each letter a..z is to be typed next ([LetterPrior]), or null for no opinion. */
         fun setLetterPrior(prior: FloatArray?) = Unit
+        /** Whether a letter tap just above the space bar may be taken as a space (plain text fields only). */
+        fun setSpaceFromLetters(on: Boolean) = Unit
     }
 
     /** What the keyboard learns from; implementations apply the user's settings. */
@@ -140,7 +142,9 @@ class TextInputController(
     fun refreshLetterPrior() {
         val gen = ++priorGeneration
         ui.setLetterPrior(null)
-        if (codeMode || !field.allowsComposing || field.variant != FieldVariant.PLAIN) return
+        val plainText = !codeMode && field.allowsComposing && field.variant == FieldVariant.PLAIN
+        ui.setSpaceFromLetters(plainText)
+        if (!plainText) return
         val (dictionary, lm) = predictionModel ?: return
         val ic = connection() ?: return
         if (!ic.getSelectedText(0).isNullOrEmpty()) return
@@ -159,6 +163,39 @@ class TextInputController(
             }.next(prefix)
             postToMain { if (gen == priorGeneration && users === suggester) ui.setLetterPrior(prior) }
         }
+    }
+
+    /**
+     * Writes a piece of dictation at the cursor: the word being typed is ended first, and a space goes before
+     * it after a word, as for a glide. Whisper's own capitals and punctuation are kept.
+     */
+    fun insertDictation(text: String) {
+        val ic = connection() ?: return
+        val t = text.trim()
+        if (t.isEmpty()) return
+        if (isComposing) endWord(ic, "", correct = false, deferOk = false)
+        settle()
+        lastGlide = null
+        dropTarget()
+        clearCandidates()
+        ownEdit()
+        val written = if (needsLeadingSpace(ic)) " $t" else t
+        ic.commitText(written, 1)
+        lastDictation = written
+        lastActionWasSpace = false
+    }
+
+    /** The last piece of dictation as written, for "scratch that" to take back. */
+    private var lastDictation: String? = null
+
+    /** Takes back the last piece of dictation, if it still stands right before the cursor. */
+    fun dropLastDictation() {
+        val ic = connection() ?: return
+        val last = lastDictation ?: return
+        if (ic.getTextBeforeCursor(last.length, 0)?.toString() != last) return
+        ownEdit()
+        ic.deleteSurroundingText(last.length, 0)
+        lastDictation = null
     }
 
     /** Whether [typed] begins a code-like identifier in the text around ("max" of "maxRetries"): not a slip. */
@@ -257,6 +294,14 @@ class TextInputController(
     /** The last glide, not yet learned: backspace can still remove it and the strip can still swap its last word. */
     private val pending = ArrayList<GlidedWord>()
 
+    /**
+     * Glided words that are final but not learned yet, newest last: the last [HELD_WORDS]. A wrong glide is
+     * often noticed a few words later and fixed by backing up to it; one changed or replaced while held is
+     * dropped unlearned ([abandon]), so the mistake does not teach its word, its pairs or its stroke. The rest
+     * are learned as newer ones push them out, and all of them when the field changes.
+     */
+    private val held = ArrayDeque<GlidedWord>()
+
     /** Words glided in this field lately, newest last: a tapped word found here has its runners-up and stroke. */
     private val recent = ArrayDeque<GlidedWord>()
     private var dictionaryInUse: Dictionary? = null
@@ -300,6 +345,9 @@ class TextInputController(
     val targetText: String? get() = target?.text
 
     fun startInput(field: FieldInfo) {
+        // What was glided in the last field is learned under that field's rules.
+        settle()
+        flushHeld()
         this.field = field
         resetState()
     }
@@ -320,6 +368,7 @@ class TextInputController(
         target = null
         recent.clear()
         settle()
+        flushHeld()
         lastActionWasSpace = false
         ui.showCandidates(emptyList())
         ui.setComposing(false)
@@ -509,9 +558,11 @@ class TextInputController(
                 resetTaps(0)
                 // Typing on at the end of a word that is not composing (the field dropped it, or the cursor was
                 // put there): the whole word is composed, so the underline and a strip pick cover all of it.
-                if (recomposeWordBeforeCursor(ic) != null) reopenedGlide = null
+                recomposeWordBeforeCursor(ic)?.let { text -> recentMatch(text)?.let { abandon(it) } }
+                reopenedGlide = null
             }
             word.append(text)
+            reopenedGlide?.let { g -> if (!reopenedUnchanged) { abandon(g); reopenedGlide = null } }
             for (k in text.indices) {
                 tapXs += if (text.length == 1) tapX else Float.NaN
                 tapYs += if (text.length == 1) tapY else Float.NaN
@@ -582,7 +633,19 @@ class TextInputController(
         val ic = connection() ?: return
         val t = target
         if (t != null) {
-            skipPastTarget(ic, t)
+            // A selected word: space moves past it (typing a space would replace it).
+            if (t.selection) {
+                skipPastTarget(ic, t)
+                return
+            }
+            // A cursor inside a word: the space goes in right there, splitting it ("twowords" -> "two words").
+            // Holding space moves past the word instead ([spaceHeld]).
+            dropTarget()
+            ownEdit()
+            lastAutocorrect = null
+            ic.commitText(" ", 1)
+            lastActionWasSpace = true
+            lastSpaceTime = clock()
             return
         }
         ownEdit()
@@ -659,6 +722,17 @@ class TextInputController(
         if (!spaceFollows) ic.commitText(" ", 1)
     }
 
+    /**
+     * Space held down: with a word pointed at, the cursor moves past it (and a space follows), so a word can be
+     * added after it. False when no word is pointed at, so the hold does what it does elsewhere.
+     */
+    fun spaceHeld(): Boolean {
+        val ic = connection() ?: return false
+        val t = target ?: return false
+        skipPastTarget(ic, t)
+        return true
+    }
+
     /** True when the two characters before the cursor are a word character then a space. */
     private fun endsSentenceWord(ic: InputConnection): Boolean {
         val before = ic.getTextBeforeCursor(2, 0) ?: return false
@@ -699,6 +773,9 @@ class TextInputController(
         }
         settle()
         if (isComposing) {
+            // Backing up into a glided word and taking letters off it: it was wrong.
+            reopenedGlide?.let { abandon(it) }
+            reopenedGlide = null
             if (tapXs.size == word.length) {
                 tapXs.removeAt(tapXs.size - 1)
                 tapYs.removeAt(tapYs.size - 1)
@@ -812,7 +889,7 @@ class TextInputController(
             if (isComposing) endWord(ic, "", correct = false, deferOk = false)
             lastGlide = null
             lastAutocorrect = null
-            settle()
+            // The last glide stays unsettled: its words may be about to go ([deleteWords]).
             if (selEnd < 0 || selStart != selEnd) return
             deleteAnchor = selEnd
             deleteBefore = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: ""
@@ -842,7 +919,12 @@ class TextInputController(
         }
         val sel = ic.getSelectedText(0)?.toString()
         if (anchor >= 0 && sel != null && sel.isNotEmpty()) {
-            if (sel == deletePreview) ic.commitText("", 1) else ic.setSelection(anchor, anchor)
+            if (sel == deletePreview) {
+                ic.commitText("", 1)
+                forgetDeletedGlide(n)
+            } else {
+                ic.setSelection(anchor, anchor)
+            }
             return
         }
         // No preview (the cursor position was not known): delete the words before the cursor.
@@ -850,6 +932,23 @@ class TextInputController(
         val before = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: return
         val offs = wordOffsets(before)
         ic.deleteSurroundingText(offs[n.coerceIn(0, offs.size - 1)], 0)
+        forgetDeletedGlide(n)
+    }
+
+    /**
+     * [n] words before the cursor were swiped away. The last glide's words are the last ones written, so as
+     * many of them go unlearned, as with backspace right after a glide: a wrong glide deleted this way must not
+     * teach its word or its stroke. The rest of that glide is final.
+     */
+    private fun forgetDeletedGlide(n: Int) {
+        val fromPending = minOf(n, pending.size)
+        repeat(fromPending) {
+            val w = pending.removeAt(pending.size - 1)
+            recent.remove(w)
+        }
+        // Words before the last glide that went too were glided before it, if they were glided at all.
+        if (pending.isEmpty()) repeat(minOf(n - fromPending, held.size)) { abandon(held.last()) }
+        settle()
     }
 
     /** offsets[k]: how many characters before the cursor the last k words take, each with the spaces after it. */
@@ -929,11 +1028,11 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
-            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps, before)?.let { commit = it }
+            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps, before)?.takeIf { keepsPunctuation(typed, it) }?.let { commit = it }
             else defer = deferOk && suggester != null
             // A word that stands elsewhere in the text as typed is a name the user means (an identifier,
             // a handle), not a slip.
@@ -960,7 +1059,7 @@ class TextInputController(
         }
         val s = suggester ?: return
         background.execute {
-            val fix = s.autocorrect(typed, taps, before)
+            val fix = s.autocorrect(typed, taps, before)?.takeIf { keepsPunctuation(typed, it) }
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
@@ -986,6 +1085,28 @@ class TextInputController(
      * ("getUser", but not "NASA" style capitals throughout, which are left alone anyway), a digit or an
      * underscore.
      */
+    /**
+     * Whether autocorrect may turn [typed] into [fix] as far as punctuation goes. An apostrophe typed into a word
+     * is on purpose: the letters stay, and only the apostrophe may move ("ca'nt" -> "can't", but "y'all" stays).
+     */
+    private fun keepsPunctuation(typed: String, fix: String): Boolean {
+        if (typed.none { it == '\'' || it == '’' }) return true
+        fun letters(w: String) = w.filter { it != '\'' && it != '’' }.lowercase()
+        return letters(typed) == letters(fix)
+    }
+
+    /**
+     * Whether the word being typed is joined to what comes before by punctuation, with no space ("f-droid",
+     * "node.js", "and/or", "user@host"): part of a name or an address, which autocorrect leaves alone.
+     */
+    private fun gluedToPrevious(ic: InputConnection, typed: String): Boolean {
+        val before = ic.getTextBeforeCursor(typed.length + 2, 0) ?: return false
+        if (before.length < typed.length + 2) return false
+        val joiner = before[before.length - typed.length - 1]
+        val prev = before[before.length - typed.length - 2]
+        return joiner in JOINERS && !prev.isWhitespace()
+    }
+
     private fun looksLikeCode(w: String): Boolean {
         if (w.any { it.isDigit() || it == '_' }) return true
         val inner = w.drop(1)
@@ -1043,10 +1164,24 @@ class TextInputController(
 
     // ---- Learning glided words ------------------------------------------------------------------------
 
-    /** The last glide can no longer be undone or swapped: learn its words. */
+    /** The last glide can no longer be undone or swapped: its words are held, then learned ([held]). */
     private fun settle() {
-        for (w in pending) retire(w)
+        for (w in pending) {
+            held.addLast(w)
+            while (held.size > HELD_WORDS) retire(held.removeFirst())
+        }
         pending.clear()
+    }
+
+    private fun flushHeld() {
+        while (held.isNotEmpty()) retire(held.removeFirst())
+    }
+
+    /** A glided word the user changed or replaced: never learned as it was glided. */
+    private fun abandon(w: GlidedWord) {
+        pending.remove(w)
+        held.remove(w)
+        recent.remove(w)
     }
 
     /** A glided word is final: learn it, and where its stroke passed its letters. */
@@ -1078,10 +1213,11 @@ class TextInputController(
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
+            (ic == null || !gluedToPrevious(ic, typed)) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
-            val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed } else null
+            val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed && keepsPunctuation(typed, it) } else null
             postToMain {
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
@@ -1111,7 +1247,7 @@ class TextInputController(
             val dictionary = dictionaryInUse
             val prev = previousOf(textBeforeTarget(ic))
             // A word being redone is not learned as it was; the rest of the last glide is final now.
-            t.glided?.let { pending.remove(it) }
+            t.glided?.let { abandon(it) }
             settle()
             if (replaceTarget(t, chosen)) {
                 val idx = dictionary?.indexOfLower(chosen.lowercase()) ?: -1
@@ -1184,7 +1320,7 @@ class TextInputController(
                 // Another reading of a glided word picked after backspacing to it: a correction.
                 val idx = dictionary.indexOfLower(chosen.lowercase())
                 if (idx >= 0) learner.correction(g.stroke, idx, dictionary)
-                recent.remove(g)
+                abandon(g)
             }
             reopened = null
             // Picking the word exactly as typed (the strip's check mark) keeps it from autocorrect from now on.
@@ -1343,7 +1479,7 @@ class TextInputController(
         lastActionWasSpace = false
         reviseBefore(ic, result, dictionary)
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
-        target?.glided?.let { pending.remove(it) }
+        target?.glided?.let { abandon(it) }
         settle()
         ownEdit()
         val t = target
@@ -1477,6 +1613,7 @@ class TextInputController(
     fun onLanguageChanged() {
         dropTarget()
         settle()
+        flushHeld()
         lastGlide = null
         recent.clear()
     }
@@ -1509,6 +1646,8 @@ class TextInputController(
         private const val QUOTES = "\"'`"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
         private const val SENTENCE_PUNCTUATION = ".,!?;:)\"'"
+        /** Punctuation that joins a word to the one before it when no space follows ([gluedToPrevious]). */
+        private const val JOINERS = "-/.@:_+#~\\=&"
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
@@ -1523,6 +1662,8 @@ class TextInputController(
         private const val MAX_WORD = 48
         /** Glided words remembered for redoing. */
         private const val MAX_RECENT = 32
+        /** Glided words held back from learning, in case one turns out wrong a few words on ([held]). */
+        private const val HELD_WORDS = 8
 
         /** Strip order for glide alternatives: runner-up left, best in the middle, third right. */
         fun arrangeBestMiddle(ranked: List<String>): List<String> = when (ranked.size) {

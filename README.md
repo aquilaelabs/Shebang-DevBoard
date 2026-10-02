@@ -44,7 +44,7 @@ one folder). `--exclude` keeps the FUTO test and dev sentences out of the counts
 stays fair:
 
 ```sh
-tools/build_wordlist.py /path/to/scowl-2020.12.07 50
+tools/build_wordlist.py /path/to/scowl-2020.12.07
 tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
@@ -88,8 +88,10 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    To redo a word, tap inside it (or double-tap to select it, which also works for "a" and "I"): it is
    underlined and the strip shows it with its alternatives (its own runners-up if it was glided lately,
    suggestions otherwise). The next glide, or a tapped alternative, replaces it and keeps its capitals.
-   To add a word instead, tap between words (a cursor at a word's edge targets nothing), or press space
-   while a word is targeted, which moves past it. After the keyboard's own edits nothing is targeted, so
+   To add a word instead, tap between words (a cursor at a word's edge targets nothing), or hold space
+   while a word is targeted, which moves past it; a tap on space with the cursor inside a word puts a space
+   right there, splitting it ("twowords"). Holding #! (or ABC) opens the system's keyboard picker, which
+   holding space used to. After the keyboard's own edits nothing is targeted, so
    gliding on never replaces a word; the one exception is the glided word right before it (setting, on by
    default), which the next glide may fix when the two together clearly read otherwise, and only while it
    stands as it went in and was not picked from the strip. Each glide is
@@ -220,10 +222,35 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Toolchain**: Gradle 9.7.1, AGP 9.4.1 with its built-in Kotlin support (no `kotlin-android` plugin),
   Kotlin 2.4.20 compiler plugins for Compose and kotlinx.serialization, JDK 21, single `app` module.
 - **Word list**: SCOWL 2020.12.07, `english` + `american` lists (American spelling), size levels 10 to 50 as
-  frequency tiers, plus contractions and the common capitalised words up to level 35. Possessive forms
-  ("ability's") are dropped, but the 's contractions of a closed set of pronouns and function words ("it's",
-  "that's", "let's") are kept: SCOWL files them among the possessives. 61,846 words, 760 KB as text, written
-  in the order the app searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+  frequency tiers, plus contractions, capitalised words, SCOWL's proper names (brands, products, people) and
+  abbreviations written in capitals of three letters or more (and a few two-letter ones people type, such as
+  "AI" and "TV"), all up to level 50, and `tools/extra_words.txt`, this project's own short list of words SCOWL
+  lacks ("app", "offline", "config", "JSON", "Reddit", "WhatsApp", "McDonald's"). Possessive forms ("ability's")
+  are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
+  "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
+  searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+- **"its" or "it's" from the words before** (the owner's request): a word typed without its apostrophe that is
+  a word either way ("its", "were", "well", "ill", "cant") becomes the contraction only when, after the two
+  words before it, the contraction is at least 20 times likelier. On 923 uses in sentences the model never
+  counted (held-out Tatoeba and the FUTO test split), 89.2% come out as meant, against 79.6% with the old rule
+  (50 times likelier by frequency alone); 75.4% of the contractions are recovered, and 10 of 557 words meant
+  without an apostrophe got one ("its", "were" and "well" never did). Only the words before count: the word
+  after is not typed yet, and a word already passed is not changed.
+- **Punctuation in a word is on purpose** (the owner's request): a word typed with an apostrophe keeps its
+  letters, and only the apostrophe may move ("ca'nt" becomes "can't", "y'all" stays); a word joined to the one
+  before by a hyphen, slash, dot, @ or the like with no space ("f-droid", "node.js", "and/or") is not
+  autocorrected at all. The strip still offers alternatives. "i'm" still gets its capital (not a correction).
+- **Names, brands and abbreviations** (the owner's request: "url, github, mcdonalds, google" were missing):
+  the capitalised words to level 50, the proper names and the abbreviations were added after measuring each
+  set. On the same 10,000 FUTO swipes glide top-1 went from 91.0% to 90.9%; FUTO swipes whose word the
+  dictionary lacked halved (969 to 492 of 10,000 read); on whole FUTO sentences the friction test needed 1.96
+  actions per word instead of 2.20 (names are glided instead of tapped out) with 98.8% of sentences exactly
+  as meant instead of 99.0%; on TSI, autocorrect fixed 77.7% of typos instead of 78.4%. The brands and
+  abbreviations alone cost nothing (78.4%, 2.14 actions per word) but leave out Paris and London, which SCOWL
+  files with the first names. Three rules keep names from getting in the way: a word that is also a name
+  ranks for autocorrect as the word does ("rich" against the name "Rich"), a name typed in lowercase is
+  weighed against the words it is a slip away from ("thar" becomes "that") and otherwise gets its capitals
+  ("github" becomes "GitHub"), and Tatoeba's second default name, "Mary", is scaled down like "Tom".
 - **Word frequencies and context**: word, word-pair and three-word counts from Tatoeba's English sentences
   (2.0 million sentences; CC BY 2.0 FR), counted twice, and Common Voice's English sentence collection (1.6
   million sentences; CC0), counted once: 43.5 million weighted words, counted only for words in the word list.
@@ -304,6 +331,19 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   96.6% and 97.3% (TSI's own language model's letter odds give 95.4%). Of the 83 words the dictionary lacks,
   91.6% came out right without the odds and 94.0% with them. Weights of 0.5, 1, 1.5 and 2 against the tap
   gave 95.9%, 97.3%, 96.5% and 94.4% of words; 1 it is.
+- **Thumbs that miss the space bar get a space** (the user's request): on TSI, 10.7% of taps meant for space
+  land on the letters above it (thumbs land about 12 dp above the bar's middle), while letters almost never
+  land on the bar (1 of 6,074). So a tap that comes down low on a letter just above the bar is weighed
+  between that letter and the bar: the bar as where its taps fall (anywhere across it; down, a 13.8 dp spread
+  around a point 12.3 dp above its middle) against the letter's tap model, each with its odds, where the
+  bar's are the chance that what has been typed is the whole word (the same dictionary and model sums as
+  the letter odds, 18% when nothing is known). On TSI's 9,854 phrase taps that landed on the bottom row or
+  the bar, taps meant for space typed as space went from 90.7% to 99.8% and letters turned into spaces from
+  1 to 15 (0.3%), 26 wrong in all against 513 (where taps land alone, without the word: 98.6%, 47, 123).
+  Leans of 8 to 16 dp and spreads of 11 to 17 dp all gave 23 to 40 wrong. A tap above the letter's middle
+  stays the letter however finished the word looks, a tap on the bar always stays a space, and it is
+  decided when the tap ends, so a glide can still start on those letters. Plain text fields only, like the
+  letter odds.
 - **Keys follow where the user taps** (R14): a touch on a letter key types the letter whose usual landing
   spot is nearest: its centre nudged by the overall lean and this user's learned offsets (the same tap
   adaptation as R12, capped at 0.35 of a key). Other keys go by their drawn edges, and the key preview
@@ -348,12 +388,15 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   edit are taken as its own, so the keyboard's cursor never targets. A cursor at a word's edge targets
   nothing, because that is where a tap between words lands. The targeted word is underlined with a
   composing region; the replacement is checked against the text around the cursor first, and goes in
-  with the old word's capitals. The last glide stays unlearned until the next edit, so a glide redone
-  right away is not learned as it was; the correction teaches the adaptation instead.
+  with the old word's capitals. Glided words are not learned right away (see the learned user
+  dictionary), so a glide redone is not learned as it was; the correction teaches the adaptation instead.
 - **Learned user dictionary** (out of scope for v1, added at the user's request): on the phone only, in
   `personal_words.json` in the app's private files, written atomically when the keyboard hides. A word is
-  learned when it is final (typed words on commit; a glide when the next edit happens, so backspace, a
-  strip swap or redoing it right away are not learned as the wrong word).
+  learned when it is final (typed words on commit; a glided word once eight more glided words follow it
+  or the field changes, so backspace, a strip swap, redoing it, or backing up to it a few words later and
+  changing it are not learned as the wrong word: the owner usually notices a wrong glide only after the
+  next word, and learning it then made the same mistake likelier each time, its word, its pairs and its
+  stroke alike).
   Learnable: 2 to 32 letters with apostrophes or inner hyphens, nothing with digits. Never learned from
   password, number, email, URL, terminal or no-suggestion fields, or fields with
   `IME_FLAG_NO_PERSONALIZED_LEARNING`. New words join after 2 uses. At most 5,000 words and 20,000 pairs;
@@ -482,6 +525,48 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Language load time**: the dictionary loads in 2.5 s and the n-gram model and letter tree in 2.7 s on the
   API 36 emulator right after install (not yet compiled ahead of time); the keyboard appears at once and
   glide starts working when both are in.
+
+## Shebang Voice (add-on, in progress: R15)
+
+Speech typing comes as a separate app, `voice/`, so the keyboard keeps VIBRATE as its only permission and
+has no network code; the add-on will hold the microphone permission and has no network access either. It
+runs OpenAI's Whisper (base.en, 5-bit, 57 MB, MIT) through whisper.cpp (vendored, CPU only). Fetch the
+model before building it: `tools/fetch_voice_model.sh`. `./gradlew :voice:connectedDebugAndroidTest`
+transcribes a public-domain recording on a device: on the emulator (2 cores, AVX2) the 11 s Kennedy sample
+comes out word for word in 15 s, against 28 s without AVX2. Speed on phones is still to be measured and
+tuned (ARM instruction sets chosen at runtime).
+
+How it works: the keyboard shows a mic at the right end of the strip once the add-on is installed (in text
+mode, in fields that take typed words); otherwise Settings > Voice typing links to the GitHub releases. A tap
+binds the add-on's service with BIND_INCLUDE_CAPABILITIES, which lends it the keyboard's foreground status so
+Android does not silence its microphone. The add-on answers only apps signed with its own key, so the
+keyboard needs no permission entry for it (a `<queries>` entry lets it see the add-on). It records,
+cuts the audio at 700 ms pauses, and transcribes each piece as it comes, so text arrives sentence by sentence;
+it stops after 8 s without speech, when the mic is tapped again, or when a key is typed (what was said is
+still written). Without the microphone permission the add-on's own screen asks for it, since a keyboard
+cannot. On the emulator, with the Kennedy sample standing in for the microphone (debug builds of the add-on
+only), the three pieces arrived in the field 7, 7 and 12 s after each was spoken.
+
+Tidy dictation (setting, on by default; R16): each piece is tidied by rules before it is written
+(`DictationCleanup`). Hesitations ("um", "uh", "er", "hmm") go with the commas around them; a word or
+phrase of up to three words said twice in a row is written once ("we should, we should go"), except
+doubles people mean ("had had", "that that"). A spoken correction (", no wait,", ", sorry,", ", I mean,",
+", or rather,") replaces what came just before it: from the word it repeats ("on Tuesday, no wait, on
+Wednesday"), or else the last word ("forty, sorry, fifty"); the words used plainly ("I mean it", "Sorry
+I'm late", "I'd rather stay") are left alone. "Scratch that" drops the sentence before it, and said at the
+start of a piece takes back the previous piece while it still stands before the cursor. Nothing is
+reworded beyond that; a small language model was the other option, at 300 MB to 1 GB and seconds per
+piece, and is left until the rules fall short.
+
+## About and updates
+
+Settings > About shows the version, the licence and the credits (`LICENSE` and `THIRD_PARTY_NOTICES.md`,
+copied into the app's assets at build time by the `copyAboutDocs` task, so the app always carries the real
+list), links to the source on GitHub, and Check for updates, which opens the GitHub releases page. The app
+does not download or install anything itself: that would need network access and the install-packages
+permission, which together are what Android's malware scanning looks for in a keyboard. Installing a newer
+APK over the old one updates it in place, keeping settings and learned words, as long as both were signed
+with the same key.
 
 ## Licence
 

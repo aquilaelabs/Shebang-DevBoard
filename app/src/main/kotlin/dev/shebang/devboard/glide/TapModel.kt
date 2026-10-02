@@ -1,6 +1,9 @@
 package dev.shebang.devboard.glide
 
+import dev.shebang.devboard.dict.LetterPrior
 import kotlin.math.abs
+import kotlin.math.ln
+import kotlin.math.sqrt
 
 /**
  * Where fingers land when they tap a letter key: around its centre, nudged by this user's learned offsets,
@@ -20,6 +23,8 @@ class TapModel(
     private val sigma = SIGMA_DP * density
     private val leanX = LEAN_X_DP * density
     private val leanY = LEAN_Y_DP * density
+    private val spaceLeanY = SPACE_LEAN_Y_DP * density
+    private val spaceSigmaY = SPACE_SIGMA_Y_DP * density
     val pitchX: Float
     val pitchY: Float
 
@@ -85,6 +90,33 @@ class TapModel(
         return best
     }
 
+    /** The space bar's edges and middle, in the same pixels as the letter keys. */
+    class Bar(val left: Float, val right: Float, val centerY: Float)
+
+    /**
+     * Whether a tap at x,y that landed on letter [c] was more likely meant for the space bar [bar] below it.
+     * Thumbs reaching for space land high (TSI: 10.7% of space taps hit the letters above it, while letters
+     * almost never land on it), so the bar is modelled as where its taps fall: across, anywhere on it; down,
+     * a spread around a point above its middle. [prior] is [LetterPrior.next] for the word so far: its share
+     * for the word ending is the space's odds, and the rest goes to the letters; without one the space gets
+     * [SPACE_BASE]. A tap above the letter's middle stays the letter, however finished the word looks (TSI:
+     * 99% of space taps land below it).
+     */
+    fun meansSpace(x: Float, y: Float, c: Char, bar: Bar, prior: FloatArray?): Boolean {
+        val i = c - 'a'
+        if (i !in 0..25 || !layout.hasLetter(c) || y <= layout.centerY[i]) return false
+        val n = nats(x, y, c) ?: return false
+        val end = prior?.getOrNull(LetterPrior.END)?.takeIf { !it.isNaN() }
+        val pSpace = (end?.toDouble() ?: SPACE_BASE).coerceIn(SPACE_FLOOR, 1 - SPACE_FLOOR)
+        // -ln of each density, with its constants, so the bar and a key compare.
+        val letter = n + ln(2 * Math.PI * sigma * sigma) - ln(1 - pSpace) +
+            if (prior != null) PRIOR_WEIGHT * LetterPrior.cost(prior, c) else ln(26.0)
+        val dy = (y - bar.centerY - spaceLeanY) / spaceSigmaY
+        val off = (if (x < bar.left) bar.left - x else if (x > bar.right) x - bar.right else 0f) / sigma
+        val space = 0.5 * (dy * dy + off * off) + ln(sqrt(2 * Math.PI) * spaceSigmaY) + ln(maxOf(1f, bar.right - bar.left).toDouble()) - ln(pSpace)
+        return space < letter
+    }
+
     /**
      * Where a tap meant for [c] landed relative to where this model aims, as an observation triple for the
      * adaptation (letter, du, dv in key pitches); null without a key.
@@ -103,5 +135,12 @@ class TapModel(
         const val LEAN_Y_DP = -2.0f
         /** How much the next letter's likelihood counts against where the tap landed. */
         var PRIOR_WEIGHT = 1.0
+        /** Where taps meant for space land relative to the bar's middle, and their spread down, in dp (TSI: -43 and 48 px at 3.5 px per dp). */
+        var SPACE_LEAN_Y_DP = -12.3f
+        var SPACE_SIGMA_Y_DP = 13.8f
+        /** The space's odds against a letter when nothing is known about the word (TSI: 18% of characters typed). */
+        var SPACE_BASE = 0.18
+        /** The space's odds are kept between this and 1 minus it, whatever the word says. */
+        var SPACE_FLOOR = 0.02
     }
 }

@@ -41,6 +41,8 @@ data class Settings(
     val doubleSpacePeriod: Boolean = true,
     /** A glide may fix the glided word right before it, when the two together clearly read otherwise. */
     val fixPreviousGlide: Boolean = true,
+    /** Dictation is tidied: hesitations, stutters and spoken corrections ("no wait", "scratch that"). */
+    val tidyDictation: Boolean = true,
     /** After a space, the strip offers the words likely to come next. */
     val nextWord: Boolean = true,
     /** In code mode, ( [ { and quotes are typed in pairs. */

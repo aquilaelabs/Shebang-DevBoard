@@ -12,8 +12,10 @@ android {
         applicationId = "dev.shebang.devboard"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // From VERSION (major.minor.patch): 1.2.3 is 1002003, so every release installs over the one before.
         versionName = rootProject.file("VERSION").readText().trim()
+        versionCode = versionName!!.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
+            .let { (it.getOrElse(0) { 0 } * 1_000_000) + (it.getOrElse(1) { 0 } * 1_000) + it.getOrElse(2) { 0 } }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -44,6 +46,28 @@ android {
         checkReleaseBuilds = false
         disable += setOf("OldTargetApi", "GradleDependency", "AndroidGradlePluginVersion", "UseKtx", "ObsoleteSdkInt")
     }
+}
+
+
+/** The licence and the third-party notices, copied into the app's assets for Settings > About. */
+abstract class CopyAboutDocs : DefaultTask() {
+    @get:InputFiles abstract val docs: ConfigurableFileCollection
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun copy() {
+        val out = outputDir.get().asFile.resolve("about")
+        out.mkdirs()
+        docs.forEach { it.copyTo(out.resolve(it.name), overwrite = true) }
+    }
+}
+
+val copyAboutDocs = tasks.register<CopyAboutDocs>("copyAboutDocs") {
+    docs.from(rootProject.file("LICENSE"), rootProject.file("THIRD_PARTY_NOTICES.md"))
+}
+
+androidComponents {
+    onVariants { variant -> variant.sources.assets?.addGeneratedSourceDirectory(copyAboutDocs, CopyAboutDocs::outputDir) }
 }
 
 dependencies {

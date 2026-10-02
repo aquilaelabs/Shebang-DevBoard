@@ -52,6 +52,8 @@ class KeyboardView(context: Context) : View(context) {
         /** The glide was abandoned (touch cancelled). */
         fun onGlideCancel()
         fun onSpaceLongPress()
+        /** The mode key (#! or ABC) held down. */
+        fun onModeLongPress() = Unit
         /** Cursor drag along the space bar: +1 right, -1 left; with [select] (shift on) the selection grows. */
         fun onCursorMove(steps: Int, select: Boolean)
         /** Swiping left from backspace: [words] words before the cursor would go (0: none). */
@@ -128,6 +130,23 @@ class KeyboardView(context: Context) : View(context) {
 
     /** How likely each letter a..z is next in the word being typed, weighed with where a tap landed; null: none. */
     var letterPrior: FloatArray? = null
+
+    /** Whether a letter tap just above the space bar may be taken as a space ([spaceInstead]). */
+    var spaceFromLetters = false
+
+    /**
+     * The space bar, when a tap that came down on a letter of the row above it more likely meant the bar:
+     * thumbs reaching for space often land on the letters above it, and more readily where the word typed so
+     * far is likely finished ([TapModel.meansSpace]). Decided when the tap ends, so a glide can still start
+     * on those letters; a tap on the bar itself always stays a space.
+     */
+    private fun spaceInstead(key: Key, x: Float, y: Float): Key? {
+        if (!spaceFromLetters || key.letter == 0.toChar()) return null
+        val space = spaceKey ?: return null
+        val model = tapModel ?: return null
+        if (y < space.top - space.height || y > space.top) return null
+        return if (model.meansSpace(x, y, key.letter, TapModel.Bar(space.left, space.right, space.centerY), letterPrior)) space else null
+    }
 
     private fun resolveLetter(hit: Key, x: Float, y: Float): Key {
         if (hit.letter == 0.toChar()) return hit
@@ -213,8 +232,11 @@ class KeyboardView(context: Context) : View(context) {
         geometry = g
         spaceKey = g.keys.firstOrNull { it.action == KeyAction.SPACE && g.layout.composing }
         radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
-        labelSize = g.rowHeightPx * 0.42f
-        hintSize = g.rowHeightPx * 0.22f
+        // By the row height, but no wider than the key allows: on a taller keyboard the keys grow taller, not
+        // wider, and a capital "W" would reach the hint in the corner. The width caps are the proportions at
+        // the default height, which they leave unchanged.
+        labelSize = minOf(g.rowHeightPx * 0.42f, g.letterKeyWidth * 0.6f)
+        hintSize = minOf(g.rowHeightPx * 0.22f, g.letterKeyWidth * 0.32f)
         iconSize = g.rowHeightPx * 0.44f
         lip = (g.rowHeightPx * 0.045f).coerceIn(1.5f * density, 3f * density)
         labelPaint.textSize = labelSize
@@ -588,6 +610,10 @@ class KeyboardView(context: Context) : View(context) {
                 pointerCancelled[p] = true
                 listener?.onSpaceLongPress()
             }
+            key.action == KeyAction.MODE_CODE || key.action == KeyAction.MODE_TEXT -> {
+                pointerCancelled[p] = true
+                listener?.onModeLongPress()
+            }
             key.alternates.isNotEmpty() -> {
                 val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.alternates
                 popup.showAlternates(this, key, alts)
@@ -636,7 +662,7 @@ class KeyboardView(context: Context) : View(context) {
             else -> {
                 lastTapX = pointerDownX[id]
                 lastTapY = pointerDownY[id]
-                l?.onKeyTap(key, shiftState)
+                l?.onKeyTap(spaceInstead(key, lastTapX, lastTapY) ?: key, shiftState)
             }
         }
         popup.dismiss()
