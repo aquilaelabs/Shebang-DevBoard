@@ -140,7 +140,11 @@ class AutocorrectBenchmarkTest {
         }
         var changedRight = 0
         val right = words.distinctBy { it.word }
-        for (wc in right) if (suggester.autocorrectFrom(wc.word, suggester.suggest(wc.word, Suggester.AUTOCORRECT_CANDIDATES, context = wc.context), context = wc.context) != null) changedRight++
+        for (wc in right) {
+            val fix = suggester.autocorrectFrom(wc.word, suggester.suggest(wc.word, Suggester.AUTOCORRECT_CANDIDATES, context = wc.context), context = wc.context)
+            // A name given its capitals ("paris" -> "Paris") is not a change of word.
+            if (fix != null && !fix.equals(wc.word, ignoreCase = true)) changedRight++
+        }
         val pct = GlideBenchmarkTest::pct
         println("AUTOCORRECT $n slips: fixed ${pct(fixed, n)}, changed to another word ${pct(wrong, n)}, left alone ${pct(untouched, n)}")
         println("AUTOCORRECT ${right.size} words typed right: changed ${pct(changedRight, right.size)}")

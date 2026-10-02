@@ -72,8 +72,10 @@ class Suggester(
             out.addAll(scored.take(limit))
         }
 
-        // 2. Corrections: words within a small edit distance whose length is close to the typed length.
-        if (lower.length >= 2 && out.none { it.word.equals(typed, ignoreCase = true) }) {
+        // 2. Corrections: words within a small edit distance whose length is close to the typed length. Also when
+        // what was typed is only a name in lowercase ("thar" for "Thar"): it is as likely a slip ("that").
+        val lowercaseName = typed == lower && dict.indexOf(lower) >= 0 && !dict.hasLowercaseSpelling(lower)
+        if (lower.length >= 2 && (lowercaseName || out.none { it.word.equals(typed, ignoreCase = true) })) {
             val maxDist = if (lower.length <= 4) 1 else 2
             val corrections = ArrayList<Suggestion>()
             val words = dict.lower
@@ -154,23 +156,30 @@ class Suggester(
     fun autocorrectFrom(typed: String, candidates: List<Suggestion>, taps: SlipCost.Taps? = null, context: Context? = null): String? {
         if (typed.length < 2) return null
         val known = dict.indexOf(typed)
-        if (known >= 0) return contractionFor(typed, known, candidates)
         val lower = typed.lowercase()
+        // A name or abbreviation the dictionary only has capitalised, typed in lowercase, is not that word yet:
+        // a slip ("thar" for "that") or the name itself without its capitals ("google" for "Google").
+        val recase = known >= 0 && typed == lower && !dict.hasLowercaseSpelling(lower)
+        if (known >= 0 && !recase) return contractionFor(typed, known, candidates)
         val maxD = if (lower.length >= 6 || (taps != null && lower.length >= TAP_TWO_SLIPS_FROM)) 2 else 1
         var best: String? = null
         var bestScore = 0.0
         for (c in candidates) {
             val idx = dict.indexOf(c.word)
             if (idx < 0) continue
-            val used = (personalCounts?.getOrNull(idx) ?: 0) > 0
-            if (dict.tiers[idx] > 35 && !used) continue
             val w = dict.lower[idx]
-            if (lower.length == 2 && !(w.length == 3 && EditDistance.bounded(lower, w, 1) == 1)) continue
-            val d = EditDistance.bounded(lower, w, maxD)
-            if (d < 1) continue
+            // The name itself, given its capitals: no slip, whatever its tier. The same letters with an apostrophe
+            // ("mcdonalds" for "McDonald's") count as the word too.
+            val sameWord = (recase && w == lower) || (w != lower && w.replace("'", "") == lower)
+            val used = (personalCounts?.getOrNull(idx) ?: 0) > 0
+            if (dict.bestTier(idx) > 35 && !used && !sameWord) continue
+            if (!sameWord && lower.length == 2 && !(w.length == 3 && EditDistance.bounded(lower, w, 1) == 1)) continue
+            val d = if (sameWord) 0 else EditDistance.bounded(lower, w, maxD)
+            if (d < 1 && !sameWord) continue
             // How likely a finger makes this slip, against how common the word is.
             val firstPenalty = if (w[0] != lower[0]) 0.35 else 1.0
-            val score = weight(idx, context) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps))
+            val score = weight(idx, context) * firstPenalty * kotlin.math.exp(-SLIP_WEIGHT * SlipCost.cost(lower, w, taps)) *
+                (if (sameWord) RECASE_WEIGHT else 1.0)
             if (score > bestScore) {
                 bestScore = score
                 best = c.word
@@ -186,6 +195,11 @@ class Suggester(
         private const val CONTRACTION_RATIO = 50.0
         /** How strongly an unlikely slip counts against a common word (per unit of [SlipCost]). */
         var SLIP_WEIGHT = 8.0
+        /**
+         * How a name typed in lowercase counts as itself ("google" -> "Google") against the words it is a slip
+         * away from: a lowercase name is itself a little unlikely, so a common word a slip away can win.
+         */
+        var RECASE_WEIGHT = 1.0
         /** How much the words before count, against how common a word is overall (0..1). */
         var CONTEXT_WEIGHT = 0.75f
         /** With tap positions, words from this length may be two slips away (else from six letters). */

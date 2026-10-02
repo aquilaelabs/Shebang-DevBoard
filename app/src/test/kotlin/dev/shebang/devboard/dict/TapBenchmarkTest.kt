@@ -135,6 +135,7 @@ class TapBenchmarkTest {
         val realWord = typos.count { dictionary.contains(it.typed) }
         val notOffered = typos.count { w -> !dictionary.contains(w.typed) && suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES).none { it.word.equals(w.meant, ignoreCase = true) } }
         println("TAPS   of the typos: ${realWord} are themselves words, ${notOffered} more lack the word meant among the candidates")
+        System.getenv("RECASE_WEIGHT")?.toDoubleOrNull()?.let { Suggester.RECASE_WEIGHT = it }
         val weights = if (System.getenv("AUTOCORRECT_SWEEP") != null) listOf(0f, 0.5f, 0.75f, 1f) else listOf(Suggester.CONTEXT_WEIGHT)
         for ((useTaps, useContext, weight) in listOf(Triple(false, false, 0f), Triple(true, false, 0f)) + weights.map { Triple(true, true, it) }) {
             Suggester.CONTEXT_WEIGHT = weight
@@ -150,12 +151,16 @@ class TapBenchmarkTest {
                     fix.equals(w.meant, ignoreCase = true) -> fixed++
                     else -> wrong++
                 }
+                if (useContext && System.getenv("TAPS_LIST") != null && !fix.equals(w.meant, ignoreCase = true)) println("TAPS MISS ${w.typed} -> $fix (meant ${w.meant})")
             }
             var changed = 0
+            var recased = 0
             for (w in right) {
                 val taps = if (useTaps) SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) } else null
                 val ctx = if (useContext) contextOf(w) else null
-                if (suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx) != null) changed++
+                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx)
+                // A name given its capitals ("canada" -> "Canada") is not a change of word.
+                if (fix != null && fix.equals(w.typed, ignoreCase = true)) recased++ else if (fix != null) changed++
             }
             val pct = GlideBenchmarkTest::pct
             val label = when {
@@ -163,7 +168,7 @@ class TapBenchmarkTest {
                 useTaps -> "with tap positions:  "
                 else -> "keys only (before):  "
             }
-            println("TAPS $label typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}")
+            println("TAPS $label typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}, given capitals $recased")
         }
         Suggester.CONTEXT_WEIGHT = 0.75f
     }

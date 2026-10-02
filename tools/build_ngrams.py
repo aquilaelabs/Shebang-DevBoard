@@ -24,9 +24,9 @@ words outside the word list break the context (the next word backs off to its un
 
 Every sentence whose Tatoeba id % 50 == 7 is held out (about 2%) and never counted.
 
-Tatoeba's English sentences use "Tom" as the default name: it is 3% of all words, which would
-make a glide decoder see "tom" everywhere. Counts involving "tom" and "tom's" are scaled down
-so "tom" is as frequent as "john" in the same corpus. ("Mary" is not in the word list.)
+Tatoeba's English sentences use "Tom" and "Mary" as the default names: "tom" is 3% of all words,
+which would make a glide decoder see "tom" everywhere. Counts involving each (and its 's form) are
+scaled down so it is as frequent as "john" in the same corpus.
 
 Format (big-endian, as java.io.DataInputStream reads it):
   magic "SDNG", int version = 2
@@ -69,7 +69,7 @@ TRI_MAX_FOLLOWERS = 24
 BI_MAX_FOLLOWERS = 400
 HOLDOUT_MOD, HOLDOUT_REM = 50, 7
 HELDOUT_SAMPLE = 3000
-DEFAULT_NAMES = ("tom", "tom's")
+DEFAULT_NAMES = (("tom", "tom's"), ("mary", "mary's"))
 NAME_REFERENCE = "john"
 
 TOKEN = re.compile(r"[a-z]+(?:'[a-z]+)*|[0-9]+|[.!?]+")
@@ -136,6 +136,8 @@ def main():
     ap.add_argument("--tatoeba-weight", type=int, default=2)
     ap.add_argument("--exclude", nargs="*", default=[])
     ap.add_argument("--out", default=OUT)
+    ap.add_argument("--words", default=WORDS)
+    ap.add_argument("--heldout", default=HELDOUT)
     args = ap.parse_args()
     weight = {"t": args.tatoeba_weight, "c": args.cv_weight}
 
@@ -150,7 +152,7 @@ def main():
     print(f"excluding {len(excluded)} sentences")
 
     vocab_words = set()
-    with open(WORDS, encoding="utf-8") as fh:
+    with open(args.words, encoding="utf-8") as fh:
         for line in fh:
             w = line.split("\t")[0].lower()
             if w:
@@ -177,24 +179,32 @@ def main():
                 bi[(prev, t)] += wt
             prev = t
 
-    # Tone down Tatoeba's default name.
-    name_scale = 1.0
+    # Tone down Tatoeba's default names, each to the reference name's frequency.
+    name_scale: dict[str, float] = {}
     ref = uni.get(NAME_REFERENCE, 1)
-    top = uni.get(DEFAULT_NAMES[0], 0)
-    if top > ref:
-        f = ref / top
-        name_scale = f
-        for n in DEFAULT_NAMES:
-            if n in uni:
-                uni[n] = max(1, int(uni[n] * f))
-        for key in list(bi):
-            if key[0] in DEFAULT_NAMES or key[1] in DEFAULT_NAMES:
-                c = int(bi[key] * f)
+    for group in DEFAULT_NAMES:
+        top = uni.get(group[0], 0)
+        if top > ref:
+            f = ref / top
+            for n in group:
+                name_scale[n] = f
+                if n in uni:
+                    uni[n] = max(1, int(uni[n] * f))
+            print(f"scaled {group} by {f:.4f} to match '{NAME_REFERENCE}' ({ref})")
+
+    def scaled(counter):
+        for key in list(counter):
+            f = 1.0
+            for k in key:
+                f *= name_scale.get(k, 1.0)
+            if f < 1:
+                c = int(counter[key] * f)
                 if c > 0:
-                    bi[key] = c
+                    counter[key] = c
                 else:
-                    del bi[key]
-        print(f"scaled {DEFAULT_NAMES} by {f:.4f} to match '{NAME_REFERENCE}' ({ref})")
+                    del counter[key]
+
+    scaled(bi)
 
     words = sorted(uni)  # ids 1..V
     wid = {w: i + 1 for i, w in enumerate(words)}
@@ -233,14 +243,7 @@ def main():
             if p2 is not None and p1 is not None and (p2, p1) in frequent:
                 tri[(p2, p1, t)] += wt
             p2, p1 = p1, t
-    if name_scale < 1:
-        for key in list(tri):
-            if any(k in DEFAULT_NAMES for k in key):
-                c = int(tri[key] * name_scale)
-                if c > 0:
-                    tri[key] = c
-                else:
-                    del tri[key]
+    scaled(tri)
 
     out = bytearray()
     out += b"SDNG" + struct.pack(">i", 2) + struct.pack(">i", V)
@@ -303,13 +306,13 @@ def main():
         chosen.append((sid, " ".join(words_only)))
         if len(chosen) >= HELDOUT_SAMPLE:
             break
-    os.makedirs(os.path.dirname(HELDOUT), exist_ok=True)
-    with open(HELDOUT, "w", encoding="utf-8") as fh:
+    os.makedirs(os.path.dirname(args.heldout), exist_ok=True)
+    with open(args.heldout, "w", encoding="utf-8") as fh:
         fh.write("# Tatoeba sentences (https://tatoeba.org, CC BY 2.0 FR), held out of en_ngrams.bin.\n")
         fh.write("# id\\tlowercased words\n")
         for sid, text in chosen:
             fh.write(f"{sid}\t{text}\n")
-    print(f"wrote {len(chosen)} held-out sentences to {HELDOUT}")
+    print(f"wrote {len(chosen)} held-out sentences to {args.heldout}")
 
 
 if __name__ == "__main__":

@@ -47,6 +47,18 @@ class FrictionTest {
         val examples = HashMap<String, MutableList<String>>()
     }
 
+    /** The spelling a glide writes for [lower]: the lowest tier, then the all-lowercase one (as LexiconTrie picks). */
+    private fun spellingGlided(lower: String): String {
+        val d = dictionary
+        var best = d.indexOfLower(lower)
+        var i = best
+        while (i < d.size && d.lower[i] == lower) {
+            if (d.tiers[i] < d.tiers[best] || (d.tiers[i] == d.tiers[best] && d.words[i] == lower)) best = i
+            i++
+        }
+        return d.words[best]
+    }
+
     @Test
     fun friction() {
         val path = System.getenv("FUTO_SWIPES")
@@ -147,7 +159,7 @@ class FrictionTest {
                 s.glided++
                 // Shift for a capital the keyboard would not give.
                 val atStart = sentenceStart()
-                val display = dictionary.words[dictionary.indexOfLower(lower)]
+                val display = spellingGlided(lower)
                 val wantCap = core[0].isUpperCase()
                 val capitalize = atStart || (wantCap && display[0].isLowerCase())
                 if (!atStart && wantCap && display[0].isLowerCase()) {

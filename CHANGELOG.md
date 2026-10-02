@@ -35,6 +35,7 @@
 - Voice typing through the new Shebang Voice add-on (a separate download): a mic at the end of the strip; speech is turned into text on the phone, sentence by sentence, and the keyboard itself never uses the microphone (3430117)
 - Settings > About: version, licence, credits for everything the keyboard is built on, the source on GitHub, and Check for updates (opens the GitHub releases) (d025d9f)
 - Tidy dictation: um and uh, stutters and repeats are dropped, and spoken corrections work ('Tuesday, no wait, Wednesday'; 'scratch that'). On by default; Settings > Tidy dictation (3029383)
+- The dictionary knows names, places, brands and abbreviations (Paris, GitHub, YouTube, iPhone, URL, McDonald's), and a name typed in lowercase gets its capitals (012e58f)
 
 ### Changed
 

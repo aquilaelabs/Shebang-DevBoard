@@ -44,7 +44,7 @@ one folder). `--exclude` keeps the FUTO test and dev sentences out of the counts
 stays fair:
 
 ```sh
-tools/build_wordlist.py /path/to/scowl-2020.12.07 50
+tools/build_wordlist.py /path/to/scowl-2020.12.07
 tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
@@ -220,10 +220,24 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Toolchain**: Gradle 9.7.1, AGP 9.4.1 with its built-in Kotlin support (no `kotlin-android` plugin),
   Kotlin 2.4.20 compiler plugins for Compose and kotlinx.serialization, JDK 21, single `app` module.
 - **Word list**: SCOWL 2020.12.07, `english` + `american` lists (American spelling), size levels 10 to 50 as
-  frequency tiers, plus contractions and the common capitalised words up to level 35. Possessive forms
-  ("ability's") are dropped, but the 's contractions of a closed set of pronouns and function words ("it's",
-  "that's", "let's") are kept: SCOWL files them among the possessives. 61,846 words, 760 KB as text, written
-  in the order the app searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+  frequency tiers, plus contractions, capitalised words, SCOWL's proper names (brands, products, people) and
+  abbreviations written in capitals of three letters or more (and a few two-letter ones people type, such as
+  "AI" and "TV"), all up to level 50, and `tools/extra_words.txt`, this project's own short list of words SCOWL
+  lacks ("app", "offline", "config", "JSON", "Reddit", "WhatsApp", "McDonald's"). Possessive forms ("ability's")
+  are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
+  "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
+  searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+- **Names, brands and abbreviations** (the owner's request: "url, github, mcdonalds, google" were missing):
+  the capitalised words to level 50, the proper names and the abbreviations were added after measuring each
+  set. On the same 10,000 FUTO swipes glide top-1 went from 91.0% to 90.9%; FUTO swipes whose word the
+  dictionary lacked halved (969 to 492 of 10,000 read); on whole FUTO sentences the friction test needed 1.96
+  actions per word instead of 2.20 (names are glided instead of tapped out) with 98.8% of sentences exactly
+  as meant instead of 99.0%; on TSI, autocorrect fixed 77.7% of typos instead of 78.4%. The brands and
+  abbreviations alone cost nothing (78.4%, 2.14 actions per word) but leave out Paris and London, which SCOWL
+  files with the first names. Three rules keep names from getting in the way: a word that is also a name
+  ranks for autocorrect as the word does ("rich" against the name "Rich"), a name typed in lowercase is
+  weighed against the words it is a slip away from ("thar" becomes "that") and otherwise gets its capitals
+  ("github" becomes "GitHub"), and Tatoeba's second default name, "Mary", is scaled down like "Tom".
 - **Word frequencies and context**: word, word-pair and three-word counts from Tatoeba's English sentences
   (2.0 million sentences; CC BY 2.0 FR), counted twice, and Common Voice's English sentence collection (1.6
   million sentences; CC0), counted once: 43.5 million weighted words, counted only for words in the word list.
