@@ -87,6 +87,9 @@ class GlideCommitTest {
         for (c in s) if (c == ' ') controller.space() else controller.typeText(c.toString())
     }
 
+    /** The user moves on to another field: glided words still held back are learned. */
+    private fun leaveField() = controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
+
     /** The user taps at [at] a while after the keyboard's last edit. */
     private fun userMovesCursor(at: Int) {
         now += 2_000
@@ -124,7 +127,9 @@ class GlideCommitTest {
         type(" ")
         // The pronoun gets its capital as the word ends.
         assertEquals("hello I ", ic.toString())
-        assertEquals(listOf("hello", "I"), learned.map { it.first })
+        leaveField()
+        // A typed word is learned as it ends; a glided one is held back a while first.
+        assertEquals(listOf("I", "hello"), learned.map { it.first })
     }
 
     @Test
@@ -207,6 +212,7 @@ class GlideCommitTest {
         userMovesCursor(8)
         glide("would")
         type(" ")
+        leaveField()
         assertEquals(listOf("hello", "would"), learned.map { it.first })
         // Its stroke was not kept as a good glide either; the correction teaches instead.
         assertEquals(2, glidesLearned.size)
@@ -415,6 +421,7 @@ class GlideCommitTest {
         controller.deleteWords(1)
         assertEquals("hello ", ic.toString())
         controller.typeText("x")
+        leaveField()
         assertEquals(listOf("hello"), learned.map { it.first })
         assertEquals(1, glidesLearned.size)
     }
@@ -424,6 +431,7 @@ class GlideCommitTest {
         glide("hello", "fur")
         controller.deleteWords(1)
         assertEquals("hello ", ic.toString())
+        leaveField()
         assertEquals(listOf("hello"), learned.map { it.first })
     }
 
@@ -438,6 +446,7 @@ class GlideCommitTest {
         controller.deleteWords(0)
         assertEquals("hello", ic.toString())
         controller.typeText(".")
+        leaveField()
         assertEquals(listOf("hello"), learned.map { it.first })
     }
 
@@ -457,19 +466,64 @@ class GlideCommitTest {
         assertEquals("hello would", ic.toString())
         assertEquals(listOf(idx("would")), corrections.map { it.second })
         controller.typeText(".")
+        leaveField()
         assertEquals(listOf("hello", "would"), learned.map { it.first })
         // Only the glide kept as it was teaches the adaptation.
         assertEquals(1, glidesLearned.size)
     }
 
     @Test
-    fun aGlideIsLearnedOnceTheNextThingHappens() {
+    fun glidedWordsAreLearnedWhenTheFieldChanges() {
         glide("hello")
+        glide("world")
+        controller.typeText(",")
+        assertTrue(learned.isEmpty())
+        leaveField()
+        assertEquals(listOf(Triple("hello", null, true), Triple("world", "hello", false)), learned)
+        assertEquals(2, glidesLearned.size)
+    }
+
+    @Test
+    fun aGlidedWordIsLearnedOnceEightMoreFollowIt() {
+        glide("hello")
+        repeat(8) { glide("world") }
         assertTrue(learned.isEmpty())
         glide("world")
         assertEquals(listOf("hello"), learned.map { it.first })
-        controller.typeText(",")
-        assertEquals(listOf(Triple("hello", null, true), Triple("world", "hello", false)), learned)
+    }
+
+    @Test
+    fun aGlideFixedAFewWordsLaterIsNeverLearned() {
+        // "fur" noticed only after the next word: back up to it, take letters off, type the word meant.
+        glide("looking")
+        glide("fur")
+        glide("the")
+        controller.backspace()
+        assertEquals("looking fur ", ic.toString())
+        controller.backspace()
+        controller.backspace()
+        controller.backspace()
+        assertEquals("looking f", ic.toString())
+        type("or ")
+        leaveField()
+        assertEquals(listOf("for", "looking"), learned.map { it.first })
+        assertEquals(1, glidesLearned.size)
+    }
+
+    @Test
+    fun aGlidedWordBackedUpToButLeftAsItWasIsStillLearned() {
+        glide("looking")
+        glide("for")
+        controller.typeText("x")
+        controller.backspace()
+        controller.backspace()
+        controller.space()
+        leaveField()
+        assertEquals(listOf("looking", "for"), learned.map { it.first }.filter { it != "x" })
+    }
+
+    @Test
+    fun theContextIsTheSentenceStartAfterAFullStop() {
         assertEquals(NgramModel.SENTENCE_START, run {
             ic.commitText(". ", 1)
             controller.glideContext(dictionary, lm).context

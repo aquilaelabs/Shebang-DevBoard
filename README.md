@@ -361,12 +361,15 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   edit are taken as its own, so the keyboard's cursor never targets. A cursor at a word's edge targets
   nothing, because that is where a tap between words lands. The targeted word is underlined with a
   composing region; the replacement is checked against the text around the cursor first, and goes in
-  with the old word's capitals. The last glide stays unlearned until the next edit, so a glide redone
-  right away is not learned as it was; the correction teaches the adaptation instead.
+  with the old word's capitals. Glided words are not learned right away (see the learned user
+  dictionary), so a glide redone is not learned as it was; the correction teaches the adaptation instead.
 - **Learned user dictionary** (out of scope for v1, added at the user's request): on the phone only, in
   `personal_words.json` in the app's private files, written atomically when the keyboard hides. A word is
-  learned when it is final (typed words on commit; a glide when the next edit happens, so backspace, a
-  strip swap or redoing it right away are not learned as the wrong word).
+  learned when it is final (typed words on commit; a glided word once eight more glided words follow it
+  or the field changes, so backspace, a strip swap, redoing it, or backing up to it a few words later and
+  changing it are not learned as the wrong word: the owner usually notices a wrong glide only after the
+  next word, and learning it then made the same mistake likelier each time, its word, its pairs and its
+  stroke alike).
   Learnable: 2 to 32 letters with apostrophes or inner hyphens, nothing with digits. Never learned from
   password, number, email, URL, terminal or no-suggestion fields, or fields with
   `IME_FLAG_NO_PERSONALIZED_LEARNING`. New words join after 2 uses. At most 5,000 words and 20,000 pairs;

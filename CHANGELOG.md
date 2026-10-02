@@ -73,3 +73,4 @@
 - The keyboard height setting shows 110% (not 109%) and the other steps exactly (9c9b1ac)
 - The terminal bar fades out before the mic instead of being cut off by it (8da7014)
 - A glide deleted by swiping left from backspace is no longer learned, so a wrong glide removed that way does not make the same mistake likelier next time (0e07792)
+- A glided word you back up to and fix a few words later is no longer learned as the wrong word (369c718)
