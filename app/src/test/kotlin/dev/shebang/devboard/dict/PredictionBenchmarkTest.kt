@@ -18,15 +18,41 @@ class PredictionBenchmarkTest {
         else -> dictionary.indexOfLower(w).let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) }
     }
 
+    /** FUTO's test sentences (never counted into the model, another style than Tatoeba's), when FUTO_SWIPES names them. */
+    private val futoSentences: List<List<String>> by lazy {
+        val f = System.getenv("FUTO_SWIPES")?.let { java.io.File(it) } ?: return@lazy emptyList()
+        if (!f.isFile) return@lazy emptyList()
+        val seen = LinkedHashSet<String>()
+        f.bufferedReader().useLines { lines ->
+            for (l in lines) {
+                val m = Regex("\"sentence\":\"((?:[^\"\\\\]|\\\\.)*)\"").find(l) ?: continue
+                seen += m.groupValues[1]
+                if (seen.size >= 3000) break
+            }
+        }
+        seen.map { s -> Regex("[A-Za-z]+(?:['’][A-Za-z]+)*").findAll(s).map { it.value.replace('’', '\'') }.toList() }.filter { it.isNotEmpty() }
+    }
+
+    @Test
+    fun nextWordHitRateOnFutoSentences() {
+        org.junit.Assume.assumeTrue("FUTO_SWIPES not set", futoSentences.isNotEmpty())
+        hitRate("FUTO", futoSentences.take(2000))
+    }
+
     @Test
     fun nextWordHitRate() {
+        val (n, top3) = hitRate("", GlideBenchmarkTest.heldOut.take(2000))
+        assertTrue("predictions should find the next word often", top3 * 100 >= n * 20)
+    }
+
+    private fun hitRate(label: String, sentences: List<List<String>>): Pair<Int, Int> {
         var n = 0
         var top1 = 0
         var top3 = 0
         var bits3 = 0.0
         var bits2 = 0.0
         var scored = 0
-        for (sentence in GlideBenchmarkTest.heldOut.take(2000)) {
+        for (sentence in sentences) {
             val words = sentence.map { it.lowercase() }
             for (i in words.indices) {
                 val w = dictionary.indexOfLower(words[i])
@@ -44,8 +70,9 @@ class PredictionBenchmarkTest {
             }
         }
         val pct = GlideBenchmarkTest::pct
-        println("PREDICT $n words: next word first ${pct(top1, n)}, in the three ${pct(top3, n)}")
-        println("PREDICT perplexity trigram %.1f, bigram %.1f".format(kotlin.math.exp(bits3 / scored), kotlin.math.exp(bits2 / scored)))
-        assertTrue("predictions should find the next word often", top3 * 100 >= n * 20)
+        val tag = if (label.isEmpty()) "" else "$label "
+        println("PREDICT $tag$n words: next word first ${pct(top1, n)}, in the three ${pct(top3, n)}")
+        println("PREDICT ${tag}perplexity trigram %.1f, bigram %.1f".format(kotlin.math.exp(bits3 / scored), kotlin.math.exp(bits2 / scored)))
+        return n to top3
     }
 }

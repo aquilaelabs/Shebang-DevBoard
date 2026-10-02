@@ -40,7 +40,7 @@ class FutoSwipesTest {
                 outOfVocabulary++
                 continue
             }
-            out += ReplayGlide(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t)
+            out += ReplayGlide(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t, if (r.sentence.isEmpty() || r.wordIdx < 0) "" else beforeOf(r))
         }
         return out to outOfVocabulary
     }
@@ -154,6 +154,7 @@ class FutoSwipesTest {
                 val entry = r?.entries?.lastOrNull()
                 val sb = StringBuilder()
                 sb.append("{\"word\":").append(q(sw.word))
+                sb.append(",\"before\":").append(q(sw.before))
                 sb.append(",\"top\":").append(q(r?.alternatives?.firstOrNull()?.let { dictionary.lower[it] } ?: ""))
                 sb.append(",\"u\":[").append(sw.x.joinToString(",") { "%.4f".format(it / sw.layout.keyWidth) }).append("]")
                 sb.append(",\"v\":[").append(sw.y.joinToString(",") { "%.4f".format(it / sw.layout.keyHeight) }).append("]")
