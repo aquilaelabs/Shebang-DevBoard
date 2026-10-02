@@ -34,8 +34,9 @@ class TopStripView(context: Context) : LinearLayout(context) {
         rows.addView(suggestions, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         rows.addView(autofill, 0, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         addView(rows, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        // A little room between the bar's last chip and the mic.
-        addView(mic, LayoutParams(rowHeight, rowHeight).apply { marginStart = (4 * resources.displayMetrics.density).toInt() })
+        // The bar runs 8 dp under the mic's empty left edge, so its fade ends close to the glyph (about 7 dp
+        // off); the listening disc, at its fullest, reaches only into the bar's end padding.
+        addView(mic, LayoutParams(rowHeight, rowHeight).apply { marginStart = -(8 * resources.displayMetrics.density).toInt() })
         mic.visibility = View.GONE
         autofill.onDismiss = {
             autofillDismissed = true
