@@ -31,14 +31,18 @@ class SpeedTest {
         u.flush()
         val want = listOf("and so my fellow americans", "ask not", "what your country can do for you ask what you can do for your country")
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z ]"), " ").trim().replace(Regex(" +"), " ")
-        val path = Models.file(target).path
+        // -e model NAME: a model file in the add-on's files instead of the shipped one.
+        val path = InstrumentationRegistry.getArguments().getString("model")?.let { java.io.File(target.filesDir, it).path } ?: Models.file(target).path
         val lib = target.applicationInfo.nativeLibraryDir
-        for (flash in listOf(false, true)) {
+        val flashes = if (InstrumentationRegistry.getArguments().getString("flash") != null) listOf(true) else listOf(false, true)
+        Log.i("ShebangVoice", "SPEED model ${path.substringAfterLast('/')}")
+        for (flash in flashes) {
             val w = Whisper.load(path, lib, flash)!!
             w.transcribe(pieces[1]) // warm up
             for ((name, ctxOf, fallback) in listOf(
                 Triple("full window, fallback", { _: FloatArray -> 0 }, true),
                 Triple("full window", { _: FloatArray -> 0 }, false),
+                Triple("window = speech + 2 s", { a: FloatArray -> a.size / 320 + 100 }, false),
                 Triple("window = speech + 1 s", { a: FloatArray -> a.size / 320 + 50 }, false),
                 Triple("window = speech + 0.5 s", { a: FloatArray -> a.size / 320 + 25 }, false),
                 Triple("window = speech", { a: FloatArray -> a.size / 320 }, false),
