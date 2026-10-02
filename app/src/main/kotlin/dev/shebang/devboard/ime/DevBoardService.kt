@@ -158,6 +158,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         clipChip.listen {
             // Every copy the keyboard sees goes in the history (never a sensitive one).
             clipChip.textToKeep()?.let { t -> background.execute { clipHistory.add(t) } }
+            clipChip.imageToKeep()?.let { (uri, mime) -> background.execute { keepImage(uri, mime) } }
             if (isInputViewShown) updateClipChip()
             if (clipPanel?.visibility == View.VISIBLE) refreshClipPanel()
         }
@@ -331,6 +332,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         emojiGroups?.let { e.setEmoji(it) }
         val cp = dev.shebang.devboard.view.ClipboardPanelView(this)
         cp.listener = this
+        cp.imageFile = { clipHistory.imageFile(it) }
         cp.visibility = View.GONE
         column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         clipPanel = cp
@@ -926,6 +928,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val height = keysHeight()
         emojiPanel?.visibility = View.GONE
         cp.layoutParams = cp.layoutParams.apply { this.height = height }
+        val image = clipChip.imageToKeep()
+        if (image != null) background.execute { keepImage(image.first, image.second) }
         refreshClipPanel(clipChip.textToKeep())
         k.visibility = View.GONE
         cp.visibility = View.VISIBLE
@@ -938,6 +942,23 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val k = keyboard ?: return panelHeight
         if (k.visibility == View.VISIBLE && k.height > 0) panelHeight = k.height
         return if (panelHeight > 0) panelHeight else k.measuredHeight
+    }
+
+    /** Copies a picture from the clipboard into the history (bigger than the cap: not kept). */
+    private fun keepImage(uri: android.net.Uri, mime: String) {
+        runCatching {
+            contentResolver.openInputStream(uri)?.use { input ->
+                val buf = java.io.ByteArrayOutputStream()
+                val chunk = ByteArray(64 * 1024)
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n < 0) break
+                    buf.write(chunk, 0, n)
+                    if (buf.size() > ClipboardHistory.MAX_IMAGE_BYTES) return
+                }
+                clipHistory.addImage(buf.toByteArray(), mime)
+            }
+        }.onFailure { Log.w(TAG, "could not keep a copied picture", it) }
     }
 
     /** Re-reads the history (recording [current], the clip now, first) and shows it. */
@@ -957,22 +978,42 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.visibility = View.VISIBLE
     }
 
-    override fun onClipPaste(text: String) {
+    override fun onClipPaste(item: ClipboardHistory.Item) {
         feedback.keyPress()
-        this.text.finishComposing()
-        ic?.commitText(text, 1)
+        text.finishComposing()
+        if (!item.isImage) {
+            ic?.commitText(item.text, 1)
+            afterEdit()
+            return
+        }
+        // A picture goes in through the editor's content insertion, where the field takes that kind of image.
+        val file = clipHistory.imageFile(item) ?: return
+        val mime = item.mime ?: "image/png"
+        val info = currentInputEditorInfo
+        val accepted = info != null && androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info)
+            .any { android.content.ClipDescription.compareMimeTypes(mime, it) }
+        val conn = ic
+        if (!accepted || conn == null || info == null) {
+            android.widget.Toast.makeText(this, "This field doesn't take pictures", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val uri = androidx.core.content.FileProvider.getUriForFile(this, CLIP_AUTHORITY, file)
+        val content = androidx.core.view.inputmethod.InputContentInfoCompat(uri, android.content.ClipDescription("Picture", arrayOf(mime)), null)
+        androidx.core.view.inputmethod.InputConnectionCompat.commitContent(
+            conn, info, content, androidx.core.view.inputmethod.InputConnectionCompat.INPUT_CONTENT_GRANT_READ_URI_PERMISSION, null,
+        )
         afterEdit()
     }
 
-    override fun onClipPinned(text: String, pinned: Boolean) {
+    override fun onClipPinned(key: String, pinned: Boolean) {
         feedback.keyPress()
-        background.execute { clipHistory.setPinned(text, pinned) }
+        background.execute { clipHistory.setPinned(key, pinned) }
         refreshClipPanel()
     }
 
-    override fun onClipRemove(text: String) {
+    override fun onClipRemove(key: String) {
         feedback.keyPress()
-        background.execute { clipHistory.remove(text) }
+        background.execute { clipHistory.remove(key) }
         refreshClipPanel()
     }
 
@@ -1032,6 +1073,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         /** Learned uses since the last build after which hiding the keyboard rebuilds the frequencies. */
         private const val REBUILD_AFTER_WORDS = 50
         private const val TAG = "DevBoard"
+        /** The file provider that hands clipboard pictures to the app they are inserted into (manifest). */
+        private const val CLIP_AUTHORITY = "dev.shebang.devboard.clips"
         /** Autofill chips asked of the service at most. */
         private const val MAX_AUTOFILL = 6
     }

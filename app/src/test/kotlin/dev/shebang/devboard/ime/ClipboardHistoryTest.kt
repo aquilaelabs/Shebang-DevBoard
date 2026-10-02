@@ -65,4 +65,45 @@ class ClipboardHistoryTest {
         h.add("x".repeat(ClipboardHistory.MAX_CHARS + 1))
         assertTrue(h.list().isEmpty())
     }
+
+    private val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 1, 2, 3, 4)
+
+    @Test
+    fun aPictureIsKeptOnceAsAFileBesideTheHistory() {
+        val h = history()
+        assertTrue(h.addImage(png, "image/png"))
+        now += 1000
+        h.add("text")
+        now += 1000
+        assertTrue(h.addImage(png, "image/png"))
+        val items = h.list()
+        assertEquals(2, items.size)
+        val pic = items.first()
+        assertTrue(pic.isImage)
+        assertEquals("image/png", pic.mime)
+        assertTrue(h.imageFile(pic)!!.readBytes().contentEquals(png))
+        assertEquals(1, h.imageDir!!.listFiles()!!.size)
+    }
+
+    @Test
+    fun removingOrClearingAPictureDeletesItsFile() {
+        val h = history()
+        h.addImage(png, "image/png")
+        h.addImage(png + byteArrayOf(9), "image/jpeg")
+        val keys = h.list().map { it.key }
+        h.remove(keys[0])
+        assertEquals(1, h.imageDir!!.listFiles()!!.size)
+        h.clear()
+        assertEquals(0, h.imageDir!!.listFiles()!!.size)
+        assertTrue(h.list().isEmpty())
+    }
+
+    @Test
+    fun tooBigOrNotAPictureIsRefused() {
+        val h = history()
+        assertTrue(!h.addImage(ByteArray(ClipboardHistory.MAX_IMAGE_BYTES + 1), "image/png"))
+        assertTrue(!h.addImage(png, "text/plain"))
+        assertTrue(h.list().isEmpty())
+    }
 }
+

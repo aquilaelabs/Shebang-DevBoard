@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The clipboard history's pictures, and nothing else of the app's files. -->
+<paths>
+    <files-path name="clip_images" path="clip_images/" />
+</paths>

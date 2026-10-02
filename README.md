@@ -324,10 +324,14 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   height, with ABC (back to the keys), space and backspace along its bottom (backspace buzzes once per hold).
   The emoji panel lists Unicode's fully-qualified emoji by group (1,911, without skin-tone variants; those the
   phone's font cannot draw are left out), Recent first, with category tabs. The clipboard panel shows the text
-  copied lately, newest first and pinned first: tap to paste, pin to keep, remove one, or Clear all but the
-  pinned. Up to 20 copies, unpinned ones for 24 hours, in the app's private files; a copy the copying app
-  marks sensitive (a password manager's) is never kept, and only copies made while the keyboard runs are
-  seen. Both bar items draw original single-colour glyphs, like the mic.
+  and pictures copied lately, newest first and pinned first: tap to paste, pin to keep, remove one, or Clear
+  all but the pinned. Up to 20 copies, unpinned ones for 24 hours, in the app's private files (a picture as
+  the keyboard's own copy, up to 5 MB); a copy the copying app marks sensitive (a password manager's) is never
+  kept, and only copies made while the keyboard runs are seen. A picture goes into the field through the
+  editor's content insertion (`commitContent`, read access granted for that one picture through a
+  `FileProvider` that serves only those pictures) where the field accepts its type; elsewhere the keyboard
+  says the field takes no pictures. Checked on the emulator with a copied test card (`ClipboardImageTest`,
+  `-e clipimage 1`); inserting into an app that takes pictures is still to be tried on a phone. Both bar items draw original single-colour glyphs, like the mic.
 - **A next-word model** (the owner's request to use the GPU for suggestions too): an LSTM over words (32,000
   words, 128-wide word table shared by input and output, 384 units, 5M weights; 6.3 MB with the word table
   in 8 bits, which cost nothing measurable) reads the whole sentence before the cursor, where the n-grams read

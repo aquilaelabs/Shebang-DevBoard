@@ -18,13 +18,15 @@ import dev.shebang.devboard.ime.ClipboardHistory
 class ClipboardPanelView(context: Context) : LinearLayout(context) {
 
     interface Listener : PanelKeyListener {
-        fun onClipPaste(text: String)
-        fun onClipPinned(text: String, pinned: Boolean)
-        fun onClipRemove(text: String)
+        fun onClipPaste(item: ClipboardHistory.Item)
+        fun onClipPinned(key: String, pinned: Boolean)
+        fun onClipRemove(key: String)
         fun onClipClear()
     }
 
     var listener: Listener? = null
+    /** Where a picture item's image is kept. */
+    var imageFile: (ClipboardHistory.Item) -> java.io.File? = { null }
     private val density = resources.displayMetrics.density
     private var theme: KeyboardTheme? = null
     private val header = LinearLayout(context).apply { orientation = HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
@@ -78,7 +80,7 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
         list.removeAllViews()
         if (items.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = "Text you copy shows here, kept on this phone for 24 hours. Pin a copy to keep it."
+                text = "Text and pictures you copy show here, kept on this phone for 24 hours. Pin a copy to keep it."
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(t.keyTextSecondary)
                 gravity = Gravity.CENTER
@@ -93,31 +95,52 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
                 gravity = Gravity.CENTER_VERTICAL
                 background = rounded(t.key)
                 isClickable = true
-                setOnClickListener { listener?.onClipPaste(item.text) }
-                contentDescription = "Paste: ${item.text.take(60)}"
+                setOnClickListener { listener?.onClipPaste(item) }
+                contentDescription = if (item.isImage) "Insert picture" else "Paste: ${item.text.take(60)}"
             }
-            val text = TextView(context).apply {
-                text = item.text.replace(Regex("\\s+"), " ").trim()
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setTextColor(t.keyText)
-                setPadding((12 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
+            val thumb = if (item.isImage) imageFile(item)?.let { thumbnail(it) } else null
+            if (thumb != null) {
+                val iv = android.widget.ImageView(context).apply {
+                    setImageBitmap(thumb)
+                    scaleType = android.widget.ImageView.ScaleType.FIT_START
+                    adjustViewBounds = true
+                    setPadding((8 * density).toInt(), (6 * density).toInt(), (8 * density).toInt(), (6 * density).toInt())
+                }
+                row.addView(iv, LayoutParams(0, (THUMB_DP * density).toInt(), 1f))
+            } else {
+                val text = TextView(context).apply {
+                    text = if (item.isImage) "Picture" else item.text.replace(Regex("\\s+"), " ").trim()
+                    maxLines = 2
+                    ellipsize = TextUtils.TruncateAt.END
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setTextColor(t.keyText)
+                    setPadding((12 * density).toInt(), (8 * density).toInt(), (8 * density).toInt(), (8 * density).toInt())
+                }
+                row.addView(text, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             }
-            row.addView(text, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             val pin = chip(if (item.pinned) "Pinned" else "Pin", if (item.pinned) t.accent else t.keyFunctional, if (item.pinned) t.onAccent else t.stripText).apply {
                 contentDescription = if (item.pinned) "Unpin" else "Pin"
-                setOnClickListener { listener?.onClipPinned(item.text, !item.pinned) }
+                setOnClickListener { listener?.onClipPinned(item.key, !item.pinned) }
             }
             row.addView(pin, LayoutParams(LayoutParams.WRAP_CONTENT, (32 * density).toInt()).apply { rightMargin = gap })
             val remove = chip("✕", t.keyFunctional, t.stripText).apply {
                 contentDescription = "Remove"
-                setOnClickListener { listener?.onClipRemove(item.text) }
+                setOnClickListener { listener?.onClipRemove(item.key) }
             }
             row.addView(remove, LayoutParams((36 * density).toInt(), (32 * density).toInt()).apply { rightMargin = (8 * density).toInt() })
             list.addView(row, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT).apply { setMargins(gap * 2, gap, gap * 2, gap) })
         }
     }
+
+    /** A small copy of a picture, about [THUMB_DP] tall, decoded at a fraction of its size. */
+    private fun thumbnail(file: java.io.File): android.graphics.Bitmap? = runCatching {
+        val target = (THUMB_DP * density).toInt()
+        val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        android.graphics.BitmapFactory.decodeFile(file.path, bounds)
+        var sample = 1
+        while (bounds.outHeight / (sample * 2) >= target) sample *= 2
+        android.graphics.BitmapFactory.decodeFile(file.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = sample })
+    }.getOrNull()
 
     private fun chip(label: String, fill: Int, fg: Int) = TextView(context).apply {
         text = label
@@ -131,5 +154,9 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
     private fun rounded(color: Int) = GradientDrawable().apply {
         setColor(color)
         cornerRadius = 8 * density
+    }
+
+    private companion object {
+        const val THUMB_DP = 72
     }
 }

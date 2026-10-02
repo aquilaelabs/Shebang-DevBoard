@@ -47,6 +47,18 @@ class ClipboardChip(private val context: Context) {
         return cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.takeIf { it.isNotBlank() }
     }
 
+    /** A picture on the clipboard now, for the history: its content address and type; null when there is none or it is sensitive. */
+    fun imageToKeep(): Pair<android.net.Uri, String>? {
+        val cm = clipboard ?: return null
+        val desc = cm.primaryClipDescription ?: return null
+        if (Build.VERSION.SDK_INT >= 33 && desc.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true) return null
+        val mime = (0 until desc.mimeTypeCount).map { desc.getMimeType(it) }.firstOrNull { it.startsWith("image/") }
+        val uri = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri ?: return null
+        // The item's own type when the description only says image/*.
+        val type = context.contentResolver.getType(uri)?.takeIf { it.startsWith("image/") } ?: mime ?: return null
+        return uri to type
+    }
+
     /** The clip to offer now, or null. [masked] hides its text (password fields). */
     fun offer(masked: Boolean): Offer? {
         val cm = clipboard ?: return null
