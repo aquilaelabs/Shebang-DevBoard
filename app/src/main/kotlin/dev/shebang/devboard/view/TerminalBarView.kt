@@ -42,6 +42,9 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
     init {
         isHorizontalScrollBarEnabled = false
         overScrollMode = OVER_SCROLL_NEVER
+        // Chips fade out where there is more to scroll, instead of being cut off (at the mic, or the edge).
+        isHorizontalFadingEdgeEnabled = true
+        setFadingEdgeLength((28 * density).toInt())
         addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))
         setPadding((4 * density).toInt(), 0, (4 * density).toInt(), 0)
     }

@@ -69,3 +69,4 @@
 - Fixing the last glided word no longer swaps a right word for a rare one ('to work pretty' could become 'to dirk pretty') (b4e6ef5)
 - The setup screen's title no longer slides under the status bar when the keyboard opens (9d68563)
 - The keyboard height setting shows 110% (not 109%) and the other steps exactly (9c9b1ac)
+- The terminal bar fades out before the mic instead of being cut off by it (8da7014)

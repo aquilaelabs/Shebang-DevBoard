@@ -31,6 +31,8 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
 
     init {
         isHorizontalScrollBarEnabled = false
+        isHorizontalFadingEdgeEnabled = true
+        setFadingEdgeLength((28 * density).toInt())
         // A row narrower than the strip is stretched to it, so its gravity centres the chips.
         isFillViewport = true
         addView(row, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT))

@@ -34,7 +34,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
         rows.addView(suggestions, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         rows.addView(autofill, 0, LayoutParams(LayoutParams.MATCH_PARENT, rowHeight))
         addView(rows, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
-        addView(mic, LayoutParams(rowHeight, rowHeight))
+        // A little room between the bar's last chip and the mic.
+        addView(mic, LayoutParams(rowHeight, rowHeight).apply { marginStart = (4 * resources.displayMetrics.density).toInt() })
         mic.visibility = View.GONE
         autofill.onDismiss = {
             autofillDismissed = true
