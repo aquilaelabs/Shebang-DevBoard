@@ -225,6 +225,12 @@ its own, locally:
 
 ## Decisions
 
+- **Long-press row** (the owner's requests): a lowercase letter's row starts with its capital, ahead of the
+  corner character and accents, and a letter with none of those still offers its capital (with shift on, the
+  row is the capitals of its alternates, as before). Once the finger has reached up into the row, coming back
+  down onto the key (0.15 of a key height below the row, which overlaps the key's top 0.35), or going 0.35
+  of a key height below where the hold began, highlights nothing; letting go then types the key as a tap
+  would. The first entry is highlighted when the row opens, so a hold and lift still picks it.
 - **Export diagnostics** (the owner's request, so a user can send what the keyboard has learned about their
   typing when it isn't working well for them): Settings > About > Export diagnostics writes one JSON file
   through the system file picker, never over a network. In it: the app version, the phone model, Android

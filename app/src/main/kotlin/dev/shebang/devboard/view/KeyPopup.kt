@@ -69,6 +69,13 @@ class KeyPopup(context: Context) : View(context) {
         place(anchor, key, w, left)
     }
 
+    /** Highlights no alternate: letting go then picks none ([selectedAlternate] is null). */
+    fun clearSelection() {
+        if (alternates == null || selected < 0) return
+        selected = -1
+        invalidate()
+    }
+
     /** Updates the highlighted alternate from an x coordinate in anchor (keyboard) space. */
     fun updateSelection(anchorX: Float) {
         val alts = alternates ?: return
@@ -80,7 +87,7 @@ class KeyPopup(context: Context) : View(context) {
         }
     }
 
-    fun selectedAlternate(): String? = alternates?.getOrNull(selected)
+    fun selectedAlternate(): String? = if (selected < 0) null else alternates?.getOrNull(selected)
 
     private var offsetX = 0f
 

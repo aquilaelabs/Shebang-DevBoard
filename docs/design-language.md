@@ -254,7 +254,7 @@ Themes: Auto (the default) follows the system between Night and Day; Wallpaper t
 
 Applies to: app/src/main/kotlin/dev/shebang/devboard/view; key, keyboard
 
-Keys are keycaps: a rounded face (radius 16% of the row height, clamped 4-12dp) raised above an edge in a deeper shade of the face (45% toward black on dark themes, 22% on light), about 4.5% of the row height tall (1.5-3dp); a pressed key sinks onto its edge. Gaps: 5dp horizontal, 8dp vertical, one Canvas. Character keys use `key`, function keys `key-functional`, enter and caps lock the accent. Letter keys, and code mode's keys that hold a character (5 holds %, 6 holds ^), show their first long-press alternate as a small hint in the top-right corner; labels and hints are sized from the row height but never wider than the key allows (60% and 32% of its width). The space bar carries a short cursor mark (an underscore) in `key-text-secondary`.
+Keys are keycaps: a rounded face (radius 16% of the row height, clamped 4-12dp) raised above an edge in a deeper shade of the face (45% toward black on dark themes, 22% on light), about 4.5% of the row height tall (1.5-3dp); a pressed key sinks onto its edge. Gaps: 5dp horizontal, 8dp vertical, one Canvas. Character keys use `key`, function keys `key-functional`, enter and caps lock the accent. Letter keys, and code mode's keys that hold a character (5 holds %, 6 holds ^), show their first long-press alternate (the first after a letter's capital, which leads its long-press row) as a small hint in the top-right corner; labels and hints are sized from the row height but never wider than the key allows (60% and 32% of its width). The space bar carries a short cursor mark (an underscore) in `key-text-secondary`.
 
 ### icons
 

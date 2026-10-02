@@ -171,6 +171,9 @@ class KeyboardView(context: Context) : View(context) {
     // Long-press / repeat / drag apply to one pointer at a time.
     private var activePointer = -1
     private var longPressPending = false
+    /** Where the finger was when the alternates row opened, and whether it has reached up into the row since. */
+    private var popupOpenY = 0f
+    private var popupEntered = false
     private var repeatFired = false
     private var repeatInterval = 0L
     private var cursorDrag = false
@@ -468,7 +471,12 @@ class KeyboardView(context: Context) : View(context) {
 
     private fun moveTo(g: KeyboardGeometry, id: Int, key: Key, x: Float, y: Float, t: Long) {
         if (popup.isAlternates) {
-            popup.updateSelection(x)
+            // Back down on the key after reaching up into the row (or well down from where the hold began):
+            // nothing is highlighted, and letting go types the key itself.
+            val popupBottom = key.top + key.height * POPUP_OVERLAP
+            if (y < popupBottom) popupEntered = true
+            val onKey = (popupEntered && y > popupBottom + key.height * BACK_ON_KEY) || y > popupOpenY + key.height * BACK_DOWN
+            if (onKey) popup.clearSelection() else popup.updateSelection(x)
             return
         }
         val dx = x - pointerDownX[id]
@@ -625,10 +633,17 @@ class KeyboardView(context: Context) : View(context) {
                 pointerCancelled[p] = true
                 listener?.onModeLongPress()
             }
-            key.alternates.isNotEmpty() -> {
-                val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.alternates
+            key.alternates.isNotEmpty() || (key.letter != 0.toChar() && shiftState == ShiftState.OFF) -> {
+                // A lowercase letter offers its capital first, ahead of its accents and symbols.
+                val alts = when {
+                    key.letter == 0.toChar() -> key.alternates
+                    shiftState != ShiftState.OFF -> key.shiftedAlternates
+                    else -> listOf(key.shiftedLabel) + key.alternates
+                }
                 popup.showAlternates(this, key, alts)
                 popup.updateSelection(pointerLastX[p])
+                popupOpenY = pointerDownY[p]
+                popupEntered = false
             }
         }
     }
@@ -643,7 +658,16 @@ class KeyboardView(context: Context) : View(context) {
         val l = listener
         when {
             pointerCancelled[id] -> Unit
-            wasActive && popup.isAlternates -> popup.selectedAlternate()?.let { l?.onAlternate(key, it) }
+            wasActive && popup.isAlternates -> {
+                val alt = popup.selectedAlternate()
+                if (alt != null) {
+                    l?.onAlternate(key, alt)
+                } else {
+                    lastTapX = pointerDownX[id]
+                    lastTapY = pointerDownY[id]
+                    l?.onKeyTap(key, shiftState)
+                }
+            }
             wasActive && gliding -> {
                 var trailingSpace = false
                 if (inSpace) {
@@ -723,6 +747,12 @@ class KeyboardView(context: Context) : View(context) {
         private const val TRAIL_SEGMENTS = 60
         private const val MIN_SAMPLE_PX = 2f
         private const val LONG_PRESS_MS = 320L
+        /** How far the alternates row reaches down over its key, in key heights ([KeyPopup] places it so). */
+        private const val POPUP_OVERLAP = 0.35f
+        /** Below the row by this much (key heights), a finger that reached up into it is back on its key. */
+        private const val BACK_ON_KEY = 0.15f
+        /** Down by this much from where the hold began (key heights), the finger has gone back to its key. */
+        private const val BACK_DOWN = 0.35f
         private const val DOUBLE_TAP_MS = 350L
         private const val REPEAT_DELAY_MS = 380L
         private const val REPEAT_START_MS = 80L
