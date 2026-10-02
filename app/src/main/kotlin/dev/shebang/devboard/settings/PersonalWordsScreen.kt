@@ -10,7 +10,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -18,6 +20,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -30,6 +33,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -62,6 +66,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     var restoreDays by remember { mutableStateOf<List<Int>>(emptyList()) }
     var choosingDay by remember { mutableStateOf(false) }
     var confirmDay by remember { mutableStateOf<Int?>(null) }
+    var query by remember { mutableStateOf("") }
 
     fun refresh() {
         scope.launch {
@@ -91,14 +96,34 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
 
     LaunchedEffect(Unit) { refresh() }
 
+    val searching = query.isNotBlank()
     Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("Personal words") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-        )
+        Column {
+            TopAppBar(
+                title = { Text("Personal words") },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            )
+            // Under the title, so the matches show below it while the keyboard is up.
+            if (!words.isNullOrEmpty()) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text("Search learned words") },
+                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    trailingIcon = {
+                        if (query.isNotEmpty()) {
+                            IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Clear search") }
+                        }
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                )
+            }
+        }
     }) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            item {
+            // While searching, only the matching words.
+            if (!searching) item {
                 Text(
                     "Learned on this phone from what you type and glide, and never sent anywhere. Nothing is learned in " +
                         "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
@@ -107,7 +132,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
-            item {
+            if (!searching) item {
                 ListItem(
                     headlineContent = { Text("Reset glide and tap adaptation") },
                     supportingContent = {
@@ -116,7 +141,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     modifier = Modifier.clickable { confirmReset = true },
                 )
             }
-            item {
+            if (!searching) item {
                 val today = (System.currentTimeMillis() / 86_400_000L).toInt()
                 ListItem(
                     headlineContent = { Text("Undo recent learning") },
@@ -150,7 +175,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     )
                 }
             }
-            item {
+            if (!searching) item {
                 ListItem(
                     headlineContent = { Text("Android personal dictionary") },
                     supportingContent = { Text("Words added there are also glidable. Tap to open it.") },
@@ -163,20 +188,23 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     },
                 )
             }
-            item { HorizontalDivider() }
+            if (!searching) item { HorizontalDivider() }
             val list = words
             when {
                 list == null -> item { Text("Loading…", modifier = Modifier.padding(16.dp)) }
                 list.isEmpty() -> item { Text("No learned words yet.", modifier = Modifier.padding(16.dp)) }
                 else -> {
-                    item {
+                    if (!searching) item {
                         ListItem(
                             headlineContent = { Text("Delete all learned words") },
                             supportingContent = { Text(plural(list.size, "word")) },
                             modifier = Modifier.clickable { confirmClear = true },
                         )
                     }
-                    items(list, key = { it.lower }) { w ->
+                    val q = query.trim().lowercase()
+                    val shown = if (q.isEmpty()) list else list.filter { q in it.lower || q in it.display.lowercase() }
+                    if (shown.isEmpty()) item { Text("No learned words match \"${query.trim()}\".", modifier = Modifier.padding(16.dp)) }
+                    items(shown, key = { it.lower }) { w ->
                         ListItem(
                             headlineContent = { Text(w.display) },
                             supportingContent = {
