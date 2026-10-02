@@ -5,6 +5,7 @@ import android.text.InputType
 import dev.shebang.devboard.dict.LetterPrior
 import dev.shebang.devboard.dict.NgramModelTest
 import dev.shebang.devboard.dict.Suggester
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -17,6 +18,7 @@ class LetterPriorTest {
     private val lm get() = NgramModelTest.lm
     private val ic = FakeInputConnection()
     private var prior: FloatArray? = null
+    private var spaceFromLetters: Boolean? = null
     private val priors = ArrayList<FloatArray?>()
 
     private fun controller(inputType: Int = InputType.TYPE_CLASS_TEXT) = TextInputController(
@@ -27,6 +29,9 @@ class LetterPriorTest {
             override fun setLetterPrior(prior: FloatArray?) {
                 this@LetterPriorTest.prior = prior
                 priors += prior
+            }
+            override fun setSpaceFromLetters(on: Boolean) {
+                spaceFromLetters = on
             }
         },
         Executor { it.run() },
@@ -76,6 +81,19 @@ class LetterPriorTest {
     fun noOddsInAPasswordField() {
         controller(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD).type("th")
         assertNull(prior)
+        assertEquals(false, spaceFromLetters)
+    }
+
+    @Test
+    fun aFinishedWordIsLikelyToEndAndAPartOfOneIsNot() {
+        val c = controller()
+        c.type("because")
+        assertTrue("end ${prior!![LetterPrior.END]}", prior!![LetterPrior.END] > 0.9f)
+        assertEquals(true, spaceFromLetters)
+        c.type(" becau")
+        assertTrue("end ${prior!![LetterPrior.END]}", prior!![LetterPrior.END] < 0.05f)
+        c.type(" ")
+        assertTrue(prior!![LetterPrior.END].isNaN())
     }
 
     @Test

@@ -304,6 +304,19 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   96.6% and 97.3% (TSI's own language model's letter odds give 95.4%). Of the 83 words the dictionary lacks,
   91.6% came out right without the odds and 94.0% with them. Weights of 0.5, 1, 1.5 and 2 against the tap
   gave 95.9%, 97.3%, 96.5% and 94.4% of words; 1 it is.
+- **Thumbs that miss the space bar get a space** (the user's request): on TSI, 10.7% of taps meant for space
+  land on the letters above it (thumbs land about 12 dp above the bar's middle), while letters almost never
+  land on the bar (1 of 6,074). So a tap that comes down low on a letter just above the bar is weighed
+  between that letter and the bar: the bar as where its taps fall (anywhere across it; down, a 13.8 dp spread
+  around a point 12.3 dp above its middle) against the letter's tap model, each with its odds, where the
+  bar's are the chance that what has been typed is the whole word (the same dictionary and model sums as
+  the letter odds, 18% when nothing is known). On TSI's 9,854 phrase taps that landed on the bottom row or
+  the bar, taps meant for space typed as space went from 90.7% to 99.8% and letters turned into spaces from
+  1 to 15 (0.3%), 26 wrong in all against 513 (where taps land alone, without the word: 98.6%, 47, 123).
+  Leans of 8 to 16 dp and spreads of 11 to 17 dp all gave 23 to 40 wrong. A tap above the letter's middle
+  stays the letter however finished the word looks, a tap on the bar always stays a space, and it is
+  decided when the tap ends, so a glide can still start on those letters. Plain text fields only, like the
+  letter odds.
 - **Keys follow where the user taps** (R14): a touch on a letter key types the letter whose usual landing
   spot is nearest: its centre nudged by the overall lean and this user's learned offsets (the same tap
   adaptation as R12, capped at 0.35 of a key). Other keys go by their drawn edges, and the key preview

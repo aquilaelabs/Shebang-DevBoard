@@ -863,6 +863,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.letterPrior = prior
     }
 
+    override fun setSpaceFromLetters(on: Boolean) {
+        keyboard?.spaceFromLetters = on
+    }
+
     override fun showCorrection(typed: String, fix: String, other: String?) {
         strip?.suggestions?.showCorrection(typed, fix, other)
     }

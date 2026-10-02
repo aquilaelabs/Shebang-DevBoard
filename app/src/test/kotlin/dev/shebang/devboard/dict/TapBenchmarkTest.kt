@@ -321,4 +321,104 @@ class TapBenchmarkTest {
         }
         LetterPrior.FLOOR = savedFloor
     }
+
+    /**
+     * Space or letter, on every phrase tap that landed on the bottom letter row or the space bar: by the drawn
+     * edges (before), by where taps meant for each land, and with the word's odds of ending there (from the
+     * words before and the letters typed so far, as the keyboard has them). A tap on the bar always stays a
+     * space. TAPS_SWEEP=1 also varies the space's odds.
+     */
+    @Test
+    fun spaceOnRealTaps() {
+        val dir = System.getenv("TSI_DIR")?.let { File(it) }
+        assumeTrue("TSI_DIR not set", dir != null && File(dir, "touch_data.csv").isFile)
+        val layout = layout(dir!!)
+        val keys = Json.parseToJsonElement(File(dir, "keyboard_data.json").readText()).jsonObject["keys_info"]!!.jsonObject
+        val rects = keys.entries.associate { (k, v) ->
+            val o = v.jsonObject
+            val cx = o["key_center_x"]!!.jsonPrimitive.float
+            val cy = o["key_center_y"]!!.jsonPrimitive.float
+            val w = o["key_width"]!!.jsonPrimitive.float / 2
+            val h = o["key_height"]!!.jsonPrimitive.float / 2
+            k to floatArrayOf(cx - w, cy - h, cx + w, cy + h)
+        }
+        fun hit(x: Float, y: Float) = rects.entries.firstOrNull { (_, r) -> x >= r[0] && x <= r[2] && y >= r[1] && y <= r[3] }?.key
+        val sr = rects["SPACE"]!!
+        val bar = TapModel.Bar(sr[0], sr[2], (sr[1] + sr[3]) / 2)
+        val prompts = HashMap<String, String>()
+        File(dir, "prompt_data.csv").readLines().drop(1).forEach { l ->
+            val f = fields(l)
+            if (f[3] == "phrase") prompts["${f[0]}/${f[1]}/${f[2]}"] = f[4]
+        }
+        class Tap(val meant: Char, val x: Float, val y: Float, val hit: String, val prefix: String, val c1: Int, val c2: Int)
+        val lm = GlideBenchmarkTest.lm
+        fun ctx(w: String?) = if (w == null) NgramModel.SENTENCE_START else dictionary.indexOfLower(w).let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) }
+        val first = HashMap<String, HashMap<Int, Pair<Float, Float>>>()
+        File(dir, "touch_data.csv").bufferedReader().useLines { lines ->
+            for (l in lines.drop(1)) {
+                val f = fields(l)
+                val trial = "${f[0]}/${f[1]}/${f[2]}"
+                if (trial in prompts) first.getOrPut(trial) { HashMap() }.putIfAbsent(f[5].toInt(), f[6].toFloat() to f[7].toFloat())
+            }
+        }
+        val taps = ArrayList<Tap>()
+        val bottom = "zxcvbnm"
+        for ((trial, prompt) in prompts) {
+            val t = first[trial] ?: continue
+            for ((i, ch) in prompt.withIndex()) {
+                val meant = if (ch == ' ') ' ' else if (ch.isLetter()) ch.lowercaseChar() else continue
+                val (x, y) = t[i] ?: continue
+                val h = hit(x, y) ?: continue
+                if (h != "SPACE" && (h.length != 1 || h[0] !in bottom)) continue
+                var b = i
+                while (b > 0 && prompt[b - 1].isLetter()) b--
+                val prefix = prompt.substring(b, i).lowercase()
+                val before = Regex("[A-Za-z]+").findAll(prompt.substring(0, b)).map { it.value.lowercase() }.toList()
+                val c1 = ctx(before.getOrNull(before.size - 1))
+                val c2 = if (before.isEmpty()) NgramModel.UNKNOWN else ctx(before.getOrNull(before.size - 2))
+                taps += Tap(meant, x, y, h, prefix, c1, c2)
+            }
+        }
+        var model = TapModel(layout, TSI_DENSITY)
+        val priors = HashMap<String, FloatArray?>()
+        fun prior(tp: Tap): FloatArray? = priors.getOrPut("${tp.c2}/${tp.c1}/${tp.prefix}") {
+            LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, tp.c2, tp.c1) + 0.25 * lm.unigramCost(it)).toDouble()) }.next(tp.prefix)
+        }
+        val spaces = taps.count { it.meant == ' ' }
+        val letters = taps.size - spaces
+        val pct = GlideBenchmarkTest::pct
+        println("TAPS SPACE ${taps.size} taps on the bottom row or the bar: $spaces meant for space, $letters for letters")
+        fun score(label: String, decide: (Tap) -> Boolean) {
+            var spaceRight = 0
+            var letterWrong = 0
+            for (tp in taps) {
+                val space = decide(tp)
+                if (tp.meant == ' ' && space) spaceRight++
+                if (tp.meant != ' ' && space) letterWrong++
+            }
+            println("TAPS SPACE ${label.padEnd(40)} spaces typed ${pct(spaceRight, spaces)}, letters made spaces ${pct(letterWrong, letters)} ($letterWrong); wrong ${spaces - spaceRight + letterWrong}")
+        }
+        fun resolved(tp: Tap, p: FloatArray?) = tp.hit == "SPACE" || model.meansSpace(tp.x, tp.y, model.nearestLetter(tp.x, tp.y, prior = p) ?: tp.hit[0], bar, p)
+        score("drawn edges (before)") { it.hit == "SPACE" }
+        score("where taps land") { resolved(it, null) }
+        score("+ the word's odds of ending") { resolved(it, prior(it)) }
+        if (System.getenv("TAPS_SWEEP") == null) return
+        val saved = Triple(TapModel.SPACE_BASE, TapModel.SPACE_FLOOR, TapModel.SPACE_LEAN_Y_DP)
+        for (base in listOf(0.1, 0.18, 0.3)) for (floor in listOf(0.005, 0.02, 0.05, 0.1)) {
+            TapModel.SPACE_BASE = base
+            TapModel.SPACE_FLOOR = floor
+            score("sweep base $base floor $floor") { resolved(it, prior(it)) }
+        }
+        TapModel.SPACE_BASE = saved.first
+        TapModel.SPACE_FLOOR = saved.second
+        val savedSigma = TapModel.SPACE_SIGMA_Y_DP
+        for (lean in listOf(-8f, -12.3f, -16f)) for (sigma in listOf(11f, 13.8f, 17f)) {
+            TapModel.SPACE_LEAN_Y_DP = lean
+            TapModel.SPACE_SIGMA_Y_DP = sigma
+            model = TapModel(layout, TSI_DENSITY)
+            score("sweep lean $lean sigma $sigma") { resolved(it, prior(it)) }
+        }
+        TapModel.SPACE_LEAN_Y_DP = saved.third
+        TapModel.SPACE_SIGMA_Y_DP = savedSigma
+    }
 }

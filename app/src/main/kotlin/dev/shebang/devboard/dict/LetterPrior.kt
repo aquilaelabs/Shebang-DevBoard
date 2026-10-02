@@ -3,34 +3,47 @@ package dev.shebang.devboard.dict
 /**
  * How likely each letter is to come next in the word being typed: the dictionary's words that start with
  * what has been typed so far, each weighted by how likely it is (with the words before, when given), summed
- * by their next letter. Lets a tap between two keys go to the letter that makes a word.
+ * by their next letter. Lets a tap between two keys go to the letter that makes a word, and a tap between a
+ * letter and the space bar go to the space when what has been typed is likely the whole word ([END]).
  */
 class LetterPrior(
     private val dict: Dictionary,
     /** How likely dictionary word i is here (any scale; only ratios matter). */
     private val weight: (Int) -> Double,
 ) {
-    /** P(next letter) for a..z after [prefix] (lowercase letters), or null when no word continues it. */
+    /**
+     * P(next letter) for a..z after [prefix] (lowercase letters), and at [END] how likely [prefix] is the whole
+     * word (NaN for an empty prefix); null when no word starts with it.
+     */
     fun next(prefix: String): FloatArray? {
         val range = dict.prefixRange(prefix)
         if (range.isEmpty()) return null
         val sums = DoubleArray(26)
         var total = 0.0
+        var whole = 0.0
         val n = prefix.length
         for (i in range) {
             val w = dict.lower[i]
-            if (w.length <= n) continue
+            if (w.length <= n) {
+                if (w.length == n) whole += weight(i)
+                continue
+            }
             val c = w[n] - 'a'
             if (c !in 0..25) continue
             val p = weight(i)
             sums[c] += p
             total += p
         }
-        if (total <= 0.0) return null
-        return FloatArray(26) { (sums[it] / total).toFloat() }
+        if (total + whole <= 0.0) return null
+        val out = FloatArray(27) { if (it < 26 && total > 0.0) (sums[it] / total).toFloat() else 0f }
+        out[END] = if (n == 0) Float.NaN else (whole / (total + whole)).toFloat()
+        return out
     }
 
     companion object {
+        /** Index of the word's end in what [next] returns. */
+        const val END = 26
+
         /** A share of the odds spread evenly, so names and words the dictionary lacks can still be typed. */
         var FLOOR = 0.1f
 

@@ -129,6 +129,23 @@ class KeyboardView(context: Context) : View(context) {
     /** How likely each letter a..z is next in the word being typed, weighed with where a tap landed; null: none. */
     var letterPrior: FloatArray? = null
 
+    /** Whether a letter tap just above the space bar may be taken as a space ([spaceInstead]). */
+    var spaceFromLetters = false
+
+    /**
+     * The space bar, when a tap that came down on a letter of the row above it more likely meant the bar:
+     * thumbs reaching for space often land on the letters above it, and more readily where the word typed so
+     * far is likely finished ([TapModel.meansSpace]). Decided when the tap ends, so a glide can still start
+     * on those letters; a tap on the bar itself always stays a space.
+     */
+    private fun spaceInstead(key: Key, x: Float, y: Float): Key? {
+        if (!spaceFromLetters || key.letter == 0.toChar()) return null
+        val space = spaceKey ?: return null
+        val model = tapModel ?: return null
+        if (y < space.top - space.height || y > space.top) return null
+        return if (model.meansSpace(x, y, key.letter, TapModel.Bar(space.left, space.right, space.centerY), letterPrior)) space else null
+    }
+
     private fun resolveLetter(hit: Key, x: Float, y: Float): Key {
         if (hit.letter == 0.toChar()) return hit
         val g = geometry ?: return hit
@@ -636,7 +653,7 @@ class KeyboardView(context: Context) : View(context) {
             else -> {
                 lastTapX = pointerDownX[id]
                 lastTapY = pointerDownY[id]
-                l?.onKeyTap(key, shiftState)
+                l?.onKeyTap(spaceInstead(key, lastTapX, lastTapY) ?: key, shiftState)
             }
         }
         popup.dismiss()

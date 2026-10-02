@@ -67,4 +67,36 @@ class TapModelTest {
     fun aTapInTheMiddleOfAKeyIsThatKey() {
         for (c in 'a'..'z') if (layout.hasLetter(c)) assertEquals(c, model.nearestLetter(x(c), y(c)))
     }
+
+    private val bar by lazy {
+        val space = GlideBenchmarkTest.geometry.keys.first { it.action == dev.shebang.devboard.layout.KeyAction.SPACE }
+        TapModel.Bar(space.left, space.right, space.centerY)
+    }
+    private val barTop get() = GlideBenchmarkTest.geometry.keys.first { it.action == dev.shebang.devboard.layout.KeyAction.SPACE }.top
+
+    private fun odds(end: Float) = FloatArray(27) { if (it < 26) 1f / 26 else end }
+
+    @Test
+    fun aTapInTheMiddleOfALetterAboveTheBarStaysThatLetter() {
+        assertTrue(!model.meansSpace(x('b'), y('b'), 'b', bar, odds(0.98f)))
+        assertTrue(!model.meansSpace(x('n'), y('n'), 'n', bar, null))
+    }
+
+    @Test
+    fun aTapLowOnALetterAboveTheBarIsASpaceWhereTheWordIsFinished() {
+        val low = barTop - 0.15f * model.pitchY
+        assertTrue(model.meansSpace(x('b'), low, 'b', bar, odds(0.9f)))
+        assertTrue(!model.meansSpace(x('b'), low, 'b', bar, odds(0f)))
+    }
+
+    @Test
+    fun theWordsOddsOfEndingMoveTheLineDownTheKey() {
+        fun line(end: Float): Float {
+            var y = barTop
+            while (y > y('n') && model.meansSpace(x('n'), y, 'n', bar, odds(end))) y -= 1f
+            return y
+        }
+        assertTrue(line(0.9f) < line(0.1f))
+    }
 }
+

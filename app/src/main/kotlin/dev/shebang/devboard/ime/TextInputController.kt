@@ -55,6 +55,8 @@ class TextInputController(
         fun showCorrection(typed: String, fix: String, other: String?) = showCandidates(listOfNotNull(typed, fix, other))
         /** How likely each letter a..z is to be typed next ([LetterPrior]), or null for no opinion. */
         fun setLetterPrior(prior: FloatArray?) = Unit
+        /** Whether a letter tap just above the space bar may be taken as a space (plain text fields only). */
+        fun setSpaceFromLetters(on: Boolean) = Unit
     }
 
     /** What the keyboard learns from; implementations apply the user's settings. */
@@ -140,7 +142,9 @@ class TextInputController(
     fun refreshLetterPrior() {
         val gen = ++priorGeneration
         ui.setLetterPrior(null)
-        if (codeMode || !field.allowsComposing || field.variant != FieldVariant.PLAIN) return
+        val plainText = !codeMode && field.allowsComposing && field.variant == FieldVariant.PLAIN
+        ui.setSpaceFromLetters(plainText)
+        if (!plainText) return
         val (dictionary, lm) = predictionModel ?: return
         val ic = connection() ?: return
         if (!ic.getSelectedText(0).isNullOrEmpty()) return
