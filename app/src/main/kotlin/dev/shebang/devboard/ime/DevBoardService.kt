@@ -394,11 +394,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val dm = resources.displayMetrics
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val baseRow = KeyboardSizing.rowHeightPx(resources, settings.heightScale)
-        val rowScale = if (layout.mode == "code") 0.86f else 1f
         val numberRow = settings.numberRow && layout.mode == "text"
-        val rows = layout.rows.size + (if (numberRow && layout.numberRow != null) 1 else 0)
+        // Every mode is as tall as text mode (with its number row when that is on): switching to code mode or
+        // a number pad never moves the strip or the app above. Code mode's five rows share that height.
+        val textLayout = layouts.text
+        val rows = textLayout.rows.size + (if (settings.numberRow && textLayout.numberRow != null) 1 else 0)
         val maxHeight = dm.heightPixels * (if (landscape) 0.6f else 0.5f)
-        val height = (rows * baseRow * rowScale).coerceAtMost(maxHeight).toInt()
+        val height = (rows * baseRow).coerceAtMost(maxHeight).toInt()
         // The IME window can be narrower than the display (landscape cutout insets), so follow the view.
         val width = if (k.width > 0) k.width else dm.widthPixels
         val g = KeyboardGeometry(

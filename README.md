@@ -544,7 +544,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   look, and the extras code needs take the fifth row. Counted in prose (Tatoeba and Common Voice) the symbols
   are `.` 64%, `'` 17%, `,` 7%, `?` 6%; in code (this project's sources) `.` 16%, `(` `)` 12% each, `=` 9%,
   `,` 7%, `-` 6%, while `%` `^` `` ` `` `~` are almost never typed, so `%` and `^` were the two put on a hold.
-- **Code mode height**: five rows at 86% of the text row height so the keyboard grows only a little.
+- **Code mode height**: every mode is exactly as tall as text mode (with its number row when that is on), so
+  switching to code mode or a number pad never moves the strip or the app above (the owner disliked the
+  jump); code mode's five rows share that height, 80% of a text row each (100% with the number row on).
 - **Mode persistence**: the text/code choice persists across fields; numeric fields force the numeric pad
   while in text mode.
 - **Suggestion strip order**: the typed word on the left (when it is not itself a suggestion), the best
