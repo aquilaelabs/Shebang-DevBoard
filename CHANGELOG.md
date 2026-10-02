@@ -81,3 +81,4 @@
 - A glide deleted by swiping left from backspace is no longer learned, so a wrong glide removed that way does not make the same mistake likelier next time (0e07792)
 - A glided word you back up to and fix a few words later is no longer learned as the wrong word (369c718)
 - On a taller keyboard the letters no longer grow into the number and accent hints; the bar's fade by the mic is shorter (3d7052c)
+- A correction that arrives after you have started the next word is no longer lost: it goes in ahead of the word you are typing (1484317)

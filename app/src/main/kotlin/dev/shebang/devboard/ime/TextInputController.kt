@@ -1063,15 +1063,21 @@ class TextInputController(
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
-                if (late != null && ic2 != null && !isComposing &&
-                    ic2.getTextBeforeCursor(typed.length + after.length, 0)?.toString() == typed + after
+                // The next word may already be under way: the fix goes in front of it, which stays composing.
+                val next = if (isComposing) word.toString() else ""
+                val expected = typed + after + next
+                if (late != null && ic2 != null && ic2.getSelectedText(0).isNullOrEmpty() &&
+                    ic2.getTextBeforeCursor(expected.length, 0)?.toString() == expected
                 ) {
                     ownEdit()
                     ic2.beginBatchEdit()
-                    ic2.deleteSurroundingText(typed.length + after.length, 0)
+                    if (next.isNotEmpty()) ic2.finishComposingText()
+                    ic2.deleteSurroundingText(expected.length, 0)
                     ic2.commitText(late + after, 1)
+                    if (next.isNotEmpty()) ic2.setComposingText(next, 1)
                     ic2.endBatchEdit()
-                    lastAutocorrect = Autocorrected(typed, late, after)
+                    // Backspace's undo of a correction only applies while it is the last thing typed.
+                    if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
