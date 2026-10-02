@@ -38,6 +38,15 @@ class ClipboardChip(private val context: Context) {
         }
     }
 
+    /** The text on the clipboard now, for the history; null when it is not text or the copying app marked it sensitive. */
+    fun textToKeep(): String? {
+        val cm = clipboard ?: return null
+        val desc = cm.primaryClipDescription ?: return null
+        if (!desc.hasMimeType("text/*")) return null
+        if (Build.VERSION.SDK_INT >= 33 && desc.extras?.getBoolean(ClipDescription.EXTRA_IS_SENSITIVE) == true) return null
+        return cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()?.takeIf { it.isNotBlank() }
+    }
+
     /** The clip to offer now, or null. [masked] hides its text (password fields). */
     fun offer(masked: Boolean): Offer? {
         val cm = clipboard ?: return null

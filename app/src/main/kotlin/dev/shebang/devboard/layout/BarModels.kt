@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 /** One item on the terminal bar. Flat shape so the editor and import/export stay simple. */
 @Serializable
 data class BarItem(
-    /** "key", "modifier" or "snippet". */
+    /** "key", "modifier", "snippet", or a panel: "emoji" or "clipboard". */
     val type: String,
     val label: String,
     /** key: keycode name from [KeyCodeNames]. */
@@ -23,6 +23,8 @@ data class BarItem(
     val isKey: Boolean get() = type == TYPE_KEY
     val isModifier: Boolean get() = type == TYPE_MODIFIER
     val isSnippet: Boolean get() = type == TYPE_SNIPPET
+    /** Opens a panel in place of the keys (the emoji or the clipboard history). */
+    val isPanel: Boolean get() = type == TYPE_EMOJI || type == TYPE_CLIPBOARD
 
     fun validate() {
         when (type) {
@@ -32,6 +34,7 @@ data class BarItem(
             }
             TYPE_MODIFIER -> requireNotNull(mod) { "modifier '$label' needs a mod" }
             TYPE_SNIPPET -> requireNotNull(text) { "snippet '$label' needs text" }
+            TYPE_EMOJI, TYPE_CLIPBOARD -> Unit
             else -> throw IllegalArgumentException("unknown bar item type '$type'")
         }
         require(label.isNotBlank()) { "bar item has an empty label" }
@@ -41,12 +44,16 @@ data class BarItem(
         const val TYPE_KEY = "key"
         const val TYPE_MODIFIER = "modifier"
         const val TYPE_SNIPPET = "snippet"
+        const val TYPE_EMOJI = "emoji"
+        const val TYPE_CLIPBOARD = "clipboard"
 
         fun key(label: String, code: String, vararg mods: String, repeat: Boolean = false) =
             BarItem(TYPE_KEY, label, code = code, mods = mods.toList(), repeat = repeat)
 
         fun modifier(label: String, mod: String) = BarItem(TYPE_MODIFIER, label, mod = mod)
         fun snippet(label: String, text: String) = BarItem(TYPE_SNIPPET, label, text = text)
+        fun emoji(label: String = "😀") = BarItem(TYPE_EMOJI, label)
+        fun clipboard(label: String = "📋") = BarItem(TYPE_CLIPBOARD, label)
     }
 }
 

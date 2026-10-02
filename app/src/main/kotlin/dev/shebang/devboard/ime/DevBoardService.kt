@@ -73,7 +73,8 @@ import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 
 class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui,
-    GlideSession.Listener, TextInputController.Learner {
+    GlideSession.Listener, TextInputController.Learner, dev.shebang.devboard.view.EmojiPanelView.Listener,
+    dev.shebang.devboard.view.ClipboardPanelView.Listener {
 
     private enum class Mode { TEXT, CODE }
 
@@ -101,6 +102,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var strip: TopStripView? = null
     private var keyboard: KeyboardView? = null
     private var popup: KeyPopup? = null
+    /** The emoji panel, shown in place of the keys while open. */
+    private var emojiPanel: dev.shebang.devboard.view.EmojiPanelView? = null
+    private var emojiGroups: List<Pair<String, List<String>>>? = null
+    /** The clipboard history panel, likewise. */
+    private var clipPanel: dev.shebang.devboard.view.ClipboardPanelView? = null
+    private lateinit var clipHistory: ClipboardHistory
 
     private var mode = Mode.TEXT
     private var field: FieldInfo = FieldInfo.from(null)
@@ -132,6 +139,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onCreate() {
         super.onCreate()
         clipChip = ClipboardChip(this)
+        clipHistory = ClipboardHistory(java.io.File(filesDir, ClipboardHistory.FILE))
         voice = VoiceClient(this, object : VoiceClient.Listener {
             override fun onVoiceState(state: Int, level: Int) = showVoiceState(state, level)
             override fun onVoiceText(text: String) {
@@ -147,7 +155,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             }
             override fun onVoiceError(code: Int) = voiceError(code)
         })
-        clipChip.listen { if (isInputViewShown) updateClipChip() }
+        clipChip.listen {
+            // Every copy the keyboard sees goes in the history (never a sensitive one).
+            clipChip.textToKeep()?.let { t -> background.execute { clipHistory.add(t) } }
+            if (isInputViewShown) updateClipChip()
+            if (clipPanel?.visibility == View.VISIBLE) refreshClipPanel()
+        }
         layouts = LayoutRepository(this)
         glideSession = GlideSession(this)
         personal = PersonalWords.get(filesDir)
@@ -285,6 +298,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val t = KeyboardTheme.build(this, settings)
         theme = t
         keyboard?.theme = t
+        emojiPanel?.setTheme(t)
+        clipPanel?.setTheme(t)
         popup?.setTheme(t)
         strip?.setTheme(t)
         root?.setBackgroundColor(t.background)
@@ -308,6 +323,17 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         column.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
         column.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val e = dev.shebang.devboard.view.EmojiPanelView(this)
+        e.listener = this
+        e.visibility = View.GONE
+        column.addView(e, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
+        emojiPanel = e
+        emojiGroups?.let { e.setEmoji(it) }
+        val cp = dev.shebang.devboard.view.ClipboardPanelView(this)
+        cp.listener = this
+        cp.visibility = View.GONE
+        column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
+        clipPanel = cp
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
         val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
@@ -411,6 +437,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        if (!restarting) closePanels()
         field = FieldInfo.from(info)
         text.startInput(field)
         val app = info?.packageName.orEmpty()
@@ -504,6 +531,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
+        closePanels()
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
         strip?.resetAutofill()
@@ -858,6 +886,124 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         text.finishComposing()
         ic?.commitText(item.text ?: return, 1)
         afterEdit()
+    }
+
+    override fun onBarPanel(item: BarItem) {
+        when (item.type) {
+            BarItem.TYPE_EMOJI -> if (emojiPanel?.visibility == View.VISIBLE) closePanels() else openEmoji()
+            BarItem.TYPE_CLIPBOARD -> if (clipPanel?.visibility == View.VISIBLE) closePanels() else openClipboard()
+        }
+    }
+
+    /** The emoji panel in place of the keys, the keyboard's height; the list is read once, off the main thread. */
+    private fun openEmoji() {
+        val k = keyboard ?: return
+        val e = emojiPanel ?: return
+        text.finishComposing()
+        val groups = emojiGroups
+        if (groups == null) {
+            background.execute {
+                val loaded = e.loadEmoji()
+                main.post {
+                    emojiGroups = loaded
+                    e.setEmoji(loaded)
+                }
+            }
+        }
+        val height = keysHeight()
+        clipPanel?.visibility = View.GONE
+        e.layoutParams = e.layoutParams.apply { this.height = height }
+        e.open()
+        k.visibility = View.GONE
+        e.visibility = View.VISIBLE
+    }
+
+    /** The clipboard history in place of the keys; what is on the clipboard now is recorded first. */
+    private fun openClipboard() {
+        val k = keyboard ?: return
+        val cp = clipPanel ?: return
+        text.finishComposing()
+        val height = keysHeight()
+        emojiPanel?.visibility = View.GONE
+        cp.layoutParams = cp.layoutParams.apply { this.height = height }
+        refreshClipPanel(clipChip.textToKeep())
+        k.visibility = View.GONE
+        cp.visibility = View.VISIBLE
+    }
+
+    /** The panel's height: the keys', remembered while they show (a panel may already hide them). */
+    private var panelHeight = 0
+
+    private fun keysHeight(): Int {
+        val k = keyboard ?: return panelHeight
+        if (k.visibility == View.VISIBLE && k.height > 0) panelHeight = k.height
+        return if (panelHeight > 0) panelHeight else k.measuredHeight
+    }
+
+    /** Re-reads the history (recording [current], the clip now, first) and shows it. */
+    private fun refreshClipPanel(current: String? = null) {
+        val cp = clipPanel ?: return
+        background.execute {
+            current?.let { clipHistory.add(it) }
+            val items = clipHistory.list()
+            main.post { cp.show(items) }
+        }
+    }
+
+    /** Back to the keys. */
+    private fun closePanels() {
+        emojiPanel?.visibility = View.GONE
+        clipPanel?.visibility = View.GONE
+        keyboard?.visibility = View.VISIBLE
+    }
+
+    override fun onClipPaste(text: String) {
+        feedback.keyPress()
+        this.text.finishComposing()
+        ic?.commitText(text, 1)
+        afterEdit()
+    }
+
+    override fun onClipPinned(text: String, pinned: Boolean) {
+        feedback.keyPress()
+        background.execute { clipHistory.setPinned(text, pinned) }
+        refreshClipPanel()
+    }
+
+    override fun onClipRemove(text: String) {
+        feedback.keyPress()
+        background.execute { clipHistory.remove(text) }
+        refreshClipPanel()
+    }
+
+    override fun onClipClear() {
+        feedback.keyPress()
+        background.execute { clipHistory.clear() }
+        refreshClipPanel()
+    }
+
+    override fun onEmoji(emoji: String) {
+        feedback.keyPress()
+        text.typeText(emoji)
+        afterEdit()
+    }
+
+    override fun onPanelSpace() {
+        feedback.keyPress()
+        text.space()
+        afterEdit()
+    }
+
+    override fun onPanelBackspace(first: Boolean) {
+        // One buzz per hold, as on the keyboard: the repeats only click.
+        if (first) feedback.keyPress(KeyAction.BACKSPACE) else feedback.keyRepeat(KeyAction.BACKSPACE)
+        text.backspace()
+        afterEdit()
+    }
+
+    override fun onPanelClose() {
+        feedback.keyPress()
+        closePanels()
     }
 
     // ---- TextInputController.Ui ----------------------------------------------------------------------

@@ -318,6 +318,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Glide parameters after the three-word model** (1 Oct): re-tuned on FUTO's dev split with the new
   model, the search reached 92.2% there (from 91.3%) but 90.7% on the test split against 91.0% for the
   values kept, so the earlier values stay.
+- **Emoji and clipboard panels on the terminal bar** (the owner's request: not a key on the keyboard, so the
+  keys stay as they are): two bar items, Emoji and Clipboard, first on the default bar and like any other item
+  movable, removable and addable again in the bar editor. Each opens a panel in place of the keys, the keys'
+  height, with ABC (back to the keys), space and backspace along its bottom (backspace buzzes once per hold).
+  The emoji panel lists Unicode's fully-qualified emoji by group (1,911, without skin-tone variants; those the
+  phone's font cannot draw are left out), Recent first, with category tabs. The clipboard panel shows the text
+  copied lately, newest first and pinned first: tap to paste, pin to keep, remove one, or Clear all but the
+  pinned. Up to 20 copies, unpinned ones for 24 hours, in the app's private files; a copy the copying app
+  marks sensitive (a password manager's) is never kept, and only copies made while the keyboard runs are
+  seen. Both bar items draw original single-colour glyphs, like the mic.
 - **A next-word model** (the owner's request to use the GPU for suggestions too): an LSTM over words (32,000
   words, 128-wide word table shared by input and output, 384 units, 5M weights; 6.3 MB with the word table
   in 8 bits, which cost nothing measurable) reads the whole sentence before the cursor, where the n-grams read

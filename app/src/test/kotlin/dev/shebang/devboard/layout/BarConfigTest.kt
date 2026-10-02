@@ -10,7 +10,10 @@ class BarConfigTest {
     @Test
     fun defaultBarMatchesSpec() {
         val bar = BarConfig.parse(File("src/main/assets/bar/default.json").readText())
-        val labels = bar.items.map { it.label }
+        // The emoji and clipboard panels come first; the keys follow.
+        assertEquals(listOf(BarItem.TYPE_EMOJI, BarItem.TYPE_CLIPBOARD), bar.items.take(2).map { it.type })
+        assertTrue(bar.items.take(2).all { it.isPanel })
+        val labels = bar.items.drop(2).map { it.label }
         val expectedStart = listOf("Esc", "Tab", "Ctrl", "Alt", "Shift", "^C", "^D", "^Z", "^L", "^R", "←", "↑", "↓", "→", "Home", "End", "PgUp", "PgDn", "Del")
         assertEquals(expectedStart, labels.take(expectedStart.size))
         assertEquals((1..12).map { "F$it" }, labels.drop(expectedStart.size).take(12))

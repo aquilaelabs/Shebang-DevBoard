@@ -569,6 +569,8 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
         when (type) {
             BarItem.TYPE_KEY -> BarItem.key(label.ifBlank { code }, code, *listOfNotNull(if (ctrl) "ctrl" else null, if (alt) "alt" else null, if (shift) "shift" else null).toTypedArray(), repeat = repeat)
             BarItem.TYPE_MODIFIER -> BarItem.modifier(label.ifBlank { mod.replaceFirstChar(Char::uppercase) }, mod)
+            BarItem.TYPE_EMOJI -> if (label.isBlank()) BarItem.emoji() else BarItem.emoji(label)
+            BarItem.TYPE_CLIPBOARD -> if (label.isBlank()) BarItem.clipboard() else BarItem.clipboard(label)
             else -> BarItem.snippet(label.ifBlank { text.trim() }, text)
         }.also { it.validate() }
     }.getOrNull()
@@ -582,6 +584,11 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     for ((t, l) in listOf(BarItem.TYPE_KEY to "Key", BarItem.TYPE_MODIFIER to "Modifier", BarItem.TYPE_SNIPPET to "Snippet")) {
+                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard")) {
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
                     }
                 }
@@ -604,6 +611,8 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     BarItem.TYPE_MODIFIER -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (m in listOf("ctrl", "alt", "shift", "meta")) FilterChip(selected = mod == m, onClick = { mod = m }, label = { Text(m.replaceFirstChar(Char::uppercase)) })
                     }
+                    BarItem.TYPE_EMOJI -> Text("Opens the emoji panel in place of the keys.")
+                    BarItem.TYPE_CLIPBOARD -> Text("Opens your recent copies in place of the keys.")
                     else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Text to insert") })
                 }
                 Spacer(Modifier.width(1.dp))
