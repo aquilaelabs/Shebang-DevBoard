@@ -613,8 +613,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   Android 12+; every other theme is an original fixed palette (see Themes).
 - **A look of its own** (asked for by the user: it should not look like a copy of Gboard): the keys stay
   where they were, but each is a keycap, a face raised above an edge in a deeper shade that a press sinks
-  onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a block cursor,
-  return a bent arrow with an open chevron head, shift a caret that gains an underline while on); and the
+  onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a bar cursor,
+  return a bent arrow with an open chevron head, shift a caret that gains an underline while on and doubles for caps lock); and the
   space bar carries a small cursor mark. The default is no longer the system's wallpaper colours (the look
   the stock keyboard wears) but Auto, which follows the system between the original Night and Day.
 - **Themes**: Auto, Wallpaper (the system palette on Android 12+, Auto before) and twelve original palettes
@@ -743,4 +743,4 @@ Layout:
 - [ ] Number row on: a fifth row appears in text mode only.
 - [ ] Strip: Auto swaps bar and suggestions; Always bar never shows suggestions; Two rows shows both.
 - [ ] Long-press space opens the system keyboard picker; dragging along space moves the cursor.
-- [ ] Shift: tap once for one capital, twice quickly for caps lock (accent-coloured key).
+- [ ] Shift: tap once for one capital (caret over a bar); tap twice quickly, or hold it, for caps lock (two carets over a bar, accent-coloured key).

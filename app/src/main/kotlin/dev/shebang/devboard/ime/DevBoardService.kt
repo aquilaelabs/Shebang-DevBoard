@@ -816,6 +816,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         afterEdit()
     }
 
+    override fun onShiftLongPress() {
+        // A second buzz says the hold took: caps lock is on.
+        feedback.keyPress(KeyAction.SHIFT)
+    }
+
     override fun onModeLongPress() {
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
     }

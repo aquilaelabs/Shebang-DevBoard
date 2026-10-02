@@ -52,6 +52,8 @@ class KeyboardView(context: Context) : View(context) {
         /** The glide was abandoned (touch cancelled). */
         fun onGlideCancel()
         fun onSpaceLongPress()
+        /** Shift held down: caps lock is now on (for feedback). */
+        fun onShiftLongPress() = Unit
         /** The mode key (#! or ABC) held down. */
         fun onModeLongPress() = Unit
         /** Cursor drag along the space bar: +1 right, -1 left; with [select] (shift on) the selection grows. */
@@ -319,7 +321,11 @@ class KeyboardView(context: Context) : View(context) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
             // Always the enter icon, whatever the field's action (search, send, go): the user's choice.
             KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enter, fg, false)
-            KeyAction.SHIFT -> drawIcon(canvas, if (shiftState == ShiftState.OFF) KeyIcons.shift else KeyIcons.shiftOn, fg, false)
+            KeyAction.SHIFT -> drawIcon(canvas, when (shiftState) {
+                ShiftState.OFF -> KeyIcons.shift
+                ShiftState.ON -> KeyIcons.shiftOn
+                ShiftState.LOCKED -> KeyIcons.shiftLocked
+            }, fg, false)
             KeyAction.SPACE -> {
                 // A cursor mark on the space bar.
                 val w = minOf(rect.width() * 0.08f, 16 * density)
@@ -607,6 +613,12 @@ class KeyboardView(context: Context) : View(context) {
         if (p < 0) return
         val key = pointerKey[p] ?: return
         when {
+            key.action == KeyAction.SHIFT -> {
+                // Holding shift locks capitals, as a double tap does; letting go then changes nothing.
+                pointerCancelled[p] = true
+                setShift(ShiftState.LOCKED)
+                listener?.onShiftLongPress()
+            }
             key.action == KeyAction.SPACE -> {
                 pointerCancelled[p] = true
                 listener?.onSpaceLongPress()
