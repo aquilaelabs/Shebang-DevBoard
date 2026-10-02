@@ -232,8 +232,11 @@ class KeyboardView(context: Context) : View(context) {
         geometry = g
         spaceKey = g.keys.firstOrNull { it.action == KeyAction.SPACE && g.layout.composing }
         radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
-        labelSize = g.rowHeightPx * 0.42f
-        hintSize = g.rowHeightPx * 0.22f
+        // By the row height, but no wider than the key allows: on a taller keyboard the keys grow taller, not
+        // wider, and a capital "W" would reach the hint in the corner. The width caps are the proportions at
+        // the default height, which they leave unchanged.
+        labelSize = minOf(g.rowHeightPx * 0.42f, g.letterKeyWidth * 0.6f)
+        hintSize = minOf(g.rowHeightPx * 0.22f, g.letterKeyWidth * 0.32f)
         iconSize = g.rowHeightPx * 0.44f
         lip = (g.rowHeightPx * 0.045f).coerceIn(1.5f * density, 3f * density)
         labelPaint.textSize = labelSize
