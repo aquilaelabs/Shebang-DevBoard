@@ -48,6 +48,30 @@ object GlideText {
     }
 
     /** The model context for a word from [contextWord]. */
+    private val SENTENCE_TOKEN = Regex("[a-z]+(?:'[a-z]+)*|[0-9]+|[.!?]+|\n")
+
+    /**
+     * The words of the sentence the cursor is in, before it, lowercase, as the next-word model was trained
+     * (tools/build_ngrams.py's tokens): a sentence ends at . ! ? or a line break, and a number is a null.
+     */
+    fun sentenceWords(before: CharSequence): List<String?> {
+        val out = ArrayList<String?>()
+        val text = before.toString().lowercase().replace('’', '\'').replace('‘', '\'')
+        for (m in SENTENCE_TOKEN.findAll(text)) {
+            val t = m.value
+            when {
+                t[0] == '.' || t[0] == '!' || t[0] == '?' || t[0] == '\n' -> out.clear()
+                t[0].isDigit() -> out += null
+                else -> out += t
+            }
+        }
+        // The text may begin mid-sentence: its first word may be cut, and older words matter least anyway.
+        return if (out.size > MAX_SENTENCE_WORDS) out.subList(out.size - MAX_SENTENCE_WORDS, out.size) else out
+    }
+
+    /** The most words of a sentence the next-word model reads. */
+    const val MAX_SENTENCE_WORDS = 24
+
     fun contextId(word: String, dictionary: Dictionary, lm: NgramModel): Int = when (word) {
         SENTENCE_START -> NgramModel.SENTENCE_START
         "" -> NgramModel.UNKNOWN

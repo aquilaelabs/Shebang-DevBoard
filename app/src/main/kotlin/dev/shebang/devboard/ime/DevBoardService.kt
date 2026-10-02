@@ -228,6 +228,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideLanguage = b.glide
         text.suggester = b.suggester
         text.predictionModel = b.dictionary to b.lm
+        text.nextWordModel = b.glide.nextWord?.let { dev.shebang.devboard.dict.NextWordModel.copyOf(it) }
         // Dictionary positions changed: remembered glides and the targeted word go.
         if (!first) text.onLanguageChanged()
     }

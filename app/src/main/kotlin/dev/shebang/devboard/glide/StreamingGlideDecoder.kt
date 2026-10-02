@@ -61,6 +61,11 @@ data class GlideParams(
      * (0: not used). Chosen on FUTO's dev split; see the README's Decisions.
      */
     val modelWeight: Float = 0.75f,
+    /**
+     * How much the next-word model ([dev.shebang.devboard.dict.NextWordModel]), reading the whole sentence
+     * before the glide, counts for the glide's first word (0: not used). Chosen on FUTO's dev split.
+     */
+    val nextWordWeight: Float = 0.5f,
 )
 
 /** What came before a glide in the text. */
@@ -74,6 +79,11 @@ class GlideContext(
     val history: List<GlideWord> = emptyList(),
     /** The word before [context] (same kinds of value), for the trigram; [NgramModel.UNKNOWN] when not known. */
     val context2: Int = NgramModel.UNKNOWN,
+    /**
+     * The sentence before the glide, for the next-word model ([dev.shebang.devboard.ime.GlideText.sentenceWords]);
+     * null when not known.
+     */
+    val sentence: List<String?>? = null,
 )
 
 /** A glided word as it stands in the text, with its runners-up so later glides can revise it. */
@@ -142,6 +152,9 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     private val modelKeys = IntArray(64)
     private var modelU = FloatArray(0)
     private var modelV = FloatArray(0)
+    /** This decoder's own next-word model, and its costs for the glide under way (null: none). */
+    private val nextWord = if (params.nextWordWeight != 0f) lang.nextWord?.let { dev.shebang.devboard.dict.NextWordModel.copyOf(it) } else null
+    private var nextWordCosts: FloatArray? = null
 
     // ---- Geometry ------------------------------------------------------------------------------------
     /** Key centres in pitches: [baseU]/[baseV] from the geometry, [keyU]/[keyV] moved by the user's offsets. */
@@ -292,6 +305,8 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         leadIn = false
         baseContext = context.context
         baseContext2 = context.context2
+        // Read while the finger is still moving, so lifting it waits for nothing.
+        nextWordCosts = context.sentence?.let { s -> nextWord?.logProbs(s) }
         segments = 0
         totalPoints = 0
         val all = context.history
@@ -794,6 +809,16 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         for (i in 0 until n) pz[i] = slowness(pd[i], ref)
         for (c in 0 until candCount) candCost[c] = align(candNode[c], coasted)
         keepBest(params.keep) { candCost[it] + lmW * lm.unigramCost(candWord[it]) }
+        // The next-word model weighs in on the glide's first word, from the whole sentence before it.
+        val nw = nextWordCosts
+        if (nw != null && segments == historyCount) {
+            val ids = lang.nextWordIds
+            val unknown = nextWord!!.unknownCost + UNKNOWN_WORD_COST
+            for (c in 0 until candCount) {
+                val id = ids[candWord[c]]
+                candCost[c] += params.nextWordWeight * (if (id >= 0) nw[id] else unknown)
+            }
+        }
         // The learned reading of the stroke weighs in on the words kept, for a stroke that is one word
         // whole (not a word of a phrase, whose stroke runs in from or out to the space bar).
         val m = model
@@ -1205,6 +1230,8 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         const val MAX_HISTORY = 4
         /** Most states per segment; the next value marks a finished word coasting into the space bar. */
         private const val MAX_SUB = 62
+        /** A word the next-word model does not know: as likely as its unknown word, less a little. */
+        private const val UNKNOWN_WORD_COST = 2f
         /** A turn of this many radians or more counts in full for [GlideParams.turnShort]. */
         private const val TURN_FULL = 2.5f
         private const val DONE = 63

@@ -45,7 +45,23 @@ class PredictionBenchmarkTest {
         assertTrue("predictions should find the next word often", top3 * 100 >= n * 20)
     }
 
-    private fun hitRate(label: String, sentences: List<List<String>>): Pair<Int, Int> {
+    private val nw get() = GlideBenchmarkTest.nextWord
+
+    /** With PREDICT_SWEEP=1, the weights of the two models against each other (on FUTO_SWIPES's sentences). */
+    @Test
+    fun weightSweep() {
+        org.junit.Assume.assumeTrue(System.getenv("PREDICT_SWEEP") != null && futoSentences.isNotEmpty() && nw != null)
+        val saved = WordPredictions.NGRAM_WEIGHT to WordPredictions.NEXT_WORD_WEIGHT
+        for ((a, b) in listOf(1f to 0f, 0f to 1f, 0.25f to 0.75f, 0.5f to 0.5f, 0.75f to 0.25f, 0.35f to 0.65f, 0.65f to 0.35f)) {
+            WordPredictions.NGRAM_WEIGHT = a
+            WordPredictions.NEXT_WORD_WEIGHT = b
+            hitRate("SWEEP n-grams $a next-word $b", futoSentences.take(2000))
+        }
+        WordPredictions.NGRAM_WEIGHT = saved.first
+        WordPredictions.NEXT_WORD_WEIGHT = saved.second
+    }
+
+    private fun hitRate(label: String, sentences: List<List<String>>, useNextWord: Boolean = true): Pair<Int, Int> {
         var n = 0
         var top1 = 0
         var top3 = 0
@@ -60,7 +76,8 @@ class PredictionBenchmarkTest {
                 val c1 = ctx(words.getOrNull(i - 1))
                 val c2 = if (i == 0) NgramModel.UNKNOWN else ctx(words.getOrNull(i - 2))
                 val rep = lm.contextOf(w)
-                val guesses = lm.predict(c2, c1, 3).map { lm.contextOf(it) }
+                val sentence = if (useNextWord) words.subList(maxOf(0, i - dev.shebang.devboard.ime.GlideText.MAX_SENTENCE_WORDS), i) else null
+                val guesses = WordPredictions.predict(dictionary, lm, nw, sentence, c2, c1, 3).map { lm.contextOf(it) }
                 n++
                 if (guesses.firstOrNull() == rep) top1++
                 if (rep in guesses) top3++

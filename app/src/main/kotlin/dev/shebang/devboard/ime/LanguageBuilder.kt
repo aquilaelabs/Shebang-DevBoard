@@ -38,6 +38,7 @@ object LanguageBuilder {
         vocabularyVersion: Int,
         countsVersion: Int,
         glideModel: dev.shebang.devboard.glide.GlideModel? = null,
+        nextWord: dev.shebang.devboard.dict.NextWordModel? = null,
     ): LanguageBundle {
         val extra = ArrayList<Pair<String, Int>>()
         for (w in personal.words) if (w.known && base.indexOfLower(w.lower) < 0) extra.add(w.display to PERSONAL_TIER)
@@ -58,7 +59,7 @@ object LanguageBuilder {
             if (i >= 0) counts[i] += w.count
         }
         return LanguageBundle(
-            dictionary, lm, GlideLanguage.build(dictionary, lm, glideModel), Suggester(dictionary, counts, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm),
+            dictionary, lm, GlideLanguage.build(dictionary, lm, glideModel, nextWord), Suggester(dictionary, counts, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm),
             vocabularyVersion, countsVersion, systemWords.size,
         )
     }

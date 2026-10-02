@@ -97,6 +97,9 @@ class TextInputController(
 
     /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
     var predictionModel: Pair<Dictionary, NgramModel>? = null
+
+    /** The next-word model for the strip's predictions, this controller's own copy (used on [background]). */
+    var nextWordModel: dev.shebang.devboard.dict.NextWordModel? = null
     /** Next words the strip offers now (after a space); empty when it offers something else. */
     private var predictions: List<String> = emptyList()
     private var predictGeneration = 0
@@ -681,13 +684,16 @@ class TextInputController(
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
         val w2 = GlideText.contextWord2(before)
+        val sentence = sentenceBefore(ic)
+        val nextWord = nextWordModel
         val gen = ++predictGeneration
         background.execute {
             val (dictionary, lm) = model
             val c1 = GlideText.contextId(w1, dictionary, lm)
             val c2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
             val start = w1 == GlideText.SENTENCE_START
-            val words = lm.predict(c2, c1, 3).map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
+            val words = dev.shebang.devboard.dict.WordPredictions.predict(dictionary, lm, nextWord, sentence, c2, c1, 3)
+                .map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
             postToMain {
                 if (gen != predictGeneration || isComposing || words.isEmpty()) return@postToMain
                 predictions = words
@@ -1359,12 +1365,20 @@ class TextInputController(
             val head = (ic.getTextBeforeCursor(CONTEXT_CHARS + r.tail.length, 0) ?: "").let { it.subSequence(0, it.length - r.tail.length) }
             val w2 = GlideText.contextWord2(head)
             val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
-            return GlideContext(GlideText.contextId(GlideText.contextWord(head), dictionary, lm), history = listOf(r.word.word), context2 = context2)
+            return GlideContext(GlideText.contextId(GlideText.contextWord(head), dictionary, lm), history = listOf(r.word.word), context2 = context2, sentence = sentenceBefore(ic))
         }
         val before = textBeforeTarget(ic)
         val w2 = GlideText.contextWord2(before)
         val context2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
-        return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2)
+        return GlideContext(GlideText.contextId(GlideText.contextWord(before), dictionary, lm), context2 = context2, sentence = sentenceBefore(ic))
+    }
+
+    /** The sentence before where a word would go (before the targeted word, if any), for the next-word model. */
+    private fun sentenceBefore(ic: InputConnection): List<String?> {
+        val t = target
+        val skip = if (t != null && !t.selection) t.before else 0
+        val before = ic.getTextBeforeCursor(SENTENCE_CHARS + skip, 0) ?: return emptyList()
+        return GlideText.sentenceWords(before.subSequence(0, maxOf(0, before.length - skip)))
     }
 
     /**
@@ -1664,6 +1678,8 @@ class TextInputController(
         private const val AROUND_CHARS = 4000
         /** Characters read before the cursor for the word before it. */
         private const val CONTEXT_CHARS = 64
+        /** Text read before the cursor for the next-word model's sentence. */
+        private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
         /** Glided words remembered for redoing. */

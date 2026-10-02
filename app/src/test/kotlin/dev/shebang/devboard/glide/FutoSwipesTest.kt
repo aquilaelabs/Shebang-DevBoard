@@ -71,7 +71,7 @@ class FutoSwipesTest {
         val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, params)
         val s = Score()
         for (sw in swipes) {
-            decoder.begin(sw.layout, if (useContext) GlideContext(sw.context, context2 = sw.context2) else GlideContext(NgramModel.UNKNOWN), sw.t[0])
+            decoder.begin(sw.layout, if (useContext) GlideContext(sw.context, context2 = sw.context2, sentence = GlideText.sentenceWords(sw.before)) else GlideContext(NgramModel.UNKNOWN), sw.t[0])
             for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
             val r = decoder.finish()?.alternatives?.map { dictionary.lower[it] }.orEmpty()
             s.n++

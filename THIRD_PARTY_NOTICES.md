@@ -54,33 +54,47 @@ Princeton University and LICENSEE agrees to preserve same.
 
 ### Tatoeba English sentences
 - Used for: `app/src/main/assets/dict/en_ngrams.bin` (word, word-pair and three-word counts, built by
-  `tools/build_ngrams.py`) and `app/src/test/resources/glide/heldout_sentences.tsv` (3,000 sentences, lowercased
-  and stripped of punctuation, held out of the counts for the glide benchmark; each line keeps its Tatoeba id).
+  `tools/build_ngrams.py`), the next-word model `app/src/main/assets/dict/en_next_word.bin` (trained on the
+  same sentences by `tools/lm_model/train.py`; the file holds the network's weights, none of the sentences),
+  and `app/src/test/resources/glide/heldout_sentences.tsv` (3,000 sentences, lowercased and stripped of
+  punctuation, held out of the counts and the training for the benchmarks; each line keeps its Tatoeba id).
 - Source: Tatoeba, <https://tatoeba.org>, per-language export `eng_sentences.tsv.bz2` downloaded 2026-09-30.
 - Licence: Creative Commons Attribution 2.0 France (CC BY 2.0 FR),
   <https://creativecommons.org/licenses/by/2.0/fr/>. Changes: sentences were tokenised and lowercased and only
-  counts are shipped; counts involving "tom" were scaled down (see the README's Decisions). Tatoeba publishes a
+  counts and trained weights are shipped; counts involving "tom" and "mary" were scaled down (see the README's
+  Decisions). Tatoeba publishes a
   subset of its sentences under CC0 as well.
 
 ### Common Voice English sentences
 - Used for: `app/src/main/assets/dict/en_ngrams.bin` (word, word-pair and three-word counts, built by
-  `tools/build_ngrams.py --cv`), alongside the Tatoeba counts.
+  `tools/build_ngrams.py --cv`), alongside the Tatoeba counts, and the next-word model
+  `app/src/main/assets/dict/en_next_word.bin`.
 - Source: Mozilla Common Voice, <https://github.com/common-voice/common-voice>, the English sentence
   collection in `server/data/en/*.txt` (13 files, 1.58 million lines), downloaded 2026-09-30.
 - Licence: the sentences are public domain under CC0 1.0 (<https://creativecommons.org/publicdomain/zero/1.0/>);
-  Common Voice accepts only CC0 sentences into the collection. Only counts are shipped.
+  Common Voice accepts only CC0 sentences into the collection. Only counts and trained weights are shipped.
+
+### Wikinews (English)
+- Used for: training the next-word model `app/src/main/assets/dict/en_next_word.bin`, with the Tatoeba and
+  Common Voice sentences: 275,227 sentences (5.5 million words) of 22,109 published articles, extracted by
+  `tools/lm_model/wikinews.py`. The file holds the network's weights, none of the text.
+- Source: Wikinews contributors, English Wikinews, <https://en.wikinews.org>, database dump
+  `enwikinews-latest-pages-articles.xml.bz2` of 2026-10-01 from <https://dumps.wikimedia.org/enwikinews/>.
+- Licence: Creative Commons Attribution 2.5 (CC BY 2.5), <https://creativecommons.org/licenses/by/2.5/>.
+  Changes: wiki markup removed, articles cut into sentences, sentences with gaps left by removed markup
+  dropped.
 
 ### TSI tap dataset (Tap Typing with Touch Sensing Images)
 - Used for: the tap model's constants in `app/src/main/kotlin/dev/shebang/devboard/glide/TapModel.kt` (where
-  taps land relative to a key's centre and how widely they spread), fitted from the dataset's 37,022 letter
-  taps, and `TapBenchmarkTest`, which replays its copy-typed phrases. No data from it is shipped or kept in
-  the repository.
+  taps land relative to a key's centre and how widely they spread, fitted from the dataset's 37,022 letter
+  taps, and where taps meant for the space bar land, from its space taps), and `TapBenchmarkTest`, which
+  replays its copy-typed phrases. No data from it is shipped or kept in the repository.
 - Source: <https://github.com/google-research-datasets/tap-typing-with-touch-sensing-images>, downloaded
   2026-10-01. Paper: Piyawat Lertvittayakumjorn, Shanqing Cai, Billy Dou, Cedric Ho and Shumin Zhai, "Can
   Capacitive Touch Images Enhance Mobile Keyboard Decoding?", UIST 2024, <https://doi.org/10.1145/3654777.3676420>.
 - Licence: Creative Commons Attribution 4.0 International (CC BY 4.0),
-  <https://creativecommons.org/licenses/by/4.0/>. Changes: only summary statistics (two spreads and two
-  offsets) are used.
+  <https://creativecommons.org/licenses/by/4.0/>. Changes: only summary statistics (spreads and offsets) are
+  used.
 
 ### OpenAI Whisper base.en model, as quantised by the whisper.cpp project (Shebang Voice add-on)
 - Used for: `voice/src/main/assets/models/ggml-base.en-q5_1.bin` (fetched by `tools/fetch_voice_model.sh`,
@@ -88,6 +102,13 @@ Princeton University and LICENSEE agrees to preserve same.
 - Source: OpenAI Whisper, <https://github.com/openai/whisper>; converted and quantised to 5 bits by the
   whisper.cpp project, <https://huggingface.co/ggerganov/whisper.cpp>, downloaded 2026-10-01.
 - Licence: MIT (Whisper's weights and code; the whisper.cpp model repository states MIT).
+
+### LibriSpeech (test-clean)
+- Used for: measuring the Shebang Voice add-on's word error rate and speed on a device (`WerTest`), which
+  chose its shipped speed settings. No audio from it is shipped or kept in the repository.
+- Source: Vassil Panayotov, Guoguo Chen, Daniel Povey and Sanjeev Khudanpur, "LibriSpeech: an ASR corpus
+  based on public domain audio books", ICASSP 2015, <https://www.openslr.org/12>.
+- Licence: Creative Commons Attribution 4.0 International (CC BY 4.0).
 
 ### Kennedy inaugural address sample (test only)
 - Used for: `voice/src/androidTest/assets/jfk.wav`, 11 seconds of President Kennedy's 1961 inaugural address,
@@ -156,8 +177,22 @@ other artwork are original to this project.
 | AndroidX Test runner and JUnit extension | 1.7.0 / 1.3.0 | device tests of the add-on only, not shipped |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |
 
+## Tools
+
+The glide model and the next-word model were trained with PyTorch (BSD 3-Clause licence,
+<https://pytorch.org>) on a GPU; PyTorch is not part of the app, which runs both models in its own Kotlin code.
+
 ## Research
 
-Glide decoding follows the published method in: Per Ola Kristensson and Shumin Zhai,
-"SHARK2: A Large Vocabulary Shorthand Writing System for Pen-based Computers", UIST 2004.
-The implementation is original.
+The implementations are original; they follow these published methods:
+
+- Glide decoding: Per Ola Kristensson and Shumin Zhai, "SHARK2: A Large Vocabulary Shorthand Writing System
+  for Pen-based Computers", UIST 2004.
+- The glide model's training: Alex Graves, Santiago Fernández, Faustino Gomez and Jürgen Schmidhuber,
+  "Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural
+  Networks", ICML 2006; its layers are gated recurrent units (Kyunghyun Cho et al., EMNLP 2014).
+- The next-word model: long short-term memory (Sepp Hochreiter and Jürgen Schmidhuber, Neural Computation,
+  1997), with the input and output word tables shared (Ofir Press and Lior Wolf, "Using the Output Embedding
+  to Improve Language Models", EACL 2017).
+- Word statistics: Witten-Bell smoothing (Ian H. Witten and Timothy C. Bell, IEEE Transactions on
+  Information Theory, 1991).
