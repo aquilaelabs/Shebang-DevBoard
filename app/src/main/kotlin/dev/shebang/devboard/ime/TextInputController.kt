@@ -261,8 +261,10 @@ class TextInputController(
      * [corrected] as it stood after the correction ([atStart]: all of the text before it, which was short).
      */
     private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean)
-    /** The latest corrections in this field, oldest first: backspace back to one puts back what was typed. */
+    /** The latest corrections in this field, oldest first: backspace back to one offers what was typed. */
     private val corrections = ArrayDeque<Correction>()
+    /** The correction backspace walked back to, while it is the reopened word: picking [Correction.typed] keeps it. */
+    private var reopenedCorrection: Correction? = null
 
     /**
      * The word backspace walked back into and reopened as the composing word, while it stands unchanged: a
@@ -370,6 +372,7 @@ class TextInputController(
         lastAutocorrect = null
         keptAsTyped.clear()
         corrections.clear()
+        reopenedCorrection = null
         reopened = null
         reopenedGlide = null
         identifiers = emptyList()
@@ -841,20 +844,15 @@ class TextInputController(
     private fun reopenWordBeforeCursor(ic: InputConnection) {
         val text = recomposeWordBeforeCursor(ic) ?: return
         val c = correctionEndingAtCursor(ic, text)
+        reopenedCorrection = c
         if (c != null) {
-            // Back to a word autocorrect changed: what was typed comes back, and the strip keeps the correction.
-            corrections.remove(c)
-            ic.setComposingText(c.typed, 1)
-            word.setLength(0)
-            word.append(c.typed)
-            resetTaps(c.typed.length)
-            reopened = c.typed
+            // Back to a word autocorrect changed: it stays, and what was typed is first on the strip.
             reopenedGlide = null
             ui.setComposing(true)
             candidates = emptyList()
             candidatesFor = ""
             suggestGeneration++
-            ui.showCandidates(arrangeBestMiddle(listOf(c.typed, c.corrected)))
+            ui.showCandidates(listOf(c.typed, text, ""))
             return
         }
         reopenedGlide = recentMatch(text)
@@ -1400,8 +1398,11 @@ class TextInputController(
                 abandon(g)
             }
             reopened = null
-            // Picking the word exactly as typed (the strip's check mark) keeps it from autocorrect from now on.
+            // Picking the word exactly as typed (the strip's check mark), or as first typed before autocorrect
+            // changed it, keeps it from autocorrect from now on.
             if (chosen == word.toString()) keptAsTyped += chosen.lowercase()
+            reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
+            reopenedCorrection = null
             learnTyped(ic, chosen)
             ic.commitText("$chosen ", 1)
             word.setLength(0)

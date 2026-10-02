@@ -16,6 +16,7 @@ class TypingCorrectionTest {
     private val lm get() = NgramModelTest.lm
     private val ic = FakeInputConnection()
     private val learned = ArrayList<String>()
+    private var shown: List<String> = emptyList()
     private val suggester by lazy {
         Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() })
     }
@@ -23,7 +24,9 @@ class TypingCorrectionTest {
     private val controller = TextInputController(
         { ic },
         object : TextInputController.Ui {
-            override fun showCandidates(words: List<String>) = Unit
+            override fun showCandidates(words: List<String>) {
+                shown = words
+            }
             override fun setComposing(composing: Boolean) = Unit
         },
         Executor { it.run() },
@@ -166,25 +169,30 @@ class TypingCorrectionTest {
     }
 
     @Test
-    fun backspacingBackToACorrectedWordPutsBackWhatWasTyped() {
+    fun backspacingBackToACorrectedWordOffersWhatWasTyped() {
         type("wiht cat ")
         assertEquals("with cat ", ic.toString())
         repeat(5) { controller.backspace() }
-        assertEquals("wiht", ic.toString())
-        // Back as typed, space leaves it so.
-        type(" ")
+        // The word stays as corrected; what was typed is first on the strip.
+        assertEquals("with", ic.toString())
+        assertEquals(listOf("wiht", "with", ""), shown)
+        controller.pickCandidate("wiht")
         assertEquals("wiht ", ic.toString())
+        // Picked back, it stays as typed.
+        type("wiht ")
+        assertEquals("wiht wiht ", ic.toString())
     }
 
     @Test
-    fun onlyTheCorrectedWordItselfGoesBack() {
+    fun onlyTheCorrectedWordItselfOffersWhatWasTyped() {
         type("with wiht cat ")
         assertEquals("with with cat ", ic.toString())
         repeat(5) { controller.backspace() }
-        assertEquals("with wiht", ic.toString())
-        // The "with" typed right before it was never corrected, and stays.
+        assertEquals(listOf("wiht", "with", ""), shown)
+        // The "with" typed right before it was never corrected.
         repeat(5) { controller.backspace() }
         assertEquals("with", ic.toString())
+        assertEquals(false, "wiht" in shown)
     }
 
     @Test
