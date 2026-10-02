@@ -25,6 +25,15 @@ An Android keyboard (IME) for developers, written in Kotlin.
   deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
   no-suggestion fields, or fields that ask for no learning.
 
+## Screenshots
+
+| | | |
+|---|---|---|
+| <img src="docs/screenshots/suggestions.png" width="270" alt="Suggestions after a space"> | <img src="docs/screenshots/glide.png" width="270" alt="Gliding with the trail and a live preview"> | <img src="docs/screenshots/code-mode.png" width="270" alt="Code mode"> |
+| Next-word suggestions from the whole sentence | Glide typing: the trail, and the word read before you lift | Code mode: every symbol on one page |
+| <img src="docs/screenshots/emoji.png" width="270" alt="Emoji panel"> | <img src="docs/screenshots/clipboard.png" width="270" alt="Clipboard history"> | <img src="docs/screenshots/settings.png" width="180" alt="Settings"> |
+| The emoji panel, from the terminal bar | Clipboard history with pins and pictures | Settings (Night theme) |
+
 ## Build and install
 
 Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36. Gradle is fetched by
