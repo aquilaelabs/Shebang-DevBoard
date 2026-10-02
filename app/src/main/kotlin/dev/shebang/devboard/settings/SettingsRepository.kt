@@ -41,7 +41,6 @@ class SettingsRepository(context: Context) {
             glide = p[Keys.GLIDE] ?: d.glide,
             glideTrail = p[Keys.GLIDE_TRAIL] ?: d.glideTrail,
             phraseGlide = p[Keys.PHRASE_GLIDE] ?: d.phraseGlide,
-            flickSymbols = p[Keys.FLICK_SYMBOLS] ?: d.flickSymbols,
             learnWords = p[Keys.LEARN_WORDS] ?: d.learnWords,
             adaptGlide = p[Keys.ADAPT_GLIDE] ?: d.adaptGlide,
             adaptTaps = p[Keys.ADAPT_TAPS] ?: d.adaptTaps,
@@ -69,7 +68,6 @@ class SettingsRepository(context: Context) {
         p[Keys.GLIDE] = s.glide
         p[Keys.GLIDE_TRAIL] = s.glideTrail
         p[Keys.PHRASE_GLIDE] = s.phraseGlide
-        p[Keys.FLICK_SYMBOLS] = s.flickSymbols
         p[Keys.LEARN_WORDS] = s.learnWords
         p[Keys.ADAPT_GLIDE] = s.adaptGlide
         p[Keys.ADAPT_TAPS] = s.adaptTaps
@@ -96,7 +94,6 @@ class SettingsRepository(context: Context) {
         val GLIDE = booleanPreferencesKey("glide")
         val GLIDE_TRAIL = booleanPreferencesKey("glide_trail")
         val PHRASE_GLIDE = booleanPreferencesKey("phrase_glide")
-        val FLICK_SYMBOLS = booleanPreferencesKey("flick_symbols")
         val LEARN_WORDS = booleanPreferencesKey("learn_words")
         val ADAPT_GLIDE = booleanPreferencesKey("adapt_glide")
         val ADAPT_TAPS = booleanPreferencesKey("adapt_taps")

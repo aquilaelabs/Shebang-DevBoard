@@ -174,7 +174,6 @@ fun SettingsScreen(
             }
             item { SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } } }
             item { SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } } }
-            item { SwitchRow("Flick up for symbols", "A quick flick up on a key types the character in its corner", settings.flickSymbols) { v -> update { it.copy(flickSymbols = v) } } }
 
             item { SectionHeader("Feedback") }
             item { SwitchRow("Haptics", "Vibrate on key press", settings.haptics) { v -> update { it.copy(haptics = v) } } }

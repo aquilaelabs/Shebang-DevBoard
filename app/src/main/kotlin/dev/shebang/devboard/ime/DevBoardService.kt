@@ -219,7 +219,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.keyPreviewEnabled = s.keyPreview
         keyboard?.glideTrailEnabled = s.glideTrail
         keyboard?.phraseGlideEnabled = s.phraseGlide
-        keyboard?.flickEnabled = s.flickSymbols
         if (heightChanged) rebuildGeometry()
         if (languageLoader.learnWords != s.learnWords) {
             languageLoader.learnWords = s.learnWords
@@ -360,7 +359,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         k.keyPreviewEnabled = settings.keyPreview
         k.glideTrailEnabled = settings.glideTrail
         k.phraseGlideEnabled = settings.phraseGlide
-        k.flickEnabled = settings.flickSymbols
         rebuildGeometry()
         return container
     }
