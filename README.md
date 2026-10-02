@@ -282,6 +282,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Glide parameters after the three-word model** (1 Oct): re-tuned on FUTO's dev split with the new
   model, the search reached 92.2% there (from 91.3%) but 90.7% on the test split against 91.0% for the
   values kept, so the earlier values stay.
+- **Looser along the stroke at turns** (from the owner's question about overshooting): at a letter where the
+  stroke turns back, real fingers stop short along the way they came (FUTO dev: 0.16 key widths on average,
+  spread 0.27 along against 0.20 across), so at a turn the decoder allows twice the spread along the
+  direction of travel. Tuned on FUTO's dev split (2x to 3x all scored alike; expecting the finger short by a
+  set amount did not help), then checked once on the test split: top-1 90.6% to 91.0% on 10,000 swipes,
+  54 swipes fixed and 17 broken (sign test p < 0.0001); the friction test's glided words right first time
+  92.0% to 92.4%. The simulator's strokes, whose noise is the same every way, dip 0.1 to 0.3 points; decoding
+  costs 11% more time. Learning a user's aim still aligns strokes without it, so what is learned is where the
+  finger went. Other habits measured (the arc of each person's strokes, starting late, lifting early) stay
+  research on roadmap R20 until one is as clearly better.
 - **Glide decoder**: the streaming decoder replaced the whole-word SHARK2 decoder in the app, because it is
   far more accurate on realistic strokes (see Glide typing) and needs no wait after lift. The spec's
   ideal-path LRU cache has no counterpart any more: per-geometry work is one table of states per tree node,

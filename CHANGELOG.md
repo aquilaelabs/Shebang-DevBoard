@@ -62,6 +62,7 @@
 - Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (5d8d5f1)
 - A word typed without its apostrophe gets one from the words before it: "I think its" becomes "I think it's", while "the dog wagged its" stays (d2da3d2)
 - Code mode's symbols are laid out like the usual phone symbol page (? and ! at the right of the third row), with backspace, comma, period and enter where they are in text mode; % and ^ are held on 5 and 6 (1e952c8)
+- Glide forgives stopping short at turns, the way thumbs actually move: 91.0% of real swipes right instead of 90.6% (3e8a5ab)
 
 ### Fixed
 

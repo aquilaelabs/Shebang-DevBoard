@@ -48,6 +48,14 @@ data class GlideParams(
     val leadInLimit: Int = 40,
     /** Phrase gliding: cost per point of coasting from a word's last letter down into the space bar. */
     val leadOutCost: Float = 0f,
+    /**
+     * At a sharp turn the finger stops short of the key (FUTO: 0.16 pitches on average where the stroke turns
+     * back, 0 where it passes through): how far short it is expected, in pitches along the way it came, at a
+     * full turn; scaled down for gentler ones.
+     */
+    val turnShort: Float = 0f,
+    /** Spread along the way the finger came, at a turn, against [sigmaVertex] across it (1: the same). */
+    val alongStretch: Float = 2f,
 )
 
 /** What came before a glide in the text. */
@@ -220,6 +228,12 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
     private val stateVertex = BooleanArray(4096)
 
     private val invTwoSigV2 = 1f / (2f * params.sigmaVertex * params.sigmaVertex)
+    private val invTwoSigAlong2 = invTwoSigV2 / (params.alongStretch * params.alongStretch)
+    private val turnModel = params.turnShort != 0f || params.alongStretch != 1f
+
+    /** Unit direction of travel from key a to key b ([a * 26 + b]), in pitches; 0 when they coincide. */
+    private val arriveU = FloatArray(26 * 26)
+    private val arriveV = FloatArray(26 * 26)
     private val invTwoSigM2 = 1f / (2f * params.sigmaMid * params.sigmaMid)
     private val invTwoSigS2 = 1f / (2f * params.sigmaStart * params.sigmaStart)
 
@@ -316,6 +330,13 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         for (c in 0..25) {
             keyU[c] = baseU[c] + (offsets?.getOrNull(c) ?: 0f)
             keyV[c] = baseV[c] + (offsets?.getOrNull(26 + c) ?: 0f)
+        }
+        if (turnModel) for (a in 0..25) for (b in 0..25) {
+            val du = keyU[b] - keyU[a]
+            val dv = keyV[b] - keyV[a]
+            val len = sqrt(du * du + dv * dv)
+            arriveU[a * 26 + b] = if (len > 1e-3f) du / len else 0f
+            arriveV[a * 26 + b] = if (len > 1e-3f) dv / len else 0f
         }
     }
 
@@ -485,7 +506,8 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         val mt = midTurnPenalty(i)
         val u = pu[i]
         val v = pv[i]
-        for (s in 0 until nxtCount) nxtCost[s] += emission(nxtNode[s], nxtSub[s], u, v, ev, mt)
+        val turn = pturn[i]
+        for (s in 0 until nxtCount) nxtCost[s] += emission(nxtNode[s], nxtSub[s], u, v, ev, mt, turn)
         prune()
     }
 
@@ -554,15 +576,29 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
      * Cost of point (u, v) at state [sub] of [node]; [evidence] is the point's letter evidence and [midTurn] its
      * penalty for sitting on a straight stretch.
      */
-    private fun emission(node: Int, sub: Int, u: Float, v: Float, evidence: Float, midTurn: Float): Float {
+    private fun emission(node: Int, sub: Int, u: Float, v: Float, evidence: Float, midTurn: Float, turn: Float = 0f): Float {
         if (sub == DONE) return 0f
         val m = subCount[node].toInt()
         val c = trie.letter[node].toInt()
         val ku = keyU[c]
         val kv = keyV[c]
         if (sub >= m) {
-            val du = u - ku
-            val dv = v - kv
+            var du = u - ku
+            var dv = v - kv
+            val p = trie.parent[node]
+            if (turnModel && p != LexiconTrie.ROOT) {
+                // At a turn the finger is expected short of the key along the way it came, and looser that way.
+                val k = trie.letter[p].toInt() * 26 + c
+                val au = arriveU[k]
+                val av = arriveV[k]
+                val t = (turn / TURN_FULL).coerceIn(0f, 1f)
+                du += params.turnShort * t * au
+                dv += params.turnShort * t * av
+                val along = du * au + dv * av
+                val across = -du * av + dv * au
+                val inv = invTwoSigV2 + (invTwoSigAlong2 - invTwoSigV2) * t
+                return along * along * inv + across * across * invTwoSigV2 - 0.5f * evidence
+            }
             return (du * du + dv * dv) * invTwoSigV2 - 0.5f * evidence
         }
         val pc = trie.letter[trie.parent[node]].toInt()
@@ -822,7 +858,7 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
                     val start = params.leadInCost * i
                     if (start < best) best = start
                 }
-                next[k] = if (best >= inf) inf else best + emission(stateNode[k], stateSub[k], u, v, ev, mt)
+                next[k] = if (best >= inf) inf else best + emission(stateNode[k], stateSub[k], u, v, ev, mt, pturn[i])
             }
             val t = prev
             prev = next
@@ -884,6 +920,7 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
                     move = 3
                 }
                 backMoves[i * states + k] = move.toByte()
+                // Learning measures where the stroke passed each key, so it aligns without the turn model.
                 next[k] = if (best >= inf) inf else best + emission(stateNode[k], stateSub[k], pu[i], pv[i], ev, mt)
             }
             val t = prev
@@ -1136,6 +1173,8 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         const val MAX_HISTORY = 4
         /** Most states per segment; the next value marks a finished word coasting into the space bar. */
         private const val MAX_SUB = 62
+        /** A turn of this many radians or more counts in full for [GlideParams.turnShort]. */
+        private const val TURN_FULL = 2.5f
         private const val DONE = 63
     }
 }
