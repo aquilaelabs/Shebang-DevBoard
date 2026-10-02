@@ -77,6 +77,15 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun aWordTypedWithAnApostropheIsLeftAsTyped() {
+        // Punctuation put into a word is on purpose, even where the word looks like a slip.
+        type("ca'nt ")
+        assertEquals("ca'nt ", ic.toString())
+        type("y'all ")
+        assertEquals("ca'nt y'all ", ic.toString())
+    }
+
+    @Test
     fun aSlipIsCorrectedOnSpace() {
         type("wiht ")
         assertEquals("with ", ic.toString())

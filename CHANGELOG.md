@@ -58,6 +58,7 @@
 - Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (c7bba27)
 - Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (c5808bd)
 - A tap that lands low on a letter just above the space bar types a space when the word looks finished, so thumbs that fall short of the bar still get their space (813a34f)
+- Autocorrect leaves a word alone when you typed an apostrophe into it (6d500e2)
 
 ### Fixed
 

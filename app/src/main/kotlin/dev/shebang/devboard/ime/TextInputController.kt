@@ -1005,7 +1005,7 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !typedPunctuation(typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
@@ -1062,6 +1062,9 @@ class TextInputController(
      * ("getUser", but not "NASA" style capitals throughout, which are left alone anyway), a digit or an
      * underscore.
      */
+    /** An apostrophe typed into the word ("y'all", "it's"): punctuation put in on purpose, so the word stays. */
+    private fun typedPunctuation(w: String): Boolean = w.any { it == '\'' || it == '’' }
+
     private fun looksLikeCode(w: String): Boolean {
         if (w.any { it.isDigit() || it == '_' }) return true
         val inner = w.drop(1)
@@ -1167,7 +1170,7 @@ class TextInputController(
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !typedPunctuation(typed) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
