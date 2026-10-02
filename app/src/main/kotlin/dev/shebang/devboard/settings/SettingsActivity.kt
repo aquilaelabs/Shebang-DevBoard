@@ -78,7 +78,9 @@ import dev.shebang.devboard.ime.VoiceClient
 import dev.shebang.devboard.layout.BarConfig
 import dev.shebang.devboard.layout.BarItem
 import dev.shebang.devboard.layout.KeyCodeNames
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -156,6 +158,16 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     fun open(url: String) = runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
+    val scope = rememberCoroutineScope()
+    val diagnosticsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it) } }.isSuccess
+            }
+            Toast.makeText(context, if (ok) "Diagnostics saved" else "Couldn't save diagnostics", Toast.LENGTH_SHORT).show()
+        }
+    }
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("DevBoard settings") },
@@ -287,6 +299,19 @@ fun SettingsScreen(
                     headlineContent = { Text("Credits") },
                     supportingContent = { Text("The word lists, sentences, swipe and tap data, models and libraries this keyboard is built on, with their licences") },
                     modifier = Modifier.clickable { onDoc("about/THIRD_PARTY_NOTICES.md", "Credits") },
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Export diagnostics") },
+                    supportingContent = {
+                        Text(
+                            "Save a file to send to the developer if typing or gliding isn't working well: your settings, how your taps " +
+                                "and glides lean, and your recorded glides. Learned words, email addresses, the clipboard, your terminal " +
+                                "bar and anything you typed are left out."
+                        )
+                    },
+                    modifier = Modifier.clickable { diagnosticsLauncher.launch("devboard-diagnostics.json") },
                 )
             }
         }

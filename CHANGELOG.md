@@ -40,6 +40,7 @@
 - Hold shift for caps lock, as well as tapping it twice (2c08853)
 - Backspacing back to a word autocorrect changed, even after typing on, puts what you typed first on the strip (cb1fddd, 2679987)
 - Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
+- Export diagnostics (Settings > About): a file to send the developer with your settings and how your taps and glides lean, leaving out learned words, email addresses, the clipboard, your terminal bar and anything typed (83479de)
 
 ### Changed
 

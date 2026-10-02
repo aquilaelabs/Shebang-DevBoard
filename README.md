@@ -225,6 +225,15 @@ its own, locally:
 
 ## Decisions
 
+- **Export diagnostics** (the owner's request, so a user can send what the keyboard has learned about their
+  typing when it isn't working well for them): Settings > About > Export diagnostics writes one JSON file
+  through the system file picker, never over a network. In it: the app version, the phone model, Android
+  version and screen size, every setting (the terminal bars only as "customised or not" and a count, since
+  they hold snippets and app names), how much has been learned as counts only (words, new words, pairs, email
+  addresses), tap and glide adaptation as numbers per letter (without the saved earlier days, which carry
+  dates), and the recorder's glides of prompted words. Left out, and listed in the file under `leftOut`:
+  learned words and pairs, email addresses, clipboard history, terminal-bar keys and snippets, app names,
+  anything typed.
 - **Remembered email addresses** (the owner's request, like other keyboards' address suggestions): what the
   user typed into an email field (`TYPE_TEXT_VARIATION_EMAIL_ADDRESS` or `WEB_EMAIL_ADDRESS`) is kept as the
   field changes and recorded when the field is left; the keyboard keeps a copy as it goes because an app may
