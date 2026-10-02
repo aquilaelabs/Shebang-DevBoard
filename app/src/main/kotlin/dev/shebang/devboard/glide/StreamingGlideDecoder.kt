@@ -56,6 +56,11 @@ data class GlideParams(
     val turnShort: Float = 0f,
     /** Spread along the way the finger came, at a turn, against [sigmaVertex] across it (1: the same). */
     val alongStretch: Float = 2f,
+    /**
+     * How much the learned reading of the stroke ([GlideModel]) counts against the decoder's own alignment
+     * (0: not used). Chosen on FUTO's dev split; see the README's Decisions.
+     */
+    val modelWeight: Float = 0.75f,
 )
 
 /** What came before a glide in the text. */
@@ -132,6 +137,11 @@ class GlideResult(
 class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlideParams = GlideParams()) {
     private val trie = lang.trie
     private val lm = lang.lm
+    /** This decoder's own copy of the learned reading (its working memory is per decoder). */
+    private val model = if (params.modelWeight != 0f) lang.model?.let { GlideModel.copyOf(it) } else null
+    private val modelKeys = IntArray(64)
+    private var modelU = FloatArray(0)
+    private var modelV = FloatArray(0)
 
     // ---- Geometry ------------------------------------------------------------------------------------
     /** Key centres in pitches: [baseU]/[baseV] from the geometry, [keyU]/[keyV] moved by the user's offsets. */
@@ -784,6 +794,28 @@ class StreamingGlideDecoder(private val lang: GlideLanguage, val params: GlidePa
         for (i in 0 until n) pz[i] = slowness(pd[i], ref)
         for (c in 0 until candCount) candCost[c] = align(candNode[c], coasted)
         keepBest(params.keep) { candCost[it] + lmW * lm.unigramCost(candWord[it]) }
+        // The learned reading of the stroke weighs in on the words kept, for a stroke that is one word
+        // whole (not a word of a phrase, whose stroke runs in from or out to the space bar).
+        val m = model
+        if (m != null && !coasted && !leadIn) {
+            if (modelU.size < n) {
+                modelU = FloatArray(n)
+                modelV = FloatArray(n)
+            }
+            // In pitches with q's key centre at (0.5, 0.5), as the model was trained (no number row).
+            val q = 'q' - 'a'
+            val du = if (hasKey[q]) baseU[q] - 0.5f else 0f
+            val dv = if (hasKey[q]) baseV[q] - 0.5f else 0f
+            for (i in 0 until n) {
+                modelU[i] = pu[i] - du
+                modelV[i] = pv[i] - dv
+            }
+            m.read(modelU, modelV, pt, n)
+            for (c in 0 until candCount) {
+                val len = LexiconTrie.keySequence(lang.dictionary.lower[candWord[c]], modelKeys)
+                if (len > 0) candCost[c] += params.modelWeight * m.cost(modelKeys, len)
+            }
+        }
         if (segments >= maxSeg) return false
         val s = segments++
         for (c in 0 until candCount) {

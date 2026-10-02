@@ -50,6 +50,19 @@ tools/build_wordlist.py /path/to/scowl-2020.12.07
 tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
+The glide model is trained on the GPU with PyTorch (`python-ml` from the toolchain store's `pytorch`) on
+FUTO's training split, then exported as the app's asset with test vectors for the Kotlin port
+(`GlideModelTest`); `score.py` picks its weight on the dev split from a decoder dump
+(`FUTO_DUMP=... ./gradlew testDebugUnitTest --tests '*FutoSwipesTest.futoDump'`):
+
+```sh
+python-ml tools/glide_model/prep.py /path/to/futo/train.jsonl train.npz
+python-ml tools/glide_model/prep.py /path/to/futo/dev.jsonl dev.npz
+bb gpu run -- python-ml tools/glide_model/train.py train.npz dev.npz glide.pt --hidden 64 --conv 64
+python-ml tools/glide_model/score.py glide.pt cands-dev.jsonl cands-test.jsonl
+python-ml tools/glide_model/export.py glide.pt app/src/main/assets/glide/glide_model.bin --vectors dev.npz app/src/test/resources/glide/glide_model_vectors.txt
+```
+
 ## Layout of the code
 
 | Package (`dev.shebang.devboard.`) | What lives there |
@@ -282,6 +295,22 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Glide parameters after the three-word model** (1 Oct): re-tuned on FUTO's dev split with the new
   model, the search reached 92.2% there (from 91.3%) but 90.7% on the test split against 91.0% for the
   values kept, so the earlier values stay.
+- **A learned glide model** (the owner's request to use the GPU): a small network (a convolution and two
+  bidirectional GRU layers, 138k weights, 276 KB as half floats) reads a glide point by point and says how
+  likely each key is meant there; a word's model cost is how unlikely its keys are given the whole stroke
+  (CTC). Trained on 909k swipes of FUTO's training split (12 passes, 15 minutes on the RTX 3070 Ti). It does
+  not replace the decoder: once the finger lifts, the decoder's 16 best candidates get 0.75 times the model's
+  cost added to their own (0.75 chosen on the dev split), so the model reorders what the decoder found, and
+  the dictionary, the word context and the user's aim still count. On FUTO's test split (10,000 swipes,
+  never seen in training or tuning) top-1 went from 91.0% to 93.7% through the app's own Kotlin code
+  (sign test on the scored candidates: 341 fixed, 55 broken, p < 1e-50); words glided on in sentences
+  92.7% to 95.3%; in the friction test glided words right first time 92.4% to 95.1% and those only fixable
+  by typing halved. The simulator's synthetic strokes score lower with it (91.2% to 89.2% alone, 95.3% to
+  94.8% with context), as expected of a model of real fingers reading drawn ones; real swipes decide. A
+  larger version (492k weights) scored 94.1% but took more than twice as long: 28 ms median after lift on
+  the emulator against 12 ms, so the small one ships. Written in plain Kotlin (no machine-learning library),
+  checked against PyTorch's outputs; only whole-word strokes are read (not a phrase's words, whose strokes
+  run into the space bar). Learning a user's aim still aligns strokes without it.
 - **Looser along the stroke at turns** (from the owner's question about overshooting): at a letter where the
   stroke turns back, real fingers stop short along the way they came (FUTO dev: 0.16 key widths on average,
   spread 0.27 along against 0.20 across), so at a turn the decoder allows twice the spread along the

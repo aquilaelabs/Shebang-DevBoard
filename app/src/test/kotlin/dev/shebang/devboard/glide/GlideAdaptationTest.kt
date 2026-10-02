@@ -125,7 +125,9 @@ class GlideAdaptationTest {
     }
 
     private val sim = GestureSimulator(GlideBenchmarkTest.layout)
-    private val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language)
+    // The adaptation's own safeguards, on the simulator's strokes: without the learned reading of strokes, which
+    // was trained on real fingers and reads the simulator's differently (FutoSwipesTest measures it on real ones).
+    private val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams(modelWeight = 0f))
     private val du get() = BIAS_U * layout.keyWidth
     private val dv get() = BIAS_V * layout.keyHeight
 

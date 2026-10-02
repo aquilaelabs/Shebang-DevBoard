@@ -12,3 +12,5 @@ dist/
 
 # Shebang Voice model (fetched by tools/fetch_voice_model.sh)
 voice/src/main/assets/models/
+.glide-model-work/
+__pycache__/

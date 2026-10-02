@@ -133,6 +133,46 @@ class FutoSwipesTest {
     }
 
     /**
+     * Writes each swipe with the decoder's candidates and their costs, one JSON object per line, for the glide
+     * model's scripts (tools/glide_model/score.py re-ranks the candidates with the model's own reading of the
+     * stroke). FUTO_DUMP names the file to write; FUTO_SWIPES and FUTO_LIMIT choose the swipes as for
+     * [futoSwipes]. Points are in key pitches (u across, v down) with times in ms from the first.
+     */
+    @Test
+    fun futoDump() {
+        val out = System.getenv("FUTO_DUMP")
+        assumeTrue("FUTO_DUMP not set", out != null)
+        val loaded = load()
+        assumeTrue("FUTO_SWIPES not set or not a file", loaded != null)
+        val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language)
+        fun q(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        File(out!!).bufferedWriter().use { w ->
+            for (sw in loaded!!.first) {
+                decoder.begin(sw.layout, GlideContext(sw.context, context2 = sw.context2), sw.t[0])
+                for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
+                val r = decoder.finish()
+                val entry = r?.entries?.lastOrNull()
+                val sb = StringBuilder()
+                sb.append("{\"word\":").append(q(sw.word))
+                sb.append(",\"top\":").append(q(r?.alternatives?.firstOrNull()?.let { dictionary.lower[it] } ?: ""))
+                sb.append(",\"u\":[").append(sw.x.joinToString(",") { "%.4f".format(it / sw.layout.keyWidth) }).append("]")
+                sb.append(",\"v\":[").append(sw.y.joinToString(",") { "%.4f".format(it / sw.layout.keyHeight) }).append("]")
+                sb.append(",\"t\":[").append(sw.t.joinToString(",") { (it - sw.t[0]).toString() }).append("]")
+                sb.append(",\"cands\":[")
+                if (entry != null) {
+                    sb.append(entry.candidates.indices.joinToString(",") { k ->
+                        val c = entry.candidates[k]
+                        "{\"w\":${q(dictionary.lower[c])},\"ac\":${"%.4f".format(entry.acoustic[k])},\"lm\":${"%.4f".format(lm.cost3(c, sw.context2, sw.context))},\"uni\":${"%.4f".format(lm.unigramCost(c))}}"
+                    })
+                }
+                sb.append("]}")
+                w.write(sb.toString())
+                w.newLine()
+            }
+        }
+    }
+
+    /**
      * Coordinate descent over the decoder's parameters on the dataset's dev split (FUTO_TUNE names it),
      * scored by top-1 with context; the result is then checked on FUTO_SWIPES (the test split), which the
      * search never saw. FUTO_TUNE_LIMIT caps the dev swipes (default 4000).

@@ -96,10 +96,13 @@ Princeton University and LICENSEE agrees to preserve same.
 
 ### FUTO swipe dataset (swipe.futo.org)
 - Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the
-  decoder's default parameters (`GlideParams`) were chosen on its dev split. No part of the data is in this
-  repository or the app: the tests read a copy downloaded to the machine they run on.
-- Source: FUTO, <https://huggingface.co/datasets/futo-org/swipe.futo.org> (`dev.jsonl`, `test.jsonl` and
-  `swipe-5/layouts/qwerty.json`), downloaded 2026-09-30.
+  decoder's default parameters (`GlideParams`) were chosen on its dev split. The glide model shipped in the
+  app (`app/src/main/assets/glide/glide_model.bin`) was trained on its training split by
+  `tools/glide_model/train.py`: the file holds the network's learned weights, none of the swipes. Apart from
+  those weights no part of the data is in this repository or the app: the tests and training read a copy
+  downloaded to the machine they run on.
+- Source: FUTO, <https://huggingface.co/datasets/futo-org/swipe.futo.org> (`train.jsonl`, `dev.jsonl`,
+  `test.jsonl` and `swipe-5/layouts/qwerty.json`), downloaded 2026-09-30 and 2026-10-02.
 - Licence: MIT.
 
 ```

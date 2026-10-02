@@ -12,6 +12,11 @@ class StreamingGlideDecoderTest {
     private val dictionary get() = GlideBenchmarkTest.dictionary
     private val lm get() = GlideBenchmarkTest.lm
     private val decoder by lazy { StreamingGlideDecoder(GlideBenchmarkTest.language) }
+    /**
+     * Without the learned reading of strokes: for tests of the decoder's own workings on drawn paths (a path
+     * placed exactly between two words, which the model, trained on real fingers, reads its own way).
+     */
+    private val alignmentOnly by lazy { StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams(modelWeight = 0f)) }
 
     private fun idx(w: String) = dictionary.indexOfLower(w)
 
@@ -71,12 +76,12 @@ class StreamingGlideDecoderTest {
         val f = 'f' - 'a'
         val sx = (layout.centerX[i] + layout.centerX[o]) / 2f
         val sy = layout.centerY[i]
-        decoder.begin(layout, ctx, 0L)
+        alignmentOnly.begin(layout, ctx, 0L)
         val steps = 30
         for (s in 0..steps) {
-            decoder.addPoint(sx + (layout.centerX[f] - sx) * s / steps, sy + (layout.centerY[f] - sy) * s / steps, s * 10L)
+            alignmentOnly.addPoint(sx + (layout.centerX[f] - sx) * s / steps, sy + (layout.centerY[f] - sy) * s / steps, s * 10L)
         }
-        return top(decoder.finish()!!)
+        return top(alignmentOnly.finish()!!)
     }
 
     @Test
