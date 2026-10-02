@@ -88,8 +88,10 @@ glide. From then on every touch point, with its time, goes to a decoder thread w
    To redo a word, tap inside it (or double-tap to select it, which also works for "a" and "I"): it is
    underlined and the strip shows it with its alternatives (its own runners-up if it was glided lately,
    suggestions otherwise). The next glide, or a tapped alternative, replaces it and keeps its capitals.
-   To add a word instead, tap between words (a cursor at a word's edge targets nothing), or press space
-   while a word is targeted, which moves past it. After the keyboard's own edits nothing is targeted, so
+   To add a word instead, tap between words (a cursor at a word's edge targets nothing), or hold space
+   while a word is targeted, which moves past it; a tap on space with the cursor inside a word puts a space
+   right there, splitting it ("twowords"). Holding #! (or ABC) opens the system's keyboard picker, which
+   holding space used to. After the keyboard's own edits nothing is targeted, so
    gliding on never replaces a word; the one exception is the glided word right before it (setting, on by
    default), which the next glide may fix when the two together clearly read otherwise, and only while it
    stands as it went in and was not picked from the strip. Each glide is

@@ -52,6 +52,8 @@ class KeyboardView(context: Context) : View(context) {
         /** The glide was abandoned (touch cancelled). */
         fun onGlideCancel()
         fun onSpaceLongPress()
+        /** The mode key (#! or ABC) held down. */
+        fun onModeLongPress() = Unit
         /** Cursor drag along the space bar: +1 right, -1 left; with [select] (shift on) the selection grows. */
         fun onCursorMove(steps: Int, select: Boolean)
         /** Swiping left from backspace: [words] words before the cursor would go (0: none). */
@@ -604,6 +606,10 @@ class KeyboardView(context: Context) : View(context) {
             key.action == KeyAction.SPACE -> {
                 pointerCancelled[p] = true
                 listener?.onSpaceLongPress()
+            }
+            key.action == KeyAction.MODE_CODE || key.action == KeyAction.MODE_TEXT -> {
+                pointerCancelled[p] = true
+                listener?.onModeLongPress()
             }
             key.alternates.isNotEmpty() -> {
                 val alts = if (shiftState != ShiftState.OFF && key.letter != 0.toChar()) key.shiftedAlternates else key.alternates

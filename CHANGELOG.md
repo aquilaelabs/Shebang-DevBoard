@@ -59,6 +59,7 @@
 - Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (c5808bd)
 - A tap that lands low on a letter just above the space bar types a space when the word looks finished, so thumbs that fall short of the bar still get their space (813a34f)
 - Autocorrect keeps the letters of a word you typed an apostrophe into (only the apostrophe may move), and leaves words joined by punctuation alone (f-droid, node.js) (6d500e2)
+- Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (5d8d5f1)
 
 ### Fixed
 

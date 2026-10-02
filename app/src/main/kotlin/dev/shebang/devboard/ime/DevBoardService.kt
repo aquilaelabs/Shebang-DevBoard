@@ -778,6 +778,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onSpaceLongPress() {
+        // With the cursor in a word, holding space moves past it; elsewhere a hold is just a space.
+        if (!text.spaceHeld()) text.space()
+        afterEdit()
+    }
+
+    override fun onModeLongPress() {
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker()
     }
 

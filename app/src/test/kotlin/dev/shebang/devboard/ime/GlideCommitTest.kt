@@ -365,12 +365,12 @@ class GlideCommitTest {
     }
 
     @Test
-    fun spaceWithAWordTargetedMovesPastItToAddAWord() {
+    fun holdingSpaceWithAWordTargetedMovesPastItToAddAWord() {
         glide("hello")
         glide("world")
         userMovesCursor(2)
         assertEquals("hello", controller.targetText)
-        controller.space()
+        assertTrue(controller.spaceHeld())
         assertNull(controller.targetText)
         assertEquals(6, ic.cursor)
         glide("big")
@@ -378,13 +378,29 @@ class GlideCommitTest {
     }
 
     @Test
-    fun spaceAfterTheLastWordAddsTheSpace() {
+    fun holdingSpaceAfterTheLastWordAddsTheSpace() {
         glide("hello")
         userMovesCursor(2)
-        controller.space()
+        assertTrue(controller.spaceHeld())
         assertEquals("hello ", ic.toString())
         glide("world")
         assertEquals("hello world", ic.toString())
+    }
+
+    @Test
+    fun tappingSpaceInsideAWordSplitsIt() {
+        ic.commitText("twowords", 1)
+        userMovesCursor(3)
+        controller.space()
+        assertEquals("two words", ic.toString())
+        assertEquals(4, ic.cursor)
+        assertNull(controller.targetText)
+    }
+
+    @Test
+    fun holdingSpaceWithNothingTargetedIsLeftToTheService() {
+        ic.commitText("hello ", 1)
+        assertTrue(!controller.spaceHeld())
     }
 
     @Test

@@ -633,7 +633,19 @@ class TextInputController(
         val ic = connection() ?: return
         val t = target
         if (t != null) {
-            skipPastTarget(ic, t)
+            // A selected word: space moves past it (typing a space would replace it).
+            if (t.selection) {
+                skipPastTarget(ic, t)
+                return
+            }
+            // A cursor inside a word: the space goes in right there, splitting it ("twowords" -> "two words").
+            // Holding space moves past the word instead ([spaceHeld]).
+            dropTarget()
+            ownEdit()
+            lastAutocorrect = null
+            ic.commitText(" ", 1)
+            lastActionWasSpace = true
+            lastSpaceTime = clock()
             return
         }
         ownEdit()
@@ -708,6 +720,17 @@ class TextInputController(
             repeat(dest) { KeySender.sendPlain(ic, KeyEvent.KEYCODE_DPAD_RIGHT) }
         }
         if (!spaceFollows) ic.commitText(" ", 1)
+    }
+
+    /**
+     * Space held down: with a word pointed at, the cursor moves past it (and a space follows), so a word can be
+     * added after it. False when no word is pointed at, so the hold does what it does elsewhere.
+     */
+    fun spaceHeld(): Boolean {
+        val ic = connection() ?: return false
+        val t = target ?: return false
+        skipPastTarget(ic, t)
+        return true
     }
 
     /** True when the two characters before the cursor are a word character then a space. */
