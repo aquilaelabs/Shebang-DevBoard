@@ -845,7 +845,7 @@ class TextInputController(
             if (isComposing) endWord(ic, "", correct = false, deferOk = false)
             lastGlide = null
             lastAutocorrect = null
-            settle()
+            // The last glide stays unsettled: its words may be about to go ([deleteWords]).
             if (selEnd < 0 || selStart != selEnd) return
             deleteAnchor = selEnd
             deleteBefore = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: ""
@@ -875,7 +875,12 @@ class TextInputController(
         }
         val sel = ic.getSelectedText(0)?.toString()
         if (anchor >= 0 && sel != null && sel.isNotEmpty()) {
-            if (sel == deletePreview) ic.commitText("", 1) else ic.setSelection(anchor, anchor)
+            if (sel == deletePreview) {
+                ic.commitText("", 1)
+                forgetDeletedGlide(n)
+            } else {
+                ic.setSelection(anchor, anchor)
+            }
             return
         }
         // No preview (the cursor position was not known): delete the words before the cursor.
@@ -883,6 +888,20 @@ class TextInputController(
         val before = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: return
         val offs = wordOffsets(before)
         ic.deleteSurroundingText(offs[n.coerceIn(0, offs.size - 1)], 0)
+        forgetDeletedGlide(n)
+    }
+
+    /**
+     * [n] words before the cursor were swiped away. The last glide's words are the last ones written, so as
+     * many of them go unlearned, as with backspace right after a glide: a wrong glide deleted this way must not
+     * teach its word or its stroke. The rest of that glide is final.
+     */
+    private fun forgetDeletedGlide(n: Int) {
+        repeat(minOf(n, pending.size)) {
+            val w = pending.removeAt(pending.size - 1)
+            recent.remove(w)
+        }
+        settle()
     }
 
     /** offsets[k]: how many characters before the cursor the last k words take, each with the spaces after it. */

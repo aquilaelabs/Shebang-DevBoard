@@ -405,6 +405,43 @@ class GlideCommitTest {
     }
 
     @Test
+    fun swipingAGlideAwayLeavesItUnlearned() {
+        glide("hello")
+        glide("fur")
+        val c = ic.cursor
+        controller.onSelectionChanged(c, c, c, c, -1, -1)
+        controller.previewDeleteWords(1)
+        assertEquals("fur", ic.getSelectedText(0))
+        controller.deleteWords(1)
+        assertEquals("hello ", ic.toString())
+        controller.typeText("x")
+        assertEquals(listOf("hello"), learned.map { it.first })
+        assertEquals(1, glidesLearned.size)
+    }
+
+    @Test
+    fun swipingAwayOnlyPartOfAGlideLearnsTheRest() {
+        glide("hello", "fur")
+        controller.deleteWords(1)
+        assertEquals("hello ", ic.toString())
+        assertEquals(listOf("hello"), learned.map { it.first })
+    }
+
+    @Test
+    fun aCancelledSwipeKeepsTheGlideToLearn() {
+        glide("hello")
+        val c = ic.cursor
+        controller.onSelectionChanged(c, c, c, c, -1, -1)
+        controller.previewDeleteWords(1)
+        assertTrue(learned.isEmpty())
+        controller.previewDeleteWords(0)
+        controller.deleteWords(0)
+        assertEquals("hello", ic.toString())
+        controller.typeText(".")
+        assertEquals(listOf("hello"), learned.map { it.first })
+    }
+
+    @Test
     fun trailingSpaceFromADipIsPartOfTheGlide() {
         glide("hello", trailingSpace = true)
         assertEquals("hello ", ic.toString())
