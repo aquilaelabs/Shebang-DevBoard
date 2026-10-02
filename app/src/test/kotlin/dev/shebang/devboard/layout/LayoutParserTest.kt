@@ -24,8 +24,12 @@ class LayoutParserTest {
     fun codeLayoutHasEveryDigitAndAsciiSymbolWithoutShift() {
         val def = LayoutParser.parse(asset("layouts/code.json"))
         val texts = def.rows.flatMap { it.keys }.mapNotNull { it.text }.toSet()
-        val expected = ("0123456789" + "!@#$%^&*()" + "`~-_=+[]{}" + "\\|;:'\",.<>" + "/?").map { it.toString() }.toSet()
+        val expected = ("0123456789" + "!@#$&*()" + "`~-_=+[]{}" + "\\|;:'\",.<>" + "/?").map { it.toString() }.toSet()
         assertEquals(emptySet<String>(), expected - texts)
+        // The two rarest, % and ^, are held on 5 and 6, where they sit on a hardware keyboard.
+        val digits = def.rows.first().keys
+        assertEquals(listOf("%"), digits.first { it.text == "5" }.alternates)
+        assertEquals(listOf("^"), digits.first { it.text == "6" }.alternates)
         val arrows = def.rows.last().keys.mapNotNull { it.code }
         assertEquals(listOf("DPAD_LEFT", "DPAD_UP", "DPAD_DOWN", "DPAD_RIGHT"), arrows)
         assertEquals("mode_text", def.rows.last().keys.first().action)
@@ -37,8 +41,22 @@ class LayoutParserTest {
         val row = def.rows.last().keys
         val arrows = row.filter { it.code?.startsWith("DPAD") == true }
         assertTrue(arrows.all { it.width == 0.875f })
-        assertEquals(1.5f, row.first { it.action == "space" }.width)
+        assertEquals(2f, row.first { it.action == "space" }.width)
         assertEquals(10.0, row.sumOf { it.width.toDouble() }, 0.001)
+        // Comma and period around space, as in text mode.
+        assertEquals(listOf(","), row.mapNotNull { it.text }.take(1))
+        assertEquals(".", row[row.indexOfFirst { it.action == "space" } + 1].text)
+    }
+
+    @Test
+    fun codeLayoutKeepsTheFamiliarPlaces() {
+        val def = LayoutParser.parse(asset("layouts/code.json"))
+        // The usual symbol page's rows, with ? and ! at the right of the second.
+        assertEquals("@#\$_&-+()/".map { it.toString() }, def.rows[1].keys.map { it.text })
+        assertEquals("=*\"':;!?<>".map { it.toString() }, def.rows[2].keys.map { it.text })
+        // Backspace ends the row above the bottom one, as in text mode.
+        assertEquals("backspace", def.rows[3].keys.last().action)
+        assertEquals(10.0, def.rows[3].keys.sumOf { it.width.toDouble() }, 0.001)
     }
 
     @Test

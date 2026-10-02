@@ -7,8 +7,10 @@ An Android keyboard (IME) for developers, written in Kotlin.
   into account; tap inside a word (or double-tap it) and glide to redo it; the keyboard learns your words
   and how you swipe, on the phone; and (optionally) one stroke can write several words by dipping into the
   space bar between them.
-- **Code mode** (`#!` key): every digit and printable ASCII symbol on one page, plus arrow keys. No shift,
-  no long-press, no autocorrect.
+- **Code mode** (`#!` key): every digit and printable ASCII symbol on one page, plus arrow keys. The two rows
+  under the digits are the usual phone symbol page's (`@ # $ _ & - + ( ) /`, then `= * " ' : ; ! ? < >`), the
+  code extras (`` ` ~ | \ [ ] { } ``) the row below, and backspace, comma, space, period and enter sit where
+  they do in text mode; `%` and `^` are held on 5 and 6. No shift, no autocorrect.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
   snippets...) that sends real `KeyEvent`s, so Termux and other terminals receive them. Sticky modifiers let
   `Ctrl` then `c` on the main keyboard send Ctrl+C.
@@ -435,6 +437,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   replace `,` with `/` and `@`; the space key absorbs the width difference so rows always sum to 10 units.
 - **Numeric pad**: a 4-column pad (digits, backspace, `-`, `.`, `,`/`+` for phone, `#!`, enter) with
   long-press alternates for `+ * / # ( ) : ;`. Number, phone and date fields all use it.
+- **Code mode layout** (the owner's report: "?" was where muscle memory did not look): no study says where
+  people expect symbols on a phone, so the rows follow the common phone symbol page, which is where thumbs
+  look, and the extras code needs take the fifth row. Counted in prose (Tatoeba and Common Voice) the symbols
+  are `.` 64%, `'` 17%, `,` 7%, `?` 6%; in code (this project's sources) `.` 16%, `(` `)` 12% each, `=` 9%,
+  `,` 7%, `-` 6%, while `%` `^` `` ` `` `~` are almost never typed, so `%` and `^` were the two put on a hold.
 - **Code mode height**: five rows at 86% of the text row height so the keyboard grows only a little.
 - **Mode persistence**: the text/code choice persists across fields; numeric fields force the numeric pad
   while in text mode.
