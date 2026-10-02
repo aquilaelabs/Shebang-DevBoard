@@ -227,9 +227,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
   "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
   searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
-- **A word typed with an apostrophe is not autocorrected** (the owner's request: punctuation put into a word
-  makes it intentional): "y'all" and "ca'nt" stay as typed, so a misplaced apostrophe is not fixed either; the
-  strip still offers the alternatives. "i'm" still gets its capital, which is not a correction.
+- **Punctuation in a word is on purpose** (the owner's request): a word typed with an apostrophe keeps its
+  letters, and only the apostrophe may move ("ca'nt" becomes "can't", "y'all" stays); a word joined to the one
+  before by a hyphen, slash, dot, @ or the like with no space ("f-droid", "node.js", "and/or") is not
+  autocorrected at all. The strip still offers alternatives. "i'm" still gets its capital (not a correction).
 - **Names, brands and abbreviations** (the owner's request: "url, github, mcdonalds, google" were missing):
   the capitalised words to level 50, the proper names and the abbreviations were added after measuring each
   set. On the same 10,000 FUTO swipes glide top-1 went from 91.0% to 90.9%; FUTO swipes whose word the

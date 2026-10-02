@@ -77,12 +77,26 @@ class TypingCorrectionTest {
     }
 
     @Test
-    fun aWordTypedWithAnApostropheIsLeftAsTyped() {
-        // Punctuation put into a word is on purpose, even where the word looks like a slip.
+    fun aWordTypedWithAnApostropheKeepsItsLetters() {
+        // The apostrophe is on purpose: it may move, but no letter changes.
         type("ca'nt ")
-        assertEquals("ca'nt ", ic.toString())
+        assertEquals("can't ", ic.toString())
         type("y'all ")
-        assertEquals("ca'nt y'all ", ic.toString())
+        assertEquals("can't y'all ", ic.toString())
+    }
+
+    @Test
+    fun aWordJoinedByPunctuationIsLeftAlone() {
+        type("f-droid ")
+        assertEquals("f-droid ", ic.toString())
+        type("node.js ")
+        assertEquals("f-droid node.js ", ic.toString())
+        // Even where the part alone would be a slip.
+        type("x-teh ")
+        assertEquals("f-droid node.js x-teh ", ic.toString())
+        // After a space a dash is not a joiner.
+        type("- wiht ")
+        assertEquals("f-droid node.js x-teh - with ", ic.toString())
     }
 
     @Test

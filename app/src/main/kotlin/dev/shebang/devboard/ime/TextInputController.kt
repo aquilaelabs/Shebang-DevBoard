@@ -1005,11 +1005,11 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !typedPunctuation(typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
-            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps, before)?.let { commit = it }
+            if (candidatesFor == typed) suggester?.autocorrectFrom(typed, candidates, taps, before)?.takeIf { keepsPunctuation(typed, it) }?.let { commit = it }
             else defer = deferOk && suggester != null
             // A word that stands elsewhere in the text as typed is a name the user means (an identifier,
             // a handle), not a slip.
@@ -1036,7 +1036,7 @@ class TextInputController(
         }
         val s = suggester ?: return
         background.execute {
-            val fix = s.autocorrect(typed, taps, before)
+            val fix = s.autocorrect(typed, taps, before)?.takeIf { keepsPunctuation(typed, it) }
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
@@ -1062,8 +1062,27 @@ class TextInputController(
      * ("getUser", but not "NASA" style capitals throughout, which are left alone anyway), a digit or an
      * underscore.
      */
-    /** An apostrophe typed into the word ("y'all", "it's"): punctuation put in on purpose, so the word stays. */
-    private fun typedPunctuation(w: String): Boolean = w.any { it == '\'' || it == '’' }
+    /**
+     * Whether autocorrect may turn [typed] into [fix] as far as punctuation goes. An apostrophe typed into a word
+     * is on purpose: the letters stay, and only the apostrophe may move ("ca'nt" -> "can't", but "y'all" stays).
+     */
+    private fun keepsPunctuation(typed: String, fix: String): Boolean {
+        if (typed.none { it == '\'' || it == '’' }) return true
+        fun letters(w: String) = w.filter { it != '\'' && it != '’' }.lowercase()
+        return letters(typed) == letters(fix)
+    }
+
+    /**
+     * Whether the word being typed is joined to what comes before by punctuation, with no space ("f-droid",
+     * "node.js", "and/or", "user@host"): part of a name or an address, which autocorrect leaves alone.
+     */
+    private fun gluedToPrevious(ic: InputConnection, typed: String): Boolean {
+        val before = ic.getTextBeforeCursor(typed.length + 2, 0) ?: return false
+        if (before.length < typed.length + 2) return false
+        val joiner = before[before.length - typed.length - 1]
+        val prev = before[before.length - typed.length - 2]
+        return joiner in JOINERS && !prev.isWhitespace()
+    }
 
     private fun looksLikeCode(w: String): Boolean {
         if (w.any { it.isDigit() || it == '_' }) return true
@@ -1170,11 +1189,12 @@ class TextInputController(
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !typedPunctuation(typed) &&
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
+            (ic == null || !gluedToPrevious(ic, typed)) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)
-            val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed } else null
+            val fix = if (correctable) s.autocorrectFrom(typed, result, taps, context)?.takeIf { it != typed && keepsPunctuation(typed, it) } else null
             postToMain {
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
@@ -1603,6 +1623,8 @@ class TextInputController(
         private const val QUOTES = "\"'`"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
         private const val SENTENCE_PUNCTUATION = ".,!?;:)\"'"
+        /** Punctuation that joins a word to the one before it when no space follows ([gluedToPrevious]). */
+        private const val JOINERS = "-/.@:_+#~\\=&"
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
