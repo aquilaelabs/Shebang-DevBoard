@@ -213,6 +213,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         settings = s
         feedback.settings = s
         text.settings = s
+        text.emails = if (s.rememberEmails) EmailMemory.get(filesDir) else null
         if (themeChanged) applyTheme()
         if (barChanged) applyBar()
         strip?.setMode(s.stripMode)
@@ -461,6 +462,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         applyPendingBundle()
         updateAutoCaps()
         text.refreshLetterPrior()
+        text.refreshEmails(edited = false)
         updateClipChip()
         updateMic()
     }
@@ -530,6 +532,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             s.setClip(null)
             afterEdit()
         })
+    }
+
+    override fun onFinishInput() {
+        // Leaving a field: an email field's addresses are remembered.
+        text.rememberEmails()
+        super.onFinishInput()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -648,6 +656,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private fun afterEdit(wordBoundary: Boolean = true) {
         if (wordBoundary || !text.isComposing) updateAutoCaps()
         text.refreshLetterPrior()
+        text.refreshEmails()
     }
 
     // ---- KeyboardView.Listener -----------------------------------------------------------------------

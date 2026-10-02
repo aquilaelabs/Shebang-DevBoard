@@ -86,6 +86,16 @@ class TextInputController(
         private set
     var settings: Settings = Settings()
     var suggester: Suggester? = null
+
+    /** Addresses entered in email fields, offered there as they are typed again; null when not remembered. */
+    var emails: EmailMemory? = null
+    /** The addresses on the strip now: picking one fills in the address being typed. */
+    private var emailOffer: List<String> = emptyList()
+    /**
+     * What the email field held after the last edit, remembered when the field is left. Kept as it goes because
+     * an app may turn the field into another kind of input before the keyboard hears it is left.
+     */
+    private var emailFieldText: String? = null
     /** The keyboard shows code mode: brackets and quotes pair (when the setting is on). */
     var codeMode = false
 
@@ -358,6 +368,8 @@ class TextInputController(
     val targetText: String? get() = target?.text
 
     fun startInput(field: FieldInfo) {
+        // An email field left for another field: its addresses are remembered.
+        rememberEmails()
         // What was glided in the last field is learned under that field's rules.
         settle()
         flushHeld()
@@ -372,6 +384,7 @@ class TextInputController(
         lastAutocorrect = null
         keptAsTyped.clear()
         corrections.clear()
+        emailOffer = emptyList()
         reopenedCorrection = null
         reopened = null
         reopenedGlide = null
@@ -1268,6 +1281,77 @@ class TextInputController(
 
     // ---- Suggestions ---------------------------------------------------------------------------------
 
+    /** What is being typed in an email field: the text before the cursor back to a space, comma or semicolon. */
+    private fun emailTyped(ic: InputConnection): String? {
+        val before = ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: return null
+        return before.split(EmailMemory.SEPARATORS).last()
+    }
+
+    /**
+     * In an email field, offers the remembered addresses that begin with what is being typed (the most used
+     * while nothing is), in place of word suggestions. Call after each edit, and with [edited] false when the
+     * field starts: only what the user typed there is remembered, not an address the field came with.
+     */
+    fun refreshEmails(edited: Boolean = true) {
+        val offered = emailOffer.isNotEmpty()
+        emailOffer = emptyList()
+        val memory = emails ?: return
+        if (field.variant != FieldVariant.EMAIL) return
+        val ic = connection() ?: return
+        if (edited) keepEmailFieldText(ic)
+        if (!field.allowsComposing || !ic.getSelectedText(0).isNullOrEmpty()) return
+        val typed = emailTyped(ic) ?: return
+        val matches = memory.matching(typed)
+        if (matches.isEmpty()) {
+            // Addresses offered a moment ago no longer match: the strip gives way to the bar again.
+            if (offered && !isComposing) {
+                ui.showCandidates(emptyList())
+                ui.setComposing(false)
+            }
+            return
+        }
+        emailOffer = matches
+        // Word suggestions still being worked out for this edit would cover the addresses.
+        suggestGeneration++
+        predictGeneration++
+        ui.showCandidates(arrangeBestMiddle(matches))
+        // Shown also with no word being typed (an empty field, or just after the @), as predictions are.
+        ui.setComposing(true)
+    }
+
+    /** Keeps what an email field holds, for [rememberEmails] (not where the app asks for no learning). */
+    private fun keepEmailFieldText(ic: InputConnection) {
+        if (field.variant != FieldVariant.EMAIL || field.isPassword || field.noPersonalizedLearning) return
+        emailFieldText = (ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: "") + (ic.getTextAfterCursor(MAX_EMAIL, 0)?.toString() ?: "")
+    }
+
+    /** Leaving an email field (or the keyboard closing): the addresses it last held are remembered. */
+    fun rememberEmails() {
+        val text = emailFieldText ?: return
+        emailFieldText = null
+        val memory = emails ?: return
+        if (text.isNotBlank()) background.execute { memory.record(text) }
+    }
+
+    /** An offered address picked: it replaces what was typed of it. */
+    private fun pickEmail(ic: InputConnection, address: String) {
+        ownEdit()
+        ic.beginBatchEdit()
+        if (isComposing) {
+            ic.finishComposingText()
+            word.setLength(0)
+            reopened = null
+            reopenedCorrection = null
+        }
+        val typed = emailTyped(ic).orEmpty()
+        ic.deleteSurroundingText(typed.length, 0)
+        ic.commitText(address, 1)
+        ic.endBatchEdit()
+        keepEmailFieldText(ic)
+        emailOffer = emptyList()
+        clearCandidates()
+    }
+
     private fun clearCandidates() {
         candidates = emptyList()
         suggestGeneration++
@@ -1313,6 +1397,10 @@ class TextInputController(
     /** Picks a strip word: replaces the targeted word, the composing word, or the last glide's last word. */
     fun pickCandidate(chosen: String) {
         val ic = connection() ?: return
+        if (chosen in emailOffer) {
+            pickEmail(ic, chosen)
+            return
+        }
         val t = target
         if (t != null) {
             if (chosen.equals(t.text, ignoreCase = true)) {
@@ -1748,6 +1836,8 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
+        /** Text read around the cursor in an email field: a few addresses' worth. */
+        private const val MAX_EMAIL = 1000
         /** Characters before a corrected word that find it again: enough to tell two of the same word apart. */
         private const val CORRECTION_CONTEXT = 32
         /** Corrections remembered per field for backspace to take back. */

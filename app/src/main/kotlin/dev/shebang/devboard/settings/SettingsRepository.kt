@@ -42,6 +42,7 @@ class SettingsRepository(context: Context) {
             glideTrail = p[Keys.GLIDE_TRAIL] ?: d.glideTrail,
             phraseGlide = p[Keys.PHRASE_GLIDE] ?: d.phraseGlide,
             learnWords = p[Keys.LEARN_WORDS] ?: d.learnWords,
+            rememberEmails = p[Keys.REMEMBER_EMAILS] ?: d.rememberEmails,
             adaptGlide = p[Keys.ADAPT_GLIDE] ?: d.adaptGlide,
             adaptTaps = p[Keys.ADAPT_TAPS] ?: d.adaptTaps,
             autocorrect = p[Keys.AUTOCORRECT] ?: d.autocorrect,
@@ -69,6 +70,7 @@ class SettingsRepository(context: Context) {
         p[Keys.GLIDE_TRAIL] = s.glideTrail
         p[Keys.PHRASE_GLIDE] = s.phraseGlide
         p[Keys.LEARN_WORDS] = s.learnWords
+        p[Keys.REMEMBER_EMAILS] = s.rememberEmails
         p[Keys.ADAPT_GLIDE] = s.adaptGlide
         p[Keys.ADAPT_TAPS] = s.adaptTaps
         p[Keys.AUTOCORRECT] = s.autocorrect
@@ -95,6 +97,7 @@ class SettingsRepository(context: Context) {
         val GLIDE_TRAIL = booleanPreferencesKey("glide_trail")
         val PHRASE_GLIDE = booleanPreferencesKey("phrase_glide")
         val LEARN_WORDS = booleanPreferencesKey("learn_words")
+        val REMEMBER_EMAILS = booleanPreferencesKey("remember_emails")
         val ADAPT_GLIDE = booleanPreferencesKey("adapt_glide")
         val ADAPT_TAPS = booleanPreferencesKey("adapt_taps")
         val AUTOCORRECT = booleanPreferencesKey("autocorrect")

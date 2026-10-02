@@ -39,6 +39,7 @@
 - Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
 - Hold shift for caps lock, as well as tapping it twice (2c08853)
 - Backspacing back to a word autocorrect changed, even after typing on, puts what you typed first on the strip (cb1fddd, 2679987)
+- Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
 
 ### Changed
 

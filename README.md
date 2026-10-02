@@ -23,7 +23,9 @@ An Android keyboard (IME) for developers, written in Kotlin.
 - **On-device only**: the sole permission is `VIBRATE`. No network code, no analytics. What the keyboard
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
   deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
-  no-suggestion fields, or fields that ask for no learning.
+  no-suggestion fields, or fields that ask for no learning. The one exception is email addresses typed into
+  email fields, which are remembered so the strip can offer them again (Settings > Learning > Remember email
+  addresses turns this off).
 
 ## Screenshots
 
@@ -223,6 +225,19 @@ its own, locally:
 
 ## Decisions
 
+- **Remembered email addresses** (the owner's request, like other keyboards' address suggestions): what the
+  user typed into an email field (`TYPE_TEXT_VARIATION_EMAIL_ADDRESS` or `WEB_EMAIL_ADDRESS`) is kept as the
+  field changes and recorded when the field is left; the keyboard keeps a copy as it goes because an app may
+  turn the field into another kind of input before the keyboard hears it was left (Contacts does).
+  Only text shaped like an address counts, an address the field came with and was not edited is not taken,
+  and nothing is taken from password fields or fields with `IME_FLAG_NO_PERSONALIZED_LEARNING`. At most 50,
+  the least used going first, in `files/emails.json` (no backups). In an email field the strip offers up to
+  three that begin with what is typed back to a space, comma or semicolon, most used first (with nothing
+  typed, the most used), raising the strip in Auto mode like next-word predictions; so one name at two
+  providers shows both until the provider is typed. A pick replaces what was typed. No offers in
+  no-suggestion fields (the standing rule). Settings > Learning > Remember email addresses (on) turns it
+  off; Settings > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
+  word alone in the middle slot spans the strip, so a long address keeps its name and its domain.
 - **Clipboard chip** (the user's request): text copied in the last three minutes gets a chip in the strip's
   top row (the autofill row, ahead of any autofill chips) while no word is composed: "Paste" and the clip's
   first 28 characters, or dots when the copying app marked it sensitive (Android 13+, as password managers

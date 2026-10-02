@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import dev.shebang.devboard.ime.EmailMemory
 import dev.shebang.devboard.dict.PersonalWord
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.GlideAdaptation
@@ -57,6 +58,9 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     val personal = remember { PersonalWords.get(context.filesDir) }
     val adaptation = remember { GlideAdaptation.get(context.filesDir) }
     val taps = remember { GlideAdaptation.getTaps(context.filesDir) }
+    val emailMemory = remember { EmailMemory.get(context.filesDir) }
+    var emails by remember { mutableStateOf<List<EmailMemory.Address>>(emptyList()) }
+    var confirmClearEmails by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     var words by remember { mutableStateOf<List<PersonalWord>?>(null) }
     var glides by remember { mutableIntStateOf(0) }
@@ -75,6 +79,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 adaptation.load()
                 Triple(personal.list(), adaptation.glides, adaptation.corrections)
             }
+            emails = withContext(Dispatchers.IO) { emailMemory.list() }
             restoreDays = withContext(Dispatchers.IO) { (personal.restoreDays() + adaptation.restoreDays() + taps.restoreDays()).distinct().sortedDescending() }
             words = w
             glides = g
@@ -125,7 +130,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             // While searching, only the matching words.
             if (!searching) item {
                 Text(
-                    "Learned on this phone from what you type and glide, and never sent anywhere. Nothing is learned in " +
+                    "Learned on this phone from what you type and glide, and never sent anywhere. No words are learned in " +
                         "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
                         "no learning. A new word is glidable after you use it twice.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -188,6 +193,34 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     },
                 )
             }
+            if (!searching && emails.isNotEmpty()) {
+                item { HorizontalDivider() }
+                item {
+                    ListItem(
+                        headlineContent = { Text("Email addresses") },
+                        supportingContent = { Text("Entered in email fields, and offered there as you type them again. Tap to forget them all.") },
+                        modifier = Modifier.clickable { confirmClearEmails = true },
+                    )
+                }
+                items(emails, key = { "email:" + it.address.lowercase() }) { e ->
+                    ListItem(
+                        headlineContent = { Text(e.address) },
+                        supportingContent = { Text(if (e.count == 1) "Entered once" else "Entered ${e.count} times") },
+                        trailingContent = {
+                            IconButton(onClick = {
+                                scope.launch {
+                                    emails = withContext(Dispatchers.IO) {
+                                        emailMemory.delete(e.address)
+                                        emailMemory.list()
+                                    }
+                                }
+                            }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Forget ${e.address}")
+                            }
+                        },
+                    )
+                }
+            }
             if (!searching) item { HorizontalDivider() }
             val list = words
             when {
@@ -223,6 +256,25 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
         }
     }
 
+    if (confirmClearEmails) {
+        AlertDialog(
+            onDismissRequest = { confirmClearEmails = false },
+            title = { Text("Forget all email addresses?") },
+            text = { Text("The keyboard stops offering them until you enter them again. Settings > Remember email addresses turns remembering off.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmClearEmails = false
+                    scope.launch {
+                        emails = withContext(Dispatchers.IO) {
+                            emailMemory.clear()
+                            emailMemory.list()
+                        }
+                    }
+                }) { Text("Forget all") }
+            },
+            dismissButton = { TextButton(onClick = { confirmClearEmails = false }) { Text("Cancel") } },
+        )
+    }
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
