@@ -1034,7 +1034,8 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed)
+            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
+            !capitalisedOnPurpose(ic, typed)
         var commit = typed
         var defer = false
         if (canCorrect) {
@@ -1111,6 +1112,19 @@ class TextInputController(
      * Whether the word being typed is joined to what comes before by punctuation, with no space ("f-droid",
      * "node.js", "and/or", "user@host"): part of a name or an address, which autocorrect leaves alone.
      */
+    /**
+     * A word the dictionary lacks, typed in capitals ("NASA", "GPU"), or with a capital in the middle of a
+     * sentence where the keyboard would not give one ("Kaito"): a name or an acronym meant as typed.
+     */
+    private fun capitalisedOnPurpose(ic: InputConnection, typed: String): Boolean {
+        if (typed.isEmpty() || !typed[0].isUpperCase()) return false
+        if (suggester?.knows(typed) != false) return false
+        if (typed.length >= 2 && typed.all { !it.isLetter() || it.isUpperCase() }) return true
+        val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return false
+        val rest = if (before.endsWith(typed)) before.subSequence(0, before.length - typed.length) else before
+        return GlideText.contextWord(rest) != GlideText.SENTENCE_START
+    }
+
     private fun gluedToPrevious(ic: InputConnection, typed: String): Boolean {
         val before = ic.getTextBeforeCursor(typed.length + 2, 0) ?: return false
         if (before.length < typed.length + 2) return false
@@ -1225,7 +1239,7 @@ class TextInputController(
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
-            (ic == null || !gluedToPrevious(ic, typed)) &&
+            (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
             val result = s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, context)

@@ -97,6 +97,18 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun aNameOrAcronymTypedInCapitalsIsLeftAlone() {
+        // "Thw" mid-sentence with a capital the keyboard did not give: a name meant as typed.
+        type("we met Thw ")
+        assertEquals("we met Thw ", ic.toString())
+        type("at TEH ")
+        assertEquals("we met Thw at TEH ", ic.toString())
+        // At the start of a sentence a capital says nothing: still a slip.
+        type(". Teh ")
+        assertEquals("we met Thw at TEH . The ", ic.toString())
+    }
+
+    @Test
     fun aWordJoinedByPunctuationIsLeftAlone() {
         type("f-droid ")
         assertEquals("f-droid ", ic.toString())

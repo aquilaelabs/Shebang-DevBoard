@@ -66,6 +66,7 @@
 - Glide forgives stopping short at turns, the way thumbs actually move: 91.0% of real swipes right instead of 90.6% (3e8a5ab)
 - Glide reads strokes with a model trained on 900,000 real swipes: 93.7% of words right first time instead of 91.0% (2d0f189)
 - Suggestions after a space read the whole sentence with a model trained on the GPU: the next word is among the three 39% of the time instead of 36%, and glide gets the word right a little more often (c128635)
+- Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (4afa886)
 
 ### Fixed
 

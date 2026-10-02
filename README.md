@@ -257,6 +257,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   are dropped, but the 's contractions of a closed set of pronouns and function words ("it's", "that's",
   "let's") are kept: SCOWL files them among the possessives. 72,074 words, written in the order the app
   searches it so loading skips the sort. Levels 60+ were left out as spell-checker noise.
+- **A word the dictionary lacks may be meant as typed** (the owner's request: autocorrect should judge
+  whether an unknown word is a slip or intended, without the check mark). A correction of a word the
+  dictionary lacks now has to be likely enough to beat keeping it: its score (how common the correction is
+  after the words before, times how likely the real taps made that slip, so cleanly hit keys count as
+  intent) must reach 2e-8. Measured on TSI's real taps, with each correctly typed phrase word decided as if
+  the dictionary lacked it (standing in for names, terms and handles): words meant as typed kept 29.1% before
+  and 65.7% now; typos fixed 77.7% to 75.9%, typos turned into another wrong word 8.4% to 4.3% (a wrong
+  correction costs more than a typo left), and words in the dictionary still never changed. Thresholds of
+  1e-9 to 1e-7 traded these off (43% to 76% kept, 77.4% to 72.8% fixed). An unknown word in capitals ("GPU")
+  or with a capital mid-sentence where the keyboard gave none (a name) is always left as typed.
 - **"its" or "it's" from the words before** (the owner's request): a word typed without its apostrophe that is
   a word either way ("its", "were", "well", "ill", "cant") becomes the contraction only when, after the two
   words before it, the contraction is at least 20 times likelier. On 923 uses in sentences the model never

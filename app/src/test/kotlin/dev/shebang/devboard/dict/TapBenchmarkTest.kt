@@ -426,4 +426,45 @@ class TapBenchmarkTest {
         TapModel.SPACE_LEAN_Y_DP = saved.third
         TapModel.SPACE_SIGMA_Y_DP = savedSigma
     }
+
+    /**
+     * Misspellings fixed against words meant as typed left alone. The typos are TSI's phrase words typed wrong;
+     * the words meant as typed are its words typed right, each decided as if the dictionary lacked it (the way
+     * a name, a term or a handle reaches autocorrect), with the same real taps and words before. For each
+     * [Suggester.KEEP_SCORE] tried: typos fixed, typos made another word, and words meant as typed kept.
+     */
+    @Test
+    fun keepingWordsMeantAsTyped() {
+        val dir = System.getenv("TSI_DIR")?.let { File(it) }
+        assumeTrue("TSI_DIR not set", dir != null && File(dir, "touch_data.csv").isFile)
+        val layout = layout(dir!!)
+        val model = TapModel(layout, TSI_DENSITY)
+        val words = words(dir, layout).filter { it.meant.length >= 2 && dictionary.contains(it.meant) }
+        val typos = words.filter { it.typed != it.meant }
+        val right = words.filter { it.typed == it.meant && it.meant.length >= 3 }
+        val saved = Suggester.KEEP_SCORE
+        val pct = GlideBenchmarkTest::pct
+        val keeps = System.getenv("KEEP_SWEEP")?.split(',')?.map { it.toDouble() } ?: listOf(0.0, saved).distinct()
+        for (keep in keeps) {
+            Suggester.KEEP_SCORE = keep
+            var fixed = 0
+            var wrong = 0
+            for (w in typos) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val ctx = contextOf(w)
+                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx)
+                if (fix.equals(w.meant, ignoreCase = true)) fixed++ else if (fix != null) wrong++
+            }
+            var kept = 0
+            for (w in right) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val ctx = contextOf(w)
+                val cands = suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES + 1, taps, ctx).filter { !it.word.equals(w.typed, ignoreCase = true) }
+                if (suggester.autocorrectFrom(w.typed, cands, taps, ctx, asUnknown = true) == null) kept++
+            }
+            println("TAPS KEEP ${keep.toString().padEnd(8)} typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}; words meant as typed kept ${pct(kept, right.size)} of ${right.size}")
+        }
+        Suggester.KEEP_SCORE = saved
+    }
 }
+
