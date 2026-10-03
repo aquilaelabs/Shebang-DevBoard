@@ -2,7 +2,8 @@
 
 An Android keyboard (IME) for developers, written in Kotlin.
 
-- **Text mode**: QWERTY with suggestions, long-press alternates and auto-capitalisation, and glide typing
+- **Text mode**: QWERTY with suggestions, long-press alternates (a letter's capital first) and
+  auto-capitalisation, and glide typing
   that decodes while the finger moves: the strip shows the word before you lift; the word before is taken
   into account; tap inside a word (or double-tap it) and glide to redo it; the keyboard learns your words
   and how you swipe, on the phone; and (optionally) one stroke can write several words by dipping into the
@@ -13,17 +14,22 @@ An Android keyboard (IME) for developers, written in Kotlin.
   they do in text mode; `%` and `^` are held on 5 and 6. No shift, no autocorrect.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
   snippets...) that sends real `KeyEvent`s, so Termux and other terminals receive them. Sticky modifiers let
-  `Ctrl` then `c` on the main keyboard send Ctrl+C.
+  `Ctrl` then `c` on the main keyboard send Ctrl+C. Its first two items open the emoji panel and the
+  clipboard history (text and pictures, with pins).
 - **Autocorrect that knows where you tapped**: a slip is weighed by where the finger came down, and the
   keyboard learns where your own taps land on each key.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no
   suggestions or glide; number/phone/date fields get a numeric pad; email/URL fields get `@` and `/`.
+- **Email addresses** typed into email fields are offered there again as you type, and **Export
+  diagnostics** saves a file you can send the developer, with nothing personal in it.
 - **Autofill in the strip** (Android 11+): the password manager's or autofill service's suggestions show as
   chips in the strip, in the keyboard's colours; tapping one fills the form.
 - **On-device only**: the sole permission is `VIBRATE`. No network code, no analytics. What the keyboard
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
   deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
-  no-suggestion fields, or fields that ask for no learning.
+  no-suggestion fields, or fields that ask for no learning. The one exception is email addresses typed into
+  email fields, which are remembered so the strip can offer them again (Settings > Learning > Remember email
+  addresses turns this off).
 
 ## Screenshots
 
@@ -87,13 +93,15 @@ python-ml tools/lm_model/export.py lm.pt app/src/main/assets/dict/en_next_word.b
 
 | Package (`dev.shebang.devboard.`) | What lives there |
 |---|---|
-| `ime` | `DevBoardService` (the `InputMethodService`), `FieldInfo` (EditorInfo -> what the field allows), `TextInputController` (composing, suggestions, smart spacing, redoing a tapped word, what is learned when), `GlideText` (context word and casing), `LanguageLoader` and `LanguageBuilder` (background load and rebuilds with learned words), `SystemUserDictionary` (Android's personal dictionary), `KeyboardSizing`, `Feedback` |
+| `ime` | `DevBoardService` (the `InputMethodService`), `FieldInfo` (EditorInfo -> what the field allows), `TextInputController` (composing, suggestions, smart spacing, redoing a tapped word, what is learned when), `GlideText` (context word and casing), `LanguageLoader` and `LanguageBuilder` (background load and rebuilds with learned words), `SystemUserDictionary` (Android's personal dictionary), `ClipboardHistory` and `ClipboardChip`, `EmailMemory` (remembered addresses), `VoiceClient` (the Shebang Voice add-on) and `DictationCleanup`, `LayoutRepository`, `KeyboardSizing`, `Feedback` |
 | `layout` | JSON models (`LayoutDef`, `KeyDef`, `BarItem`), `LayoutParser`, `KeyboardGeometry` (pixel positions computed at runtime), `KeyCodeNames` |
-| `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `TerminalBarView`, `SuggestionStripView`, `TopStripView`, `KeyboardTheme` |
-| `input` | `ModifierState` (sticky modifier state machine), `KeyEventMapper`/`CharKeyCodes` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
+| `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `KeyIcons` (the key glyphs), `TerminalBarView`, `SuggestionStripView`, `AutofillStripView`, `TopStripView`, `EmojiPanelView`, `ClipboardPanelView` and `PanelKeys`, `MicButton`, `KeyboardTheme` and `Palettes` |
+| `input` | `ModifierState` (sticky modifier state machine), `CharKeyCodes` and `KeyEventPlan` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
 | `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideModel` (the learned reading of strokes), `GlideSession` (decoder thread fed by a lock-free ring), `GlideAdaptation` and `TapModel` (where this user's glides and taps land), `GlideTrace` (recorded glides), `KeyLayoutModel` |
-| `dict` | `Dictionary` (sorted word list with tiers), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |
-| `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `GlideRecorderView`, `GlideTraceStore` |
+| `dict` | `Dictionary` (sorted word list with tiers), `PersonalWords` (learned words), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |
+| `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `PersonalWordsScreen`, `AboutScreen`, `DiagnosticsExport`, `AppProfiles` (each app's mode and bar), `GlideRecorderView`, `GlideTraceStore` |
+
+The Shebang Voice add-on is the `voice` module (`dev.shebang.devboard.voice`); see its section below.
 
 Layouts live in `app/src/main/assets/layouts/*.json`, the default terminal bar in `assets/bar/default.json`,
 the word list in `assets/dict/en_words.txt`, the n-gram model in `assets/dict/en_ngrams.bin`, the next-word model
@@ -223,6 +231,34 @@ its own, locally:
 
 ## Decisions
 
+- **Long-press row** (the owner's requests): a lowercase letter's row starts with its capital, ahead of the
+  corner character and accents, and a letter with none of those still offers its capital (with shift on, the
+  row is the capitals of its alternates, as before). Once the finger has reached up into the row, coming back
+  down onto the key (0.15 of a key height below the row, which overlaps the key's top 0.35), or going 0.35
+  of a key height below where the hold began, highlights nothing; letting go then types the key as a tap
+  would. The first entry is highlighted when the row opens, so a hold and lift still picks it.
+- **Export diagnostics** (the owner's request, so a user can send what the keyboard has learned about their
+  typing when it isn't working well for them): Settings > About > Export diagnostics writes one JSON file
+  through the system file picker, never over a network. In it: the app version, the phone model, Android
+  version and screen size, every setting (the terminal bars only as "customised or not" and a count, since
+  they hold snippets and app names), how much has been learned as counts only (words, new words, pairs, email
+  addresses), tap and glide adaptation as numbers per letter (without the saved earlier days, which carry
+  dates), and the recorder's glides of prompted words. Left out, and listed in the file under `leftOut`:
+  learned words and pairs, email addresses, clipboard history, terminal-bar keys and snippets, app names,
+  anything typed.
+- **Remembered email addresses** (the owner's request, like other keyboards' address suggestions): what the
+  user typed into an email field (`TYPE_TEXT_VARIATION_EMAIL_ADDRESS` or `WEB_EMAIL_ADDRESS`) is kept as the
+  field changes and recorded when the field is left; the keyboard keeps a copy as it goes because an app may
+  turn the field into another kind of input before the keyboard hears it was left (Contacts does).
+  Only text shaped like an address counts, an address the field came with and was not edited is not taken,
+  and nothing is taken from password fields or fields with `IME_FLAG_NO_PERSONALIZED_LEARNING`. At most 50,
+  the least used going first, in `files/emails.json` (no backups). In an email field the strip offers up to
+  three that begin with what is typed back to a space, comma or semicolon, most used first (with nothing
+  typed, the most used), raising the strip in Auto mode like next-word predictions; so one name at two
+  providers shows both until the provider is typed. A pick replaces what was typed. No offers in
+  no-suggestion fields (the standing rule). Settings > Learning > Remember email addresses (on) turns it
+  off; Settings > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
+  word alone in the middle slot spans the strip, so a long address keeps its name and its domain.
 - **Clipboard chip** (the user's request): text copied in the last three minutes gets a chip in the strip's
   top row (the autofill row, ahead of any autofill chips) while no word is composed: "Paste" and the clip's
   first 28 characters, or dots when the copying app marked it sensitive (Android 13+, as password managers
@@ -257,7 +293,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   activity-compose to 1.12.4, the newest releases that compile against 36. Bump all five together when
   platform 37 is installed.
 - **Toolchain**: Gradle 9.7.1, AGP 9.4.1 with its built-in Kotlin support (no `kotlin-android` plugin),
-  Kotlin 2.4.20 compiler plugins for Compose and kotlinx.serialization, JDK 21, single `app` module.
+  Kotlin 2.4.20 compiler plugins for Compose and kotlinx.serialization, JDK 21; two modules, `app` (the
+  keyboard) and `voice` (the Shebang Voice add-on). Static analysis is Android Lint, failing on errors, in CI
+  and in the build; it reports nothing in `voice` and two untranslated labels in `app` (the app is English
+  only), and the Kotlin compiler reports no warnings.
 - **Word list**: SCOWL 2020.12.07, `english` + `american` lists (American spelling), size levels 10 to 50 as
   frequency tiers, plus contractions, capitalised words, SCOWL's proper names (brands, products, people) and
   abbreviations written in capitals of three letters or more (and a few two-letter ones people type, such as
@@ -544,7 +583,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   look, and the extras code needs take the fifth row. Counted in prose (Tatoeba and Common Voice) the symbols
   are `.` 64%, `'` 17%, `,` 7%, `?` 6%; in code (this project's sources) `.` 16%, `(` `)` 12% each, `=` 9%,
   `,` 7%, `-` 6%, while `%` `^` `` ` `` `~` are almost never typed, so `%` and `^` were the two put on a hold.
-- **Code mode height**: five rows at 86% of the text row height so the keyboard grows only a little.
+- **Code mode height**: every mode is exactly as tall as text mode (with its number row when that is on), so
+  switching to code mode or a number pad never moves the strip or the app above (the owner disliked the
+  jump); code mode's five rows share that height, 80% of a text row each (100% with the number row on).
 - **Mode persistence**: the text/code choice persists across fields; numeric fields force the numeric pad
   while in text mode.
 - **Suggestion strip order**: the typed word on the left (when it is not itself a suggestion), the best
@@ -552,13 +593,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   never displace it.
 - **Autocorrect** (on space, and on sentence punctuation; on enter and a following glide when the suggestions
   are for the word) leaves a dictionary word alone, except one typed without the apostrophe of a contraction
-  at least 50 times more common ("cant", "wont", "dont"; "its", "were", "well" and "ill" stay). Otherwise the
+  at least 20 times likelier after the two words before it (see "its" or "it's" above). Otherwise the
   most likely of the six suggestions wins, among common words (tier 35 or better, or used by the user) within
   one slip (two from six letters): frequency times exp(-6 x slip cost) times 0.35 for a wrong first letter.
   Slip costs follow how fingers miss on QWERTY: a skipped apostrophe 0.2, one of a double letter dropped 0.4,
   a neighbouring key, two letters swapped or a letter doubled 0.5, another letter dropped 0.8, anything else
   1.0. Two-letter words are only corrected by a letter they dropped, so "js" and "ui" stay. Backspace right
-  after an autocorrect puts back what was typed, and that word is not corrected again in the field. When
+  after an autocorrect puts back what was typed, and that word is not corrected again in the field. Later,
+  backspacing back to the end of a corrected word (the last 16 in the field, found by the 32 characters
+  before them, so only that word and not the same word elsewhere) leaves it as corrected and puts what was
+  typed first on the strip; picking it there keeps it from autocorrect in the field. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
   (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the
@@ -611,8 +655,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   Android 12+; every other theme is an original fixed palette (see Themes).
 - **A look of its own** (asked for by the user: it should not look like a copy of Gboard): the keys stay
   where they were, but each is a keycap, a face raised above an edge in a deeper shade that a press sinks
-  onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a block cursor,
-  return a bent arrow with an open chevron head, shift a caret that gains an underline while on); and the
+  onto; the glyphs are original and terminal-flavoured (backspace a chevron erasing toward a bar cursor,
+  return a bent arrow with an open chevron head, shift a caret that gains an underline while on and doubles for caps lock); and the
   space bar carries a small cursor mark. The default is no longer the system's wallpaper colours (the look
   the stock keyboard wears) but Auto, which follows the system between the original Night and Day.
 - **Themes**: Auto, Wallpaper (the system palette on Android 12+, Auto before) and twelve original palettes
@@ -631,9 +675,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Build order**: the four phases were built in one pass because the service integrates the bar, dictionary
   and glide from the start; the git history groups the work by layer (core logic, IME and UI, docs) with each
   commit building.
-- **Language load time**: the dictionary loads in 2.5 s and the n-gram model and letter tree in 2.7 s on the
-  API 36 emulator right after install (not yet compiled ahead of time); the keyboard appears at once and
-  glide starts working when both are in.
+- **Language load time**: 0.5 to 1.2 s on the API 36 emulator, 2.4 s on the first start after installing
+  (not yet compiled ahead of time); the keyboard appears at once and glide starts working when the language
+  is in. Still to be measured on a phone (R7).
 
 ## Shebang Voice (add-on)
 
@@ -649,7 +693,7 @@ tuned (ARM instruction sets chosen at runtime).
 
 How it works: the keyboard shows a mic at the right end of the strip once the add-on is installed (in text
 mode, in fields that take typed words); otherwise Settings > Voice typing links to the GitHub releases. A tap
-binds the add-on's service with BIND_INCLUDE_CAPABILITIES, which lends it the keyboard's foreground status so
+binds the add-on's service with BIND_INCLUDE_CAPABILITIES (Android 10 and later), which lends it the keyboard's foreground status so
 Android does not silence its microphone. The add-on answers only apps signed with its own key, so the
 keyboard needs no permission entry for it (a `<queries>` entry lets it see the add-on). It records,
 cuts the audio at 500 ms pauses (or at 25 s), and transcribes each piece as it comes, so text arrives sentence by sentence;
@@ -730,9 +774,16 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [ ] Password: no suggestions, no glide, no preview text left anywhere.
 - [x] Autofill (with a test autofill service on the emulator): chips in the strip in the keyboard's colours;
   tapping one filled the username and password.
-- [ ] URL/email: `@` and `/` on the bottom row; no auto-capitalisation.
+- [x] Email: `@` and `/` on the bottom row. *(verified on the emulator in Contacts)*
+- [ ] URL: `@` and `/` on the bottom row; no auto-capitalisation in URL or email fields.
+- [x] Email field: an address typed there and left is offered in an empty email field and fills it in.
+      *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
-- [ ] Multiline: Enter inserts a newline; a Search field shows "Search" and performs it.
+- [ ] Multiline: Enter inserts a newline; a Search field keeps the enter icon and performs the search.
+- [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and "wiht" is first on the strip;
+      tapping it puts it back. *(verified on the emulator)*
+- [x] Settings > About > Export diagnostics saves a file with no learned words or email addresses in it.
+      *(verified on the emulator)*
 
 Layout:
 - [x] Rotate to landscape: keys re-flow to the IME window's width (narrower than the display with a cutout),
@@ -740,5 +791,10 @@ Layout:
 - [ ] Change keyboard height in settings: the keyboard resizes immediately; glide still decodes.
 - [ ] Number row on: a fifth row appears in text mode only.
 - [ ] Strip: Auto swaps bar and suggestions; Always bar never shows suggestions; Two rows shows both.
-- [ ] Long-press space opens the system keyboard picker; dragging along space moves the cursor.
-- [ ] Shift: tap once for one capital, twice quickly for caps lock (accent-coloured key).
+- [ ] Holding #! (or ABC) opens the system keyboard picker; dragging along space moves the cursor.
+- [x] Shift: tap once for one capital (caret over a bar); tap twice quickly, or hold it, for caps lock (two
+      carets over a bar, accent-coloured key). *(hold verified on the emulator)*
+- [x] Hold "e": E is first in the row and lifting types it; hold "a", slide into the row and back down onto
+      the key: lifting types "a". *(verified on the emulator)*
+- [x] Emoji and clipboard panels from the bar: Recent emoji, a pinned copy and a picture in the history.
+      *(verified on the emulator)*

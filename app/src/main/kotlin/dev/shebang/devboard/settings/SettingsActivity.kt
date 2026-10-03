@@ -24,6 +24,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -50,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,7 +79,9 @@ import dev.shebang.devboard.ime.VoiceClient
 import dev.shebang.devboard.layout.BarConfig
 import dev.shebang.devboard.layout.BarItem
 import dev.shebang.devboard.layout.KeyCodeNames
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -151,6 +159,16 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     fun open(url: String) = runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
+    val scope = rememberCoroutineScope()
+    val diagnosticsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it) } }.isSuccess
+            }
+            Toast.makeText(context, if (ok) "Diagnostics saved" else "Couldn't save diagnostics", Toast.LENGTH_SHORT).show()
+        }
+    }
     Scaffold(topBar = {
         TopAppBar(
             title = { Text("DevBoard settings") },
@@ -169,7 +187,6 @@ fun SettingsScreen(
             }
             item { SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } } }
             item { SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } } }
-            item { SwitchRow("Flick up for symbols", "A quick flick up on a key types the character in its corner", settings.flickSymbols) { v -> update { it.copy(flickSymbols = v) } } }
 
             item { SectionHeader("Feedback") }
             item { SwitchRow("Haptics", "Vibrate on key press", settings.haptics) { v -> update { it.copy(haptics = v) } } }
@@ -221,12 +238,13 @@ fun SettingsScreen(
             }
             item { SectionHeader("Learning") }
             item { SwitchRow("Learn words I type", "Remember new words and the ones you use most, on this phone only", settings.learnWords) { v -> update { it.copy(learnWords = v) } } }
+            item { SwitchRow("Remember email addresses", "Offer addresses you entered in email fields as you type them again, on this phone only", settings.rememberEmails) { v -> update { it.copy(rememberEmails = v) } } }
             item { SwitchRow("Adapt autocorrect to my taps", "Learn where your taps land on each key, from the words you type right", settings.adaptTaps) { v -> update { it.copy(adaptTaps = v) } } }
             item { SwitchRow("Adapt glide to my swiping", "Learn how your glides lean off each key, most from the words you correct", settings.adaptGlide, enabled = settings.glide) { v -> update { it.copy(adaptGlide = v) } } }
             item {
                 ListItem(
                     headlineContent = { Text("Personal words") },
-                    supportingContent = { Text("Review or delete what was learned, or reset glide adaptation") },
+                    supportingContent = { Text("Review or delete what was learned and the email addresses remembered, or reset glide adaptation") },
                     modifier = Modifier.clickable(onClick = onPersonalWords),
                 )
             }
@@ -284,6 +302,19 @@ fun SettingsScreen(
                     modifier = Modifier.clickable { onDoc("about/THIRD_PARTY_NOTICES.md", "Credits") },
                 )
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("Export diagnostics") },
+                    supportingContent = {
+                        Text(
+                            "Save a file to send to the developer if typing or gliding isn't working well: your settings, how your taps " +
+                                "and glides lean, and your recorded glides. Learned words, email addresses, the clipboard, your terminal " +
+                                "bar and anything you typed are left out."
+                        )
+                    },
+                    modifier = Modifier.clickable { diagnosticsLauncher.launch("devboard-diagnostics.json") },
+                )
+            }
         }
     }
 }
@@ -320,7 +351,7 @@ private fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, value: 
 
 @Composable
 private fun SliderRow(title: String, valueLabel: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int, onChange: (Float) -> Unit) {
-    var local by remember(value) { mutableStateOf(value) }
+    var local by remember(value) { mutableFloatStateOf(value) }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -483,7 +514,18 @@ fun BarEditorScreen(
                             },
                         )
                     },
-                    headlineContent = { Text(item.label) },
+                    headlineContent = {
+                        if (item.isPanel) {
+                            // The same single-colour glyph the bar draws, with a name.
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                BarGlyph(if (item.type == BarItem.TYPE_EMOJI) dev.shebang.devboard.view.KeyIcons.emoji else dev.shebang.devboard.view.KeyIcons.clipboard)
+                                Spacer(Modifier.width(10.dp))
+                                Text(if (item.type == BarItem.TYPE_EMOJI) "Emoji" else "Clipboard")
+                            }
+                        } else {
+                            Text(item.label)
+                        }
+                    },
                     supportingContent = { Text(describe(item)) },
                     trailingContent = {
                         IconButton(onClick = { commit(order.filter { it.first != id }) }, enabled = order.size > 1) {
@@ -517,7 +559,21 @@ fun BarEditorScreen(
     }
 }
 
+/** One of the keyboard's glyphs, in the text colour, 22 dp square. */
+@Composable
+private fun BarGlyph(path: android.graphics.Path) {
+    val color = androidx.compose.material3.LocalContentColor.current
+    val px = with(androidx.compose.ui.platform.LocalDensity.current) { 22.dp.toPx() }
+    androidx.compose.foundation.Canvas(Modifier.size(22.dp)) {
+        val d = dev.shebang.devboard.view.IconDrawable(path, color.toArgb(), px)
+        d.setBounds(0, 0, size.width.toInt(), size.height.toInt())
+        drawIntoCanvas { d.draw(it.nativeCanvas) }
+    }
+}
+
 private fun describe(item: BarItem): String = when {
+    item.type == BarItem.TYPE_EMOJI -> "Opens the emoji panel"
+    item.type == BarItem.TYPE_CLIPBOARD -> "Opens the clipboard history"
     item.isModifier -> "Sticky modifier: ${item.mod}"
     item.isSnippet -> "Snippet: \"${item.text}\""
     else -> buildString {
@@ -596,7 +652,11 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                 when (type) {
                     BarItem.TYPE_KEY -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { codeMenu = true }) { Text("Key: $code") }
+                            // Looks like the button it is: an outlined field-like button with a drop-down arrow.
+                            androidx.compose.material3.OutlinedButton(onClick = { codeMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                                Text("Key: $code", modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose a key")
+                            }
                             DropdownMenu(expanded = codeMenu, onDismissRequest = { codeMenu = false }) {
                                 for (name in KeyCodeNames.names) DropdownMenuItem(text = { Text(name) }, onClick = { code = name; codeMenu = false })
                             }
@@ -644,9 +704,9 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember { GlideTraceStore(context) }
     val scope = rememberCoroutineScope()
-    var count by remember { mutableStateOf(0) }
+    var count by remember { mutableIntStateOf(0) }
     var prompts by remember { mutableStateOf<List<String>>(emptyList()) }
-    var index by remember { mutableStateOf(0) }
+    var index by remember { mutableIntStateOf(0) }
     var confirmClear by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.count() }

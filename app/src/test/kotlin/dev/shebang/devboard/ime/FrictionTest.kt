@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import dev.shebang.devboard.glide.FutoData
 import dev.shebang.devboard.glide.GlideBenchmarkTest
@@ -101,7 +102,7 @@ class FrictionTest {
                 override fun setComposing(composing: Boolean) = Unit
             },
             Executor { it.run() },
-            Handler(),
+            Handler(Looper.getMainLooper()),
         )
         c.clock = { now }
         c.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES, 0))

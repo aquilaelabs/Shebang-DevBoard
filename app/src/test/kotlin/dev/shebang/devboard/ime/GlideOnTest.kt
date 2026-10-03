@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import dev.shebang.devboard.glide.FutoData
 import dev.shebang.devboard.glide.GlideBenchmarkTest
@@ -76,7 +77,7 @@ class GlideOnTest {
                 override fun setComposing(composing: Boolean) = Unit
             },
             Executor { it.run() },
-            Handler(),
+            Handler(Looper.getMainLooper()),
         )
         c.clock = { now }
         c.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
@@ -98,7 +99,7 @@ class GlideOnTest {
             }
             for (ch in lead) c.typeText(ch.toString())
             val ctx = c.glideContext(dictionary, lm)
-            decoder.begin(record!!.layout, ctx, record.t[0])
+            decoder.begin(record.layout, ctx, record.t[0])
             for (k in record.x.indices) decoder.addPoint(record.x[k], record.y[k], record.t[k])
             val r = decoder.finish()
             if (r != null) c.commitGlide(r, dictionary, false, false)

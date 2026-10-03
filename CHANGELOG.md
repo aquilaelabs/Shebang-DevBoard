@@ -21,7 +21,6 @@
 - Backspacing back to a word reopens it: the strip offers what else it could be, and a pick or a glide replaces it (c3b3a8a)
 - Code mode pairs brackets and quotes, steps over a closing one, and backspace between an empty pair takes both (Settings: Pair brackets and quotes) (04cb7b0)
 - Swipe left from backspace to delete whole words, drag the space bar with shift on to select, and Undo and Redo keys on the default terminal bar (04cb7b0)
-- Flick up on a key to type the character in its corner (Settings: Flick up for symbols) (04cb7b0)
 - The keyboard remembers text or code mode per app, and each app can have its own terminal bar (04cb7b0)
 - Code-aware words: identifiers already in the text are suggested as you type and offered after a glide, and words glided in a row can be joined as camelCase or snake_case (c5888d9)
 - Next-word suggestions: after a space the strip offers the three words most likely to come next; tap one to write it and get the next three. Settings > Next-word suggestions turns them off (8e1d2ae)
@@ -38,6 +37,11 @@
 - The dictionary knows names, places, brands and abbreviations (Paris, GitHub, YouTube, iPhone, URL, McDonald's), and a name typed in lowercase gets its capitals (012e58f)
 - Personal words has a search field: type part of a word to find it among the words the keyboard learned (a36a242)
 - Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
+- Hold shift for caps lock, as well as tapping it twice (2c08853)
+- Backspacing back to a word autocorrect changed, even after typing on, puts what you typed first on the strip (cb1fddd, 2679987)
+- Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
+- Export diagnostics (Settings > About): a file to send the developer with your settings and how your taps and glides lean, leaving out learned words, email addresses, the clipboard, your terminal bar and anything typed (83479de)
+- Holding a lowercase letter offers its capital first in the row; sliding back down onto the key cancels the row and types the key itself (ee022cf)
 
 ### Changed
 
@@ -68,6 +72,9 @@
 - Glide reads strokes with a model trained on 900,000 real swipes: 93.7% of words right first time instead of 91.0% (2d0f189)
 - Suggestions after a space read the whole sentence with a model trained on the GPU: the next word is among the three 39% of the time instead of 36%, and glide gets the word right a little more often (c128635)
 - Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (4afa886)
+- Switching to code mode or the number pad no longer changes the keyboard's height (37d04b4)
+- Caps lock has its own shift glyph (two carets over a bar), so it no longer looks like one capital; backspace is drawn at the shift caret's thin weight (2c08853)
+- Shebang Voice has its own icon (the mic) instead of Android's default (eb90a44)
 
 ### Fixed
 

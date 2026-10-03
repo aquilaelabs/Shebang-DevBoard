@@ -69,6 +69,10 @@ object PanelKeys {
                 handler.postDelayed(this, REPEAT_MS)
             }
         }
+        // A touch acts on the way down and repeats while held; a click that comes without a touch (from
+        // TalkBack or another accessibility service) acts once.
+        var touched = false
+        v.setOnClickListener { if (touched) touched = false else onTap(true) }
         v.setOnTouchListener { view, e ->
             when (e.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
@@ -76,7 +80,13 @@ object PanelKeys {
                     onTap(true)
                     handler.postDelayed(tick, REPEAT_DELAY_MS)
                 }
-                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                MotionEvent.ACTION_UP -> {
+                    view.isPressed = false
+                    handler.removeCallbacks(tick)
+                    touched = true
+                    view.performClick()
+                }
+                MotionEvent.ACTION_CANCEL -> {
                     view.isPressed = false
                     handler.removeCallbacks(tick)
                 }

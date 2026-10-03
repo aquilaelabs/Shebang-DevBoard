@@ -2,6 +2,10 @@ package dev.shebang.devboard.glide
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import java.io.File
 import kotlin.math.sqrt
 
@@ -112,6 +116,25 @@ class GlideAdaptation(
     }
 
     private fun state() = State(offU.toList(), offV.toList(), n.toList(), gU, gV, gN)
+
+    /**
+     * What has been learned, for a diagnostics export: per-letter offsets a..z and their weights, the overall
+     * lean, and how many glides and corrections it came from. Not the saved earlier days (they carry dates).
+     */
+    @Synchronized
+    fun exportJson(): JsonObject {
+        load()
+        return buildJsonObject {
+            put("glides", JsonPrimitive(glides))
+            put("corrections", JsonPrimitive(corrections))
+            put("offU", JsonArray(offU.map { JsonPrimitive(it) }))
+            put("offV", JsonArray(offV.map { JsonPrimitive(it) }))
+            put("weight", JsonArray(n.map { JsonPrimitive(it) }))
+            put("overallU", JsonPrimitive(gU))
+            put("overallV", JsonPrimitive(gV))
+            put("overallWeight", JsonPrimitive(gN))
+        }
+    }
 
     private fun applyState(s: State) {
         offU.fill(0f)

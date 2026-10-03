@@ -7,18 +7,20 @@ import androidx.core.graphics.PathParser
 
 /**
  * Key glyphs as paths in a 24x24 box, all original to this project, in a terminal idiom: backspace is a
- * chevron erasing back toward a block cursor, return a bent arrow with an open chevron head, shift a caret
- * that gains an underline while shift is on. Scaled copies are built once per geometry.
+ * chevron erasing back toward a bar cursor, return a bent arrow with an open chevron head, shift a caret
+ * that gains an underline while shift is on and doubles for caps lock. Scaled copies are built once per geometry.
  */
 object KeyIcons {
-    /** A left chevron and a block cursor after it. */
-    private const val BACKSPACE = "M11.3 6.3 L12.7 7.7 L8.4 12 L12.7 16.3 L11.3 17.7 L5.6 12 Z M14.5 8 H20 V16 H14.5 Z"
+    /** The shift caret turned to point left, and a bar cursor after it. */
+    private const val BACKSPACE = "M5 12 L13.1 3.9 L14.5 5.3 L7.8 12 L14.5 18.7 L13.1 20.1 Z M17 6 H19 V18 H17 Z"
     /** Down from the top right, then left, ending in an open chevron. */
     private const val RETURN = "M19 4.5 H21 V15 H8.8 L11.9 18.1 L10.5 19.5 L5 14 L10.5 8.5 L11.9 9.9 L8.8 13 H19 Z"
     /** A caret pointing up. */
     private const val SHIFT = "M12 4.6 L20.1 12.7 L18.7 14.1 L12 7.4 L5.3 14.1 L3.9 12.7 Z"
     /** The caret with a bar under it: shift is on. */
     private const val SHIFT_ON = "$SHIFT M6.5 17.5 H17.5 V19.5 H6.5 Z"
+    /** Two carets stacked over the bar: caps lock. */
+    private const val SHIFT_LOCKED = "M12 3 L18.4 9.4 L17 10.8 L12 5.8 L7 10.8 L5.6 9.4 Z M12 8 L18.4 14.4 L17 15.8 L12 10.8 L7 15.8 L5.6 14.4 Z M6.5 17.5 H17.5 V19.5 H6.5 Z"
 
     /** A microphone: a capsule on a cradle and stand, with a block cursor as its foot. */
     private const val MIC = "M12 3 A3 3 0 0 1 15 6 V11 A3 3 0 0 1 9 11 V6 A3 3 0 0 1 12 3 Z " +
@@ -41,6 +43,7 @@ object KeyIcons {
     val enter: Path = PathParser.createPathFromPathData(RETURN)
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
     val shiftOn: Path = PathParser.createPathFromPathData(SHIFT_ON)
+    val shiftLocked: Path = PathParser.createPathFromPathData(SHIFT_LOCKED)
 
     private val matrix = Matrix()
 

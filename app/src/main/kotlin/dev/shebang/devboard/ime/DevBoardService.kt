@@ -213,13 +213,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         settings = s
         feedback.settings = s
         text.settings = s
+        text.emails = if (s.rememberEmails) EmailMemory.get(filesDir) else null
         if (themeChanged) applyTheme()
         if (barChanged) applyBar()
         strip?.setMode(s.stripMode)
         keyboard?.keyPreviewEnabled = s.keyPreview
         keyboard?.glideTrailEnabled = s.glideTrail
         keyboard?.phraseGlideEnabled = s.phraseGlide
-        keyboard?.flickEnabled = s.flickSymbols
         if (heightChanged) rebuildGeometry()
         if (languageLoader.learnWords != s.learnWords) {
             languageLoader.learnWords = s.learnWords
@@ -360,7 +360,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         k.keyPreviewEnabled = settings.keyPreview
         k.glideTrailEnabled = settings.glideTrail
         k.phraseGlideEnabled = settings.phraseGlide
-        k.flickEnabled = settings.flickSymbols
         rebuildGeometry()
         return container
     }
@@ -394,11 +393,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val dm = resources.displayMetrics
         val landscape = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
         val baseRow = KeyboardSizing.rowHeightPx(resources, settings.heightScale)
-        val rowScale = if (layout.mode == "code") 0.86f else 1f
         val numberRow = settings.numberRow && layout.mode == "text"
-        val rows = layout.rows.size + (if (numberRow && layout.numberRow != null) 1 else 0)
+        // Every mode is as tall as text mode (with its number row when that is on): switching to code mode or
+        // a number pad never moves the strip or the app above. Code mode's five rows share that height.
+        val textLayout = layouts.text
+        val rows = textLayout.rows.size + (if (settings.numberRow && textLayout.numberRow != null) 1 else 0)
         val maxHeight = dm.heightPixels * (if (landscape) 0.6f else 0.5f)
-        val height = (rows * baseRow * rowScale).coerceAtMost(maxHeight).toInt()
+        val height = (rows * baseRow).coerceAtMost(maxHeight).toInt()
         // The IME window can be narrower than the display (landscape cutout insets), so follow the view.
         val width = if (k.width > 0) k.width else dm.widthPixels
         val g = KeyboardGeometry(
@@ -461,6 +462,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         applyPendingBundle()
         updateAutoCaps()
         text.refreshLetterPrior()
+        text.refreshEmails(edited = false)
         updateClipChip()
         updateMic()
     }
@@ -530,6 +532,12 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             s.setClip(null)
             afterEdit()
         })
+    }
+
+    override fun onFinishInput() {
+        // Leaving a field: an email field's addresses are remembered.
+        text.rememberEmails()
+        super.onFinishInput()
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
@@ -648,6 +656,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private fun afterEdit(wordBoundary: Boolean = true) {
         if (wordBoundary || !text.isComposing) updateAutoCaps()
         text.refreshLetterPrior()
+        text.refreshEmails()
     }
 
     // ---- KeyboardView.Listener -----------------------------------------------------------------------
@@ -812,6 +821,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         // With the cursor in a word, holding space moves past it; elsewhere a hold is just a space.
         if (!text.spaceHeld()) text.space()
         afterEdit()
+    }
+
+    override fun onShiftLongPress() {
+        // A second buzz says the hold took: caps lock is on.
+        feedback.keyPress(KeyAction.SHIFT)
     }
 
     override fun onModeLongPress() {
@@ -993,7 +1007,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val accepted = info != null && androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info)
             .any { android.content.ClipDescription.compareMimeTypes(mime, it) }
         val conn = ic
-        if (!accepted || conn == null || info == null) {
+        if (!accepted || conn == null) {
             android.widget.Toast.makeText(this, "This field doesn't take pictures", android.widget.Toast.LENGTH_SHORT).show()
             return
         }

@@ -26,12 +26,12 @@ data class Settings(
     val glideTrail: Boolean = true,
     /** Dip into the space bar mid-glide to start the next word in the same stroke. */
     val phraseGlide: Boolean = false,
-    /** A quick flick up on a key types its corner character. */
-    val flickSymbols: Boolean = true,
     /** Let a new glide rewrite the recent glided words when it makes another reading more likely. */
     /** Glided words wait in a row above the keys for a moment, where they can be tapped and corrected. */
     /** Learn words typed or glided in ordinary text fields, on this device only. */
     val learnWords: Boolean = true,
+    /** Remember addresses entered in email fields and offer them there, on this device only. */
+    val rememberEmails: Boolean = true,
     /** Adapt glide to where this user's strokes actually pass the keys. */
     val adaptGlide: Boolean = true,
     /** Autocorrect learns where this user's taps land on each key. */

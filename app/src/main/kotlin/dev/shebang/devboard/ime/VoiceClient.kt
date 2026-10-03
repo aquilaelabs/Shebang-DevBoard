@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -78,7 +79,9 @@ class VoiceClient(private val context: Context, private val listener: Listener) 
         }
         startWhenBound = true
         bound = runCatching {
-            context.bindService(intent, connection, Context.BIND_AUTO_CREATE or Context.BIND_INCLUDE_CAPABILITIES)
+            // From Android 10, the add-on may use the microphone while the keyboard (on screen) is bound to it.
+            val capabilities = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) Context.BIND_INCLUDE_CAPABILITIES else 0
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE or capabilities)
         }.getOrDefault(false)
         if (!bound) {
             active = false

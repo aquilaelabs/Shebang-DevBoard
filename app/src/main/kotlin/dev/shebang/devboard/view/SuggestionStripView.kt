@@ -22,7 +22,8 @@ class SuggestionStripView(context: Context) : LinearLayout(context) {
             s.gravity = Gravity.CENTER
             s.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
             s.maxLines = 1
-            s.ellipsize = android.text.TextUtils.TruncateAt.END
+            // Cut from the middle, so a long email address keeps its name and its domain.
+            s.ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
             s.isClickable = true
             s.setOnClickListener { values[i]?.takeIf { it.isNotEmpty() }?.let { w -> onSuggestion?.invoke(w) } }
             addView(s, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
@@ -70,7 +71,8 @@ class SuggestionStripView(context: Context) : LinearLayout(context) {
     }
 
     fun show(words: List<String>) {
-        setSideSlotsVisible(true)
+        // A word alone in the middle (a long email address, say) has the whole strip.
+        setSideSlotsVisible(words.getOrNull(0).orEmpty().isNotEmpty() || words.getOrNull(2).orEmpty().isNotEmpty())
         for (i in slots.indices) {
             slots[i].text = words.getOrNull(i) ?: ""
             values[i] = words.getOrNull(i)

@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import dev.shebang.devboard.dict.NgramModelTest
 import org.junit.Assert.assertEquals
@@ -20,7 +21,7 @@ class NextWordTest {
             override fun setComposing(composing: Boolean) = Unit
         },
         Executor { it.run() },
-        Handler(),
+        Handler(Looper.getMainLooper()),
         postToMain = { it.run() },
     ).also {
         it.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))

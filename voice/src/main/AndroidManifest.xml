@@ -1,18 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Shebang Voice: speech typing for Shebang DevBoard, on the phone. The microphone is its only permission:
      no INTERNET. -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
         android:label="Shebang Voice">
 
-        <!-- Exported for the keyboard; every message's sender is checked against this app's signature. -->
+        <!-- Exported for the keyboard; every message's sender is checked against this app's signature. Not
+             a permission: the keyboard would have to declare it, and VIBRATE stays its only one. -->
         <service
             android:name=".VoiceService"
-            android:exported="true">
+            android:exported="true"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="dev.shebang.devboard.voice.LISTEN" />
             </intent-filter>

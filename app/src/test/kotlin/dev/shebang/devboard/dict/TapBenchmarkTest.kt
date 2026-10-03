@@ -207,7 +207,7 @@ class TapBenchmarkTest {
                 val own = TapModel(layout, TSI_DENSITY, adaptation.offsets())
                 val c1 = w.before1?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
                 val c2 = if (w.before1 == null) NgramModel.UNKNOWN else w.before2?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
-                val ctxPrior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it)).toDouble()) }
+                val ctxPrior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it))) }
                 fun decode(prior: ((String, Int) -> FloatArray?)?, weight: Double): String {
                     val sb = StringBuilder()
                     for (i in w.meant.indices) {
@@ -304,7 +304,7 @@ class TapBenchmarkTest {
                     val own = TapModel(layout, TSI_DENSITY, adaptation.offsets())
                     val c1 = w.before1?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
                     val c2 = if (w.before1 == null) NgramModel.UNKNOWN else w.before2?.let { dictionary.indexOfLower(it) }?.let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) } ?: NgramModel.SENTENCE_START
-                    val prior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it)).toDouble()) }
+                    val prior = LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, c2, c1) + 0.25 * lm.unigramCost(it))) }
                     val sb = StringBuilder()
                     for (i in w.meant.indices) sb.append(own.nearestLetter(w.xs[i], w.ys[i], prior = prior.next(sb.toString()), priorWeight = weight) ?: '?')
                     val read = sb.toString()
@@ -387,7 +387,7 @@ class TapBenchmarkTest {
         var model = TapModel(layout, TSI_DENSITY)
         val priors = HashMap<String, FloatArray?>()
         fun prior(tp: Tap): FloatArray? = priors.getOrPut("${tp.c2}/${tp.c1}/${tp.prefix}") {
-            LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, tp.c2, tp.c1) + 0.25 * lm.unigramCost(it)).toDouble()) }.next(tp.prefix)
+            LetterPrior(dictionary) { kotlin.math.exp(-(0.75 * lm.cost3(it, tp.c2, tp.c1) + 0.25 * lm.unigramCost(it))) }.next(tp.prefix)
         }
         val spaces = taps.count { it.meant == ' ' }
         val letters = taps.size - spaces

@@ -76,11 +76,11 @@ class FutoSwipesTest {
             val r = decoder.finish()?.alternatives?.map { dictionary.lower[it] }.orEmpty()
             s.n++
             val bucket = byLength?.getOrPut(minOf(sw.word.length, 10)) { Score() }
-            bucket?.n = (bucket?.n ?: 0) + 1
+            if (bucket != null) bucket.n++
             if (r.isEmpty()) s.empty++
             if (r.firstOrNull() == sw.word) {
                 s.top1++
-                bucket?.top1 = (bucket?.top1 ?: 0) + 1
+                if (bucket != null) bucket.top1++
             } else if (confusions != null && r.isNotEmpty()) {
                 val k = "${sw.word} -> ${r[0]}"
                 confusions[k] = (confusions[k] ?: 0) + 1

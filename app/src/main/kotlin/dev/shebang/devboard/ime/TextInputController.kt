@@ -86,6 +86,16 @@ class TextInputController(
         private set
     var settings: Settings = Settings()
     var suggester: Suggester? = null
+
+    /** Addresses entered in email fields, offered there as they are typed again; null when not remembered. */
+    var emails: EmailMemory? = null
+    /** The addresses on the strip now: picking one fills in the address being typed. */
+    private var emailOffer: List<String> = emptyList()
+    /**
+     * What the email field held after the last edit, remembered when the field is left. Kept as it goes because
+     * an app may turn the field into another kind of input before the keyboard hears it is left.
+     */
+    private var emailFieldText: String? = null
     /** The keyboard shows code mode: brackets and quotes pair (when the setting is on). */
     var codeMode = false
 
@@ -257,6 +267,16 @@ class TextInputController(
     private val keptAsTyped = HashSet<String>()
 
     /**
+     * A word autocorrect changed, found again by the text before it: [upTo] is the text up to and including
+     * [corrected] as it stood after the correction ([atStart]: all of the text before it, which was short).
+     */
+    private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean)
+    /** The latest corrections in this field, oldest first: backspace back to one offers what was typed. */
+    private val corrections = ArrayDeque<Correction>()
+    /** The correction backspace walked back to, while it is the reopened word: picking [Correction.typed] keeps it. */
+    private var reopenedCorrection: Correction? = null
+
+    /**
      * The word backspace walked back into and reopened as the composing word, while it stands unchanged: a
      * glide or a strip pick replaces it (a correction), space leaves it as it was. [reopenedGlide] is the same
      * word from the glides remembered, with its runners-up and stroke.
@@ -348,6 +368,8 @@ class TextInputController(
     val targetText: String? get() = target?.text
 
     fun startInput(field: FieldInfo) {
+        // An email field left for another field: its addresses are remembered.
+        rememberEmails()
         // What was glided in the last field is learned under that field's rules.
         settle()
         flushHeld()
@@ -361,6 +383,9 @@ class TextInputController(
         candidatesFor = ""
         lastAutocorrect = null
         keptAsTyped.clear()
+        corrections.clear()
+        emailOffer = emptyList()
+        reopenedCorrection = null
         reopened = null
         reopenedGlide = null
         identifiers = emptyList()
@@ -761,6 +786,7 @@ class TextInputController(
             ic.commitText(ac.typed, 1)
             ic.endBatchEdit()
             keptAsTyped += ac.typed.lowercase()
+            corrections.removeAll { it.typed == ac.typed && it.corrected == ac.corrected }
             return
         }
         val glide = lastGlide
@@ -830,6 +856,18 @@ class TextInputController(
      */
     private fun reopenWordBeforeCursor(ic: InputConnection) {
         val text = recomposeWordBeforeCursor(ic) ?: return
+        val c = correctionEndingAtCursor(ic, text)
+        reopenedCorrection = c
+        if (c != null) {
+            // Back to a word autocorrect changed: it stays, and what was typed is first on the strip.
+            reopenedGlide = null
+            ui.setComposing(true)
+            candidates = emptyList()
+            candidatesFor = ""
+            suggestGeneration++
+            ui.showCandidates(listOf(c.typed, text, ""))
+            return
+        }
         reopenedGlide = recentMatch(text)
         ui.setComposing(true)
         val g = reopenedGlide
@@ -844,6 +882,26 @@ class TextInputController(
         } else {
             requestSuggestions()
         }
+    }
+
+    /** Remembers that autocorrect wrote [corrected] for [typed], with [trailing] characters after it before the cursor. */
+    private fun rememberCorrection(ic: InputConnection, typed: String, corrected: String, trailing: Int) {
+        val n = CORRECTION_CONTEXT + corrected.length + trailing
+        val before = ic.getTextBeforeCursor(n, 0)?.toString() ?: return
+        val upTo = before.dropLast(trailing)
+        if (before.length < trailing || !upTo.endsWith(corrected)) return
+        corrections.addLast(Correction(typed, corrected, upTo, atStart = before.length < n))
+        if (corrections.size > MAX_CORRECTIONS) corrections.removeFirst()
+    }
+
+    /** The remembered correction that [text], the word just before the cursor, still is, in the same place. */
+    private fun correctionEndingAtCursor(ic: InputConnection, text: String): Correction? {
+        for (c in corrections.asReversed()) {
+            if (c.corrected != text) continue
+            val before = ic.getTextBeforeCursor(c.upTo.length + 1, 0)?.toString() ?: return null
+            if (if (c.atStart) before == c.upTo else before.length > c.upTo.length && before.endsWith(c.upTo)) return c
+        }
+        return null
     }
 
     /**
@@ -1055,7 +1113,10 @@ class TextInputController(
         ic.endBatchEdit()
         word.setLength(0)
         clearCandidates()
-        if (commit != pronounCase(typed)) lastAutocorrect = Autocorrected(typed, commit, after)
+        if (commit != pronounCase(typed)) {
+            lastAutocorrect = Autocorrected(typed, commit, after)
+            rememberCorrection(ic, typed, commit, after.length)
+        }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
             // A word the dictionary knows, typed and kept as it is, shows where this user's taps land.
@@ -1085,6 +1146,7 @@ class TextInputController(
                     ic2.endBatchEdit()
                     // Backspace's undo of a correction only applies while it is the last thing typed.
                     if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
+                    rememberCorrection(ic2, typed, late, after.length + next.length)
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
@@ -1219,6 +1281,77 @@ class TextInputController(
 
     // ---- Suggestions ---------------------------------------------------------------------------------
 
+    /** What is being typed in an email field: the text before the cursor back to a space, comma or semicolon. */
+    private fun emailTyped(ic: InputConnection): String? {
+        val before = ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: return null
+        return before.split(EmailMemory.SEPARATORS).last()
+    }
+
+    /**
+     * In an email field, offers the remembered addresses that begin with what is being typed (the most used
+     * while nothing is), in place of word suggestions. Call after each edit, and with [edited] false when the
+     * field starts: only what the user typed there is remembered, not an address the field came with.
+     */
+    fun refreshEmails(edited: Boolean = true) {
+        val offered = emailOffer.isNotEmpty()
+        emailOffer = emptyList()
+        val memory = emails ?: return
+        if (field.variant != FieldVariant.EMAIL) return
+        val ic = connection() ?: return
+        if (edited) keepEmailFieldText(ic)
+        if (!field.allowsComposing || !ic.getSelectedText(0).isNullOrEmpty()) return
+        val typed = emailTyped(ic) ?: return
+        val matches = memory.matching(typed)
+        if (matches.isEmpty()) {
+            // Addresses offered a moment ago no longer match: the strip gives way to the bar again.
+            if (offered && !isComposing) {
+                ui.showCandidates(emptyList())
+                ui.setComposing(false)
+            }
+            return
+        }
+        emailOffer = matches
+        // Word suggestions still being worked out for this edit would cover the addresses.
+        suggestGeneration++
+        predictGeneration++
+        ui.showCandidates(arrangeBestMiddle(matches))
+        // Shown also with no word being typed (an empty field, or just after the @), as predictions are.
+        ui.setComposing(true)
+    }
+
+    /** Keeps what an email field holds, for [rememberEmails] (not where the app asks for no learning). */
+    private fun keepEmailFieldText(ic: InputConnection) {
+        if (field.variant != FieldVariant.EMAIL || field.isPassword || field.noPersonalizedLearning) return
+        emailFieldText = (ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: "") + (ic.getTextAfterCursor(MAX_EMAIL, 0)?.toString() ?: "")
+    }
+
+    /** Leaving an email field (or the keyboard closing): the addresses it last held are remembered. */
+    fun rememberEmails() {
+        val text = emailFieldText ?: return
+        emailFieldText = null
+        val memory = emails ?: return
+        if (text.isNotBlank()) background.execute { memory.record(text) }
+    }
+
+    /** An offered address picked: it replaces what was typed of it. */
+    private fun pickEmail(ic: InputConnection, address: String) {
+        ownEdit()
+        ic.beginBatchEdit()
+        if (isComposing) {
+            ic.finishComposingText()
+            word.setLength(0)
+            reopened = null
+            reopenedCorrection = null
+        }
+        val typed = emailTyped(ic).orEmpty()
+        ic.deleteSurroundingText(typed.length, 0)
+        ic.commitText(address, 1)
+        ic.endBatchEdit()
+        keepEmailFieldText(ic)
+        emailOffer = emptyList()
+        clearCandidates()
+    }
+
     private fun clearCandidates() {
         candidates = emptyList()
         suggestGeneration++
@@ -1264,6 +1397,10 @@ class TextInputController(
     /** Picks a strip word: replaces the targeted word, the composing word, or the last glide's last word. */
     fun pickCandidate(chosen: String) {
         val ic = connection() ?: return
+        if (chosen in emailOffer) {
+            pickEmail(ic, chosen)
+            return
+        }
         val t = target
         if (t != null) {
             if (chosen.equals(t.text, ignoreCase = true)) {
@@ -1349,8 +1486,11 @@ class TextInputController(
                 abandon(g)
             }
             reopened = null
-            // Picking the word exactly as typed (the strip's check mark) keeps it from autocorrect from now on.
+            // Picking the word exactly as typed (the strip's check mark), or as first typed before autocorrect
+            // changed it, keeps it from autocorrect from now on.
             if (chosen == word.toString()) keptAsTyped += chosen.lowercase()
+            reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
+            reopenedCorrection = null
             learnTyped(ic, chosen)
             ic.commitText("$chosen ", 1)
             word.setLength(0)
@@ -1696,6 +1836,12 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
+        /** Text read around the cursor in an email field: a few addresses' worth. */
+        private const val MAX_EMAIL = 1000
+        /** Characters before a corrected word that find it again: enough to tell two of the same word apart. */
+        private const val CORRECTION_CONTEXT = 32
+        /** Corrections remembered per field for backspace to take back. */
+        private const val MAX_CORRECTIONS = 16
         /** Glided words remembered for redoing. */
         private const val MAX_RECENT = 32
         /** Glided words held back from learning, in case one turns out wrong a few words on ([held]). */
