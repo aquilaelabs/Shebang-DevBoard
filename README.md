@@ -744,8 +744,10 @@ piece, and is left until the rules fall short.
 Settings > About shows the version, the licence, the credits and the privacy policy (`LICENSE`,
 `THIRD_PARTY_NOTICES.md` and `PRIVACY.md`, copied into the app's assets at build time by the `copyAboutDocs`
 task, so the app always carries the same text as the repository; `PRIVACY.md` is also the policy's public
-address for app stores), links to the source on GitHub, and Check for updates, which opens the GitHub releases page. The app
-does not download or install anything itself: that would need network access and the install-packages
+address for app stores), and links to the source on GitHub. There is no Check for updates (the owner's
+decision, with Google Play in view: Play allows updates only through Play); a newer release is installed from
+the GitHub releases page or, once it is there, from Play. The app does not download or install anything
+itself: that would need network access and the install-packages
 permission, which together are what Android's malware scanning looks for in a keyboard. Installing a newer
 APK over the old one updates it in place, keeping settings and learned words, as long as both were signed
 with the same key.

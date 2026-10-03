@@ -8,7 +8,7 @@ Short version: nothing you type or say leaves your phone. Neither app can connec
 
 The keyboard asks Android for one permission, vibration. Shebang Voice asks for one, the microphone. Neither asks for internet access, so Android does not let either app open a network connection at all: they cannot send, upload, check or download anything.
 
-A few buttons open a web page in your browser: Check for updates, Source code, and the link to get Shebang Voice. The browser makes that connection, not the keyboard, and nothing about your typing goes with it.
+A few buttons open a web page in your browser: Source code, and the link to get Shebang Voice. The browser makes that connection, not the keyboard, and nothing about your typing goes with it.
 
 ## What the keyboard keeps on your phone
 

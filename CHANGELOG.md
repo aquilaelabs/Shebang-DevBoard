@@ -79,6 +79,10 @@
 - Caps lock has its own shift glyph (two carets over a bar), so it no longer looks like one capital; backspace is drawn at the shift caret's thin weight (2c08853)
 - Shebang Voice has its own icon (the mic) instead of Android's default (eb90a44)
 
+### Removed
+
+- Check for updates is gone from Settings > About (the app will also be on Google Play, which allows updates only through Play); Source code still links to GitHub (df9c56a)
+
 ### Fixed
 
 - Glide can now produce apostrophe words (don't, it's), and it's, that's, let's and other 's contractions are in the word list (6383035)
