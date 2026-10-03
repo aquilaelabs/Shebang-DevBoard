@@ -42,10 +42,11 @@ An Android keyboard (IME) for developers, written in Kotlin.
 
 ## Build and install
 
-Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36. Gradle is fetched by
-the wrapper.
+Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36, and for Shebang Voice
+NDK 29.0.14206865 and CMake 4.1.2 (CI installs exactly these). Gradle is fetched by the wrapper.
 
 ```sh
+tools/fetch_voice_model.sh             # Shebang Voice's speech model (57 MB, not in git); its build needs it
 ./gradlew assembleDebug test lint      # what CI runs (.github/workflows/android.yml)
 ./gradlew installDebug                 # install on the connected device or emulator
 adb shell ime enable dev.shebang.devboard/.ime.DevBoardService

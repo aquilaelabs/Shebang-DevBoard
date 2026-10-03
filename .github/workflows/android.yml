@@ -8,20 +8,43 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # The unit tests read this for how many test JVMs to run (app/build.gradle.kts).
+      BB_TEST_WORKERS: 4
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
-      - uses: gradle/actions/setup-gradle@v4
+      # What the build pins: platform and build-tools 36, and for Shebang Voice the NDK and CMake in
+      # voice/build.gradle.kts. setup-android v3 asked for the retired 'tools' package and failed.
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;29.0.14206865
+            cmake;4.1.2
+      - uses: gradle/actions/setup-gradle@v6
+      # Shebang Voice's speech model (57 MB) is not in git; its build stops without it. Keyed on the
+      # checksum in the fetch script, so a new model is downloaded once.
+      - name: Cache the speech model
+        uses: actions/cache@v6
+        with:
+          path: voice/src/main/assets/models
+          key: voice-model-${{ hashFiles('tools/fetch_voice_model.sh') }}
+      - name: Fetch the speech model
+        run: tools/fetch_voice_model.sh
       - name: Build, test, lint
-        run: ./gradlew assembleDebug test lint --no-daemon --stacktrace
-      - uses: actions/upload-artifact@v4
+        run: ./gradlew assembleDebug test lint --stacktrace
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reports
           path: |
             app/build/reports/
+            voice/build/reports/
             app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
