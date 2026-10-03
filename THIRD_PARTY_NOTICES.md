@@ -61,8 +61,8 @@ Princeton University and LICENSEE agrees to preserve same.
 - Source: Tatoeba, <https://tatoeba.org>, per-language export `eng_sentences.tsv.bz2` downloaded 2026-09-30.
 - Licence: Creative Commons Attribution 2.0 France (CC BY 2.0 FR),
   <https://creativecommons.org/licenses/by/2.0/fr/>. Changes: sentences were tokenised and lowercased and only
-  counts and trained weights are shipped; counts involving "tom" and "mary" were scaled down (see the README's
-  Decisions). Tatoeba publishes a
+  counts and trained weights are shipped; counts involving "tom" and "mary" were scaled down (see
+  docs/decisions.md). Tatoeba publishes a
   subset of its sentences under CC0 as well.
 
 ### Common Voice English sentences
