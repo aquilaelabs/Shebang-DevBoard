@@ -284,13 +284,6 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
-                    headlineContent = { Text("Check for updates") },
-                    supportingContent = { Text("Opens the releases on GitHub. Install a newer APK over this one to update; your settings and words stay.") },
-                    modifier = Modifier.clickable { open(VoiceClient.RELEASES_URL) },
-                )
-            }
-            item {
-                ListItem(
                     headlineContent = { Text("Source code") },
                     supportingContent = { Text(REPO_URL.removePrefix("https://")) },
                     modifier = Modifier.clickable { open(REPO_URL) },
@@ -315,9 +308,9 @@ fun SettingsScreen(
                     headlineContent = { Text("Export diagnostics") },
                     supportingContent = {
                         Text(
-                            "Save a file to send to the developer if typing or gliding isn't working well: your settings, how your taps " +
-                                "and glides lean, and your recorded glides. Learned words, email addresses, the clipboard, your terminal " +
-                                "bar and anything you typed are left out."
+                            "Save a file to send to the developer if typing or gliding isn't working well, or the app crashed: your " +
+                                "settings, how your taps and glides lean, your recorded glides, and where the app crashed. Learned words, " +
+                                "email addresses, the clipboard, your terminal bar and anything you typed are left out."
                         )
                     },
                     modifier = Modifier.clickable { diagnosticsLauncher.launch("devboard-diagnostics.json") },

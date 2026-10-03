@@ -76,6 +76,7 @@ dependencies {
     androidTestImplementation(libs.androidx.test.junit)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.autofill)
+    implementation(libs.androidx.customview)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

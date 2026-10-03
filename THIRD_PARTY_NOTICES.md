@@ -61,8 +61,8 @@ Princeton University and LICENSEE agrees to preserve same.
 - Source: Tatoeba, <https://tatoeba.org>, per-language export `eng_sentences.tsv.bz2` downloaded 2026-09-30.
 - Licence: Creative Commons Attribution 2.0 France (CC BY 2.0 FR),
   <https://creativecommons.org/licenses/by/2.0/fr/>. Changes: sentences were tokenised and lowercased and only
-  counts and trained weights are shipped; counts involving "tom" and "mary" were scaled down (see the README's
-  Decisions). Tatoeba publishes a
+  counts and trained weights are shipped; counts involving "tom" and "mary" were scaled down (see
+  docs/decisions.md). Tatoeba publishes a
   subset of its sentences under CC0 as well.
 
 ### Common Voice English sentences
@@ -223,6 +223,7 @@ other artwork are original to this project.
 | Jetpack Compose (BOM 2026.06.01) incl. Material 3 | 1.11.x / 1.4.0 | settings app only |
 | AndroidX DataStore Preferences | 1.2.1 | settings storage |
 | AndroidX Autofill | 1.3.0 | the style autofill services read to draw their chips in the strip |
+| AndroidX CustomView | 1.2.0 | ExploreByTouchHelper: the keys for TalkBack and other screen readers |
 | whisper.cpp and ggml (The ggml authors), MIT | 1.9.4 | the Shebang Voice add-on's speech engine, vendored and trimmed to the CPU build in `voice/src/main/cpp/whisper.cpp` (see `VENDORED.md` there) |
 | AndroidX Test runner and JUnit extension | 1.7.0 / 1.3.0 | device tests of the add-on only, not shipped |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |

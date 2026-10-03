@@ -58,7 +58,7 @@ data class GlideParams(
     val alongStretch: Float = 2f,
     /**
      * How much the learned reading of the stroke ([GlideModel]) counts against the decoder's own alignment
-     * (0: not used). Chosen on FUTO's dev split; see the README's Decisions.
+     * (0: not used). Chosen on FUTO's dev split; see docs/decisions.md.
      */
     val modelWeight: Float = 0.75f,
     /**

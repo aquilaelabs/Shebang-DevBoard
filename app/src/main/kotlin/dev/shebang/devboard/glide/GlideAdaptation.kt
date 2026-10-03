@@ -1,5 +1,6 @@
 package dev.shebang.devboard.glide
 
+import dev.shebang.devboard.store.JsonFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -84,8 +85,7 @@ class GlideAdaptation(
         if (loaded) return
         loaded = true
         val f = file ?: return
-        if (!f.exists()) return
-        val s = runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull() ?: return
+        val s = JsonFile(f).read(Stored.serializer(), json) ?: return
         applyState(State(s.offU, s.offV, s.n, s.gU, s.gV, s.gN))
         glides = s.glides
         corrections = s.corrections
@@ -106,12 +106,7 @@ class GlideAdaptation(
             glides = glides, corrections = corrections, budgetDay = budgetDay, budgetUsed = budgetUsed,
             snapshots = snapshots.toList(),
         )
-        val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), s))
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            tmp.renameTo(f)
-        }
+        JsonFile(f).write(Stored.serializer(), json, s)
         dirty = false
     }
 
@@ -282,6 +277,7 @@ class GlideAdaptation(
         budgetDay = 0
         budgetUsed = 0
         snapshots.clear()
+        file?.let { JsonFile(it).discardUnreadable() }
         dirty = true
         version++
     }

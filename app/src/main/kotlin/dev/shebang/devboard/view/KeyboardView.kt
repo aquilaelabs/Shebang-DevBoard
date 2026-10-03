@@ -12,6 +12,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
+import androidx.core.view.ViewCompat
 import dev.shebang.devboard.layout.Key
 import dev.shebang.devboard.layout.KeyAction
 import dev.shebang.devboard.layout.KeyboardGeometry
@@ -229,9 +230,40 @@ class KeyboardView(context: Context) : View(context) {
         }
     }
 
+    /** The keys as virtual views for screen readers. */
+    private val accessibility = KeyboardAccessibility(this)
+
     init {
         applyTheme()
         isClickable = true
+        ViewCompat.setAccessibilityDelegate(this, accessibility)
+    }
+
+    /** The key a screen reader's exploring finger is on, for lift-to-type. */
+    private var exploredKey: Key? = null
+
+    // With a screen reader's explore-by-touch on, a finger arrives as hover events, which find the keys. Lifting
+    // the finger on the key it is exploring types it (lift-to-type, as keyboards do for TalkBack; the screen
+    // reader leaves that to the keyboard); a double tap types the focused key through the accessibility node.
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean {
+        val am = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        if (am?.isTouchExplorationEnabled == true) {
+            val key = geometry?.keys?.firstOrNull { !it.def.spacer && it.contains(event.x, event.y) }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> exploredKey = key
+                MotionEvent.ACTION_HOVER_EXIT -> {
+                    if (key != null && key === exploredKey) accessibilityTap(key)
+                    exploredKey = null
+                }
+            }
+        }
+        return accessibility.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+    }
+
+    /** A key activated through a screen reader: typed as a tap on it would type it. */
+    internal fun accessibilityTap(key: Key) {
+        listener?.onKeyDown(key)
+        if (key.action == KeyAction.SHIFT) onShiftTap() else listener?.onKeyTap(key, shiftState)
     }
 
     private fun applyTheme() {
@@ -243,6 +275,7 @@ class KeyboardView(context: Context) : View(context) {
 
     fun setGeometry(g: KeyboardGeometry) {
         geometry = g
+        accessibility.invalidateRoot()
         spaceKey = g.keys.firstOrNull { it.action == KeyAction.SPACE && g.layout.composing }
         radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
         // By the row height, but no wider than the key allows: on a taller keyboard the keys grow taller, not
@@ -263,6 +296,7 @@ class KeyboardView(context: Context) : View(context) {
         if (shiftState == state) return
         shiftState = state
         if (notify) listener?.onShiftChanged(state)
+        accessibility.invalidateRoot()
         invalidate()
     }
 

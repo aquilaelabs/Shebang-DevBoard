@@ -37,7 +37,7 @@ def is_s_contraction(word):
 def main():
     ap = argparse.ArgumentParser(usage=__doc__)
     ap.add_argument("root")
-    # The defaults build the shipped list (see the README's Decisions: "Names, brands and abbreviations").
+    # The defaults build the shipped list (see docs/decisions.md: "Names, brands and abbreviations").
     ap.add_argument("max_level", nargs="?", type=int, default=50)
     # Capitalised words (places, peoples, names) up to this level.
     ap.add_argument("--upper-max", type=int, default=50)

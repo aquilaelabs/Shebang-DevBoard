@@ -2,6 +2,7 @@ package dev.shebang.devboard.settings
 
 import android.content.Context
 import android.os.Build
+import dev.shebang.devboard.CrashLog
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.GlideAdaptation
 import dev.shebang.devboard.ime.EmailMemory
@@ -30,6 +31,7 @@ object DiagnosticsExport {
         "terminal bar keys and snippets",
         "names of apps",
         "anything typed",
+        "error messages (crash reports keep only where the code failed)",
     )
 
     data class Device(val app: String, val model: String, val android: Int, val widthPx: Int, val heightPx: Int, val density: Float)
@@ -43,6 +45,7 @@ object DiagnosticsExport {
         taps: JsonObject,
         glides: JsonObject,
         recordings: List<String>,
+        crashes: List<CrashLog.Crash> = emptyList(),
     ): JsonObject = buildJsonObject {
         put("format", JsonPrimitive("shebang-devboard-diagnostics"))
         put("version", JsonPrimitive(1))
@@ -65,6 +68,13 @@ object DiagnosticsExport {
         put("tapAdaptation", taps)
         put("glideAdaptation", glides)
         put("glideRecordings", JsonArray(recordings.mapNotNull { line -> runCatching { json.parseToJsonElement(line) }.getOrNull() }))
+        put("crashes", JsonArray(crashes.map { c ->
+            buildJsonObject {
+                put("version", JsonPrimitive(c.version))
+                put("count", JsonPrimitive(c.count))
+                put("trace", JsonArray(c.trace.map { JsonPrimitive(it) }))
+            }
+        }))
     }
 
     /** Every setting, except the terminal bars themselves (their keys, snippets and app names). */
@@ -114,6 +124,7 @@ object DiagnosticsExport {
             GlideAdaptation.getTaps(dir).exportJson(),
             GlideAdaptation.get(dir).exportJson(),
             traces,
+            CrashLog.read(File(dir, CrashLog.FILE)),
         )
         out.write(pretty.encodeToString(JsonObject.serializer(), doc).toByteArray())
     }
