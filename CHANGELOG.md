@@ -38,10 +38,12 @@
 - Personal words has a search field: type part of a word to find it among the words the keyboard learned (a36a242)
 - Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
 - Hold shift for caps lock, as well as tapping it twice (2c08853)
-- Backspacing back to a word autocorrect changed, even after typing on, puts what you typed first on the strip (cb1fddd, 2679987)
+- Backspacing back to a word autocorrect changed, even after typing on, offers what you typed, the correction and the other suggestion for what you typed (cb1fddd, 2679987, 591f200, 018e3b3)
 - Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
 - Export diagnostics (Settings > About): a file to send the developer with your settings and how your taps and glides lean, leaving out learned words, email addresses, the clipboard, your terminal bar and anything typed (83479de)
 - Holding a lowercase letter offers its capital first in the row; sliding back down onto the key cancels the row and types the key itself (ee022cf)
+- A privacy policy, in Settings > About and in the repository: nothing leaves the phone, what is kept and how to delete it (84d8490)
+- Holding backspace deletes whole words after a second (setting: Hold backspace for whole words) (12a13dc)
 
 ### Changed
 
@@ -94,3 +96,4 @@
 - A glided word you back up to and fix a few words later is no longer learned as the wrong word (369c718)
 - On a taller keyboard the letters no longer grow into the number and accent hints; the bar's fade by the mic is shorter (3d7052c)
 - A correction that arrives after you have started the next word is no longer lost: it goes in ahead of the word you are typing (1484317)
+- Next-word suggestions no longer linger after the app changes the text (a message sent and the field cleared, a hardware keyboard) (591f200)

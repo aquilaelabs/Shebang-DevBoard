@@ -23,6 +23,8 @@ data class Settings(
     val hapticStrength: Int = 2,
     val keySounds: Boolean = false,
     val glide: Boolean = true,
+    /** Holding backspace for a second deletes whole words. */
+    val holdDeletesWords: Boolean = true,
     val glideTrail: Boolean = true,
     /** Dip into the space bar mid-glide to start the next word in the same stroke. */
     val phraseGlide: Boolean = false,

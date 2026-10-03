@@ -55,6 +55,27 @@ class NextWordTest {
     }
 
     @Test
+    fun predictionsGoWhenTheAppChangesTheText() {
+        type("see you soon ")
+        assertTrue(shown.any { it.isNotEmpty() })
+        // The app clears the field (after sending a message, say), and reports the cursor moving.
+        val old = ic.cursor
+        ic.text.setLength(0)
+        ic.cursor = 0
+        controller.onSelectionChanged(old, old, 0, 0, -1, -1)
+        assertTrue("stale predictions left: $shown", shown.none { it.isNotEmpty() })
+    }
+
+    @Test
+    fun predictionsStayWhileTheTextIsTheSame() {
+        type("thank ")
+        val n = ic.cursor
+        // A late report of the keyboard's own space.
+        controller.onSelectionChanged(n - 1, n - 1, n, n, -1, -1)
+        assertTrue("you" in shown)
+    }
+
+    @Test
     fun aSentenceStartIsCapitalised() {
         type("ok. ")
         assertTrue("capitalised at a sentence start: $shown", shown.isNotEmpty() && shown.all { it[0].isUpperCase() })

@@ -218,6 +218,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (barChanged) applyBar()
         strip?.setMode(s.stripMode)
         keyboard?.keyPreviewEnabled = s.keyPreview
+        keyboard?.holdDeletesWords = s.holdDeletesWords
         keyboard?.glideTrailEnabled = s.glideTrail
         keyboard?.phraseGlideEnabled = s.phraseGlide
         if (heightChanged) rebuildGeometry()
@@ -358,6 +359,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         s.setMode(settings.stripMode)
         k.keyPreviewEnabled = settings.keyPreview
+        k.holdDeletesWords = settings.holdDeletesWords
         k.glideTrailEnabled = settings.glideTrail
         k.phraseGlideEnabled = settings.phraseGlide
         rebuildGeometry()
@@ -743,6 +745,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             }
         }
         feedback.keyRepeat(key.action)
+        afterEdit()
+    }
+
+    override fun onBackspaceWordRepeat() {
+        if (sendWithStickyModifiers(KeyEvent.KEYCODE_DEL)) return
+        text.backspaceWord()
+        feedback.keyRepeat(KeyAction.BACKSPACE)
         afterEdit()
     }
 

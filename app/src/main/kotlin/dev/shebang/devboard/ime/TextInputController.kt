@@ -112,6 +112,8 @@ class TextInputController(
     var nextWordModel: dev.shebang.devboard.dict.NextWordModel? = null
     /** Next words the strip offers now (after a space); empty when it offers something else. */
     private var predictions: List<String> = emptyList()
+    /** The text before the cursor the [predictions] were made for: once it is not, they are stale. */
+    private var predictedBefore = ""
     private var predictGeneration = 0
 
     /** Code-like identifiers in the text around the cursor, most used first, and when they were read. */
@@ -269,8 +271,10 @@ class TextInputController(
     /**
      * A word autocorrect changed, found again by the text before it: [upTo] is the text up to and including
      * [corrected] as it stood after the correction ([atStart]: all of the text before it, which was short).
+     * [other] is the third word the strip offered for [typed] beside the correction, so going back to the word
+     * shows the strip as it was before the correction.
      */
-    private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean)
+    private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean, val other: String?)
     /** The latest corrections in this field, oldest first: backspace back to one offers what was typed. */
     private val corrections = ArrayDeque<Correction>()
     /** The correction backspace walked back to, while it is the reopened word: picking [Correction.typed] keeps it. */
@@ -415,6 +419,13 @@ class TextInputController(
         selStart = newSelStart
         selEnd = newSelEnd
         if (deleteAnchor >= 0) return
+        // The app changed the text under the predictions (cleared it after sending, a hardware keyboard typed,
+        // text was selected): they no longer follow from it, and the bar comes back. Checked against the text,
+        // not the time, because an app may clear the field right after the keyboard's own edit.
+        if (predictions.isNotEmpty() && !isComposing) {
+            val now = connection()?.getTextBeforeCursor(CONTEXT_CHARS, 0)?.toString()
+            if (newSelStart != newSelEnd || now != predictedBefore) clearCandidates()
+        }
         if (isComposing) {
             val insideComposing = newSelStart == newSelEnd && newSelStart == candidatesEnd && candidatesStart >= 0
             // A report can lag the keyboard's own edits: ask the field whether the word still ends at the cursor.
@@ -722,6 +733,7 @@ class TextInputController(
             postToMain {
                 if (gen != predictGeneration || isComposing || words.isEmpty()) return@postToMain
                 predictions = words
+                predictedBefore = before.toString()
                 ui.showCandidates(arrangeBestMiddle(words))
                 ui.setComposing(true)
             }
@@ -859,13 +871,15 @@ class TextInputController(
         val c = correctionEndingAtCursor(ic, text)
         reopenedCorrection = c
         if (c != null) {
-            // Back to a word autocorrect changed: it stays, and what was typed is first on the strip.
+            // Back to a word autocorrect changed: it stays, and the strip offers the words it offered before the
+            // correction: what was typed, the correction, and the other suggestion for what was typed. No check
+            // mark: space now leaves the word as it is, and the check mark means space would change it.
             reopenedGlide = null
             ui.setComposing(true)
             candidates = emptyList()
             candidatesFor = ""
             suggestGeneration++
-            ui.showCandidates(listOf(c.typed, text, ""))
+            ui.showCandidates(listOf(c.typed, text, c.other?.takeIf { !it.equals(text, ignoreCase = true) }.orEmpty()))
             return
         }
         reopenedGlide = recentMatch(text)
@@ -885,14 +899,18 @@ class TextInputController(
     }
 
     /** Remembers that autocorrect wrote [corrected] for [typed], with [trailing] characters after it before the cursor. */
-    private fun rememberCorrection(ic: InputConnection, typed: String, corrected: String, trailing: Int) {
+    private fun rememberCorrection(ic: InputConnection, typed: String, corrected: String, trailing: Int, other: String?) {
         val n = CORRECTION_CONTEXT + corrected.length + trailing
         val before = ic.getTextBeforeCursor(n, 0)?.toString() ?: return
         val upTo = before.dropLast(trailing)
         if (before.length < trailing || !upTo.endsWith(corrected)) return
-        corrections.addLast(Correction(typed, corrected, upTo, atStart = before.length < n))
+        corrections.addLast(Correction(typed, corrected, upTo, atStart = before.length < n, other))
         if (corrections.size > MAX_CORRECTIONS) corrections.removeFirst()
     }
+
+    /** The strip's third word beside a correction: the best of [ranked] that is neither [typed] nor [fix]. */
+    private fun otherSuggestion(typed: String, fix: String, ranked: List<Suggestion>): String? =
+        ranked.map { it.word }.firstOrNull { !it.equals(fix, ignoreCase = true) && !it.equals(typed, ignoreCase = true) }
 
     /** The remembered correction that [text], the word just before the cursor, still is, in the same place. */
     private fun correctionEndingAtCursor(ic: InputConnection, text: String): Correction? {
@@ -970,6 +988,26 @@ class TextInputController(
      * The swipe from backspace ended: the [n] words go (the previewed selection, when it still is exactly
      * that; otherwise the words before the cursor), or with 0 the cursor is put back.
      */
+    /**
+     * Backspace held a while: the word before the cursor goes, with the spaces after it. Where the words
+     * cannot be seen (password and terminal fields, or nothing readable before the cursor) or text is
+     * selected, an ordinary backspace instead.
+     */
+    fun backspaceWord() {
+        val ic = connection() ?: return
+        if (field.isTerminal || field.isPassword || !ic.getSelectedText(0).isNullOrEmpty() ||
+            ic.getTextBeforeCursor(1, 0).isNullOrEmpty()
+        ) {
+            backspace()
+            return
+        }
+        dropTarget()
+        lastAutocorrect = null
+        lastGlide = null
+        lastActionWasSpace = false
+        deleteWords(1)
+    }
+
     fun deleteWords(n: Int) {
         val ic = connection() ?: return
         val anchor = deleteAnchor
@@ -1107,6 +1145,8 @@ class TextInputController(
             }
         }
         commit = pronounCase(commit)
+        // The strip's third word beside the correction, kept with it before the suggestions are cleared.
+        val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
         ic.beginBatchEdit()
         ic.commitText(commit, 1)
         if (after.isNotEmpty()) ic.commitText(after, 1)
@@ -1115,7 +1155,7 @@ class TextInputController(
         clearCandidates()
         if (commit != pronounCase(typed)) {
             lastAutocorrect = Autocorrected(typed, commit, after)
-            rememberCorrection(ic, typed, commit, after.length)
+            rememberCorrection(ic, typed, commit, after.length, other)
         }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
@@ -1128,6 +1168,7 @@ class TextInputController(
         val s = suggester ?: return
         background.execute {
             val fix = s.autocorrect(typed, taps, before)?.takeIf { keepsPunctuation(typed, it) }
+            val ranked = if (fix != null) s.suggest(typed, Suggester.AUTOCORRECT_CANDIDATES, taps, before) else emptyList()
             postToMain {
                 val ic2 = connection()
                 val late = fix?.let { pronounCase(it) }
@@ -1146,7 +1187,7 @@ class TextInputController(
                     ic2.endBatchEdit()
                     // Backspace's undo of a correction only applies while it is the last thing typed.
                     if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
-                    rememberCorrection(ic2, typed, late, after.length + next.length)
+                    rememberCorrection(ic2, typed, late, after.length + next.length, otherSuggestion(typed, late, ranked))
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
@@ -1382,7 +1423,7 @@ class TextInputController(
                 candidates = result
                 candidatesFor = typed
                 if (fix != null) {
-                    val other = result.map { it.word }.firstOrNull { !it.equals(fix, ignoreCase = true) && !it.equals(typed, ignoreCase = true) }
+                    val other = otherSuggestion(typed, fix, result)
                     ui.showCorrection(typed, fix, other)
                     return@postToMain
                 }

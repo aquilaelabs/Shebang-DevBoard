@@ -42,10 +42,11 @@ An Android keyboard (IME) for developers, written in Kotlin.
 
 ## Build and install
 
-Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36. Gradle is fetched by
-the wrapper.
+Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36, and for Shebang Voice
+NDK 29.0.14206865 and CMake 4.1.2 (CI installs exactly these). Gradle is fetched by the wrapper.
 
 ```sh
+tools/fetch_voice_model.sh             # Shebang Voice's speech model (57 MB, not in git); its build needs it
 ./gradlew assembleDebug test lint      # what CI runs (.github/workflows/android.yml)
 ./gradlew installDebug                 # install on the connected device or emulator
 adb shell ime enable dev.shebang.devboard/.ime.DevBoardService
@@ -379,7 +380,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   editor's content insertion (`commitContent`, read access granted for that one picture through a
   `FileProvider` that serves only those pictures) where the field accepts its type; elsewhere the keyboard
   says the field takes no pictures. Checked on the emulator with a copied test card (`ClipboardImageTest`,
-  `-e clipimage 1`); inserting into an app that takes pictures is still to be tried on a phone. Both bar items draw original single-colour glyphs, like the mic.
+  `-e clipimage 1`), and inserting into an app that takes pictures works on the owner's phone (3 Oct). Both bar items draw original single-colour glyphs, like the mic.
 - **A next-word model** (the owner's request to use the GPU for suggestions too): an LSTM over words (32,000
   words, 128-wide word table shared by input and output, 384 units, 5M weights; 6.3 MB with the word table
   in 8 bits, which cost nothing measurable) reads the whole sentence before the cursor, where the n-grams read
@@ -601,8 +602,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1.0. Two-letter words are only corrected by a letter they dropped, so "js" and "ui" stay. Backspace right
   after an autocorrect puts back what was typed, and that word is not corrected again in the field. Later,
   backspacing back to the end of a corrected word (the last 16 in the field, found by the 32 characters
-  before them, so only that word and not the same word elsewhere) leaves it as corrected and puts what was
-  typed first on the strip; picking it there keeps it from autocorrect in the field. When
+  before them, so only that word and not the same word elsewhere) leaves it as corrected and the strip
+  offers the words it offered before the correction (what was typed, the correction, and the other
+  suggestion for what was typed, kept with the correction), without the check mark, which only shows when
+  space would change the word; picking what was typed keeps it from autocorrect in the field. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
   (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the
@@ -636,7 +639,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Caps-mode queries** (`getCursorCapsMode`, an IPC) run only at word boundaries, never after a letter that is
   still being composed. Autocorrect reuses the candidates the background thread already produced for the
   word, and never scans the dictionary on the main thread.
-- **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms.
+- **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms. Held for a
+  second (the owner's request; setting Hold backspace for whole words, on), it deletes a whole word, with
+  the spaces after it, every 150 ms: a little faster than characters at their quickest, and letting go
+  leaves a word's edge. Password and terminal fields, where the words cannot be read, keep deleting
+  characters.
   Arrows and Del repeat the same way on the bar and in code mode.
 - **Sticky modifiers**: tap = one-shot, second tap within 350 ms = locked, tap while locked = off.
   `KeySender` brackets each key with the modifier keys' own down/up events so apps tracking modifiers see a
@@ -715,9 +722,10 @@ piece, and is left until the rules fall short.
 
 ## About and updates
 
-Settings > About shows the version, the licence and the credits (`LICENSE` and `THIRD_PARTY_NOTICES.md`,
-copied into the app's assets at build time by the `copyAboutDocs` task, so the app always carries the real
-list), links to the source on GitHub, and Check for updates, which opens the GitHub releases page. The app
+Settings > About shows the version, the licence, the credits and the privacy policy (`LICENSE`,
+`THIRD_PARTY_NOTICES.md` and `PRIVACY.md`, copied into the app's assets at build time by the `copyAboutDocs`
+task, so the app always carries the same text as the repository; `PRIVACY.md` is also the policy's public
+address for app stores), links to the source on GitHub, and Check for updates, which opens the GitHub releases page. The app
 does not download or install anything itself: that would need network access and the install-packages
 permission, which together are what Android's malware scanning looks for in a keyboard. Installing a newer
 APK over the old one updates it in place, keeping settings and learned words, as long as both were signed
@@ -780,8 +788,13 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
       *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
 - [ ] Multiline: Enter inserts a newline; a Search field keeps the enter icon and performs the search.
-- [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and "wiht" is first on the strip;
-      tapping it puts it back. *(verified on the emulator)*
+- [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip offers "wiht",
+      "with", "whit" (no check mark: space leaves the word); tapping "wiht" puts it back. *(verified on the
+      emulator)*
+- [x] Hold backspace on a long sentence: after a second it deletes whole words and stops at a word's edge;
+      with Hold backspace for whole words off it stops mid-word. *(verified on the emulator)*
+- [x] Type "see you soon " so predictions show, then clear the field from a hardware keyboard: the
+      predictions go and the bar comes back. *(verified on the emulator)*
 - [x] Settings > About > Export diagnostics saves a file with no learned words or email addresses in it.
       *(verified on the emulator)*
 
@@ -798,3 +811,5 @@ Layout:
       the key: lifting types "a". *(verified on the emulator)*
 - [x] Emoji and clipboard panels from the bar: Recent emoji, a pinned copy and a picture in the history.
       *(verified on the emulator)*
+- [x] A copied picture pasted from the clipboard history into an app that takes pictures. *(verified on the
+      owner's phone)*

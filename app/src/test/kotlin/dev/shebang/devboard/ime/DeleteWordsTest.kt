@@ -39,6 +39,36 @@ class DeleteWordsTest {
     }
 
     @Test
+    fun holdingBackspaceTakesAWordAtATime() {
+        at("hello big world")
+        controller.backspaceWord()
+        assertEquals("hello big ", ic.toString())
+        controller.backspaceWord()
+        assertEquals("hello ", ic.toString())
+        controller.backspaceWord()
+        assertEquals("", ic.toString())
+        // Nothing left: an ordinary backspace, which does nothing.
+        controller.backspaceWord()
+        assertEquals("", ic.toString())
+    }
+
+    @Test
+    fun aWordBeingTypedGoesWhole() {
+        at("hello ")
+        for (c in "wor") controller.typeText(c.toString())
+        controller.backspaceWord()
+        assertEquals("hello ", ic.toString())
+    }
+
+    @Test
+    fun aPasswordFieldStillDeletesOneCharacter() {
+        controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD, 0))
+        at("secret words")
+        controller.backspaceWord()
+        assertEquals("secret word", ic.toString())
+    }
+
+    @Test
     fun swipingBackCancels() {
         at("hello world")
         controller.previewDeleteWords(1)

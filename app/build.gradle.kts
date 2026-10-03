@@ -63,7 +63,7 @@ abstract class CopyAboutDocs : DefaultTask() {
 }
 
 val copyAboutDocs = tasks.register<CopyAboutDocs>("copyAboutDocs") {
-    docs.from(rootProject.file("LICENSE"), rootProject.file("THIRD_PARTY_NOTICES.md"))
+    docs.from(rootProject.file("LICENSE"), rootProject.file("THIRD_PARTY_NOTICES.md"), rootProject.file("PRIVACY.md"))
 }
 
 androidComponents {
