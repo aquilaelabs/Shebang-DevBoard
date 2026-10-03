@@ -601,10 +601,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   1.0. Two-letter words are only corrected by a letter they dropped, so "js" and "ui" stay. Backspace right
   after an autocorrect puts back what was typed, and that word is not corrected again in the field. Later,
   backspacing back to the end of a corrected word (the last 16 in the field, found by the 32 characters
-  before them, so only that word and not the same word elsewhere) leaves it as corrected and brings back the
-  strip as it was before the correction (what was typed behind the check mark, the correction, and the
-  other suggestion for what was typed, kept with the correction); picking what was typed keeps it from
-  autocorrect in the field. When
+  before them, so only that word and not the same word elsewhere) leaves it as corrected and the strip
+  offers the words it offered before the correction (what was typed, the correction, and the other
+  suggestion for what was typed, kept with the correction), without the check mark, which only shows when
+  space would change the word; picking what was typed keeps it from autocorrect in the field. When
   the suggestions are not for the word yet (a quick space), the correction is worked out in the background
   and applied if the word and space still stand as typed. On 7,000 one-slip typos of held-out words
   (`AutocorrectBenchmarkTest`; the slips are synthetic, of the kinds the costs describe), each with the
@@ -783,8 +783,8 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
       *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
 - [ ] Multiline: Enter inserts a newline; a Search field keeps the enter icon and performs the search.
-- [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip is as it was
-      before the correction ("✓ wiht", "with", "whit"); tapping "wiht" puts it back. *(verified on the
+- [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip offers "wiht",
+      "with", "whit" (no check mark: space leaves the word); tapping "wiht" puts it back. *(verified on the
       emulator)*
 - [x] Type "see you soon " so predictions show, then clear the field from a hardware keyboard: the
       predictions go and the bar comes back. *(verified on the emulator)*

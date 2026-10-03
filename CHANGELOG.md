@@ -38,7 +38,7 @@
 - Personal words has a search field: type part of a word to find it among the words the keyboard learned (a36a242)
 - Emoji and clipboard history panels, opened from the terminal bar (first two items by default; move or remove them in the bar editor); the clipboard history keeps pictures too, for apps that accept them (d777355)
 - Hold shift for caps lock, as well as tapping it twice (2c08853)
-- Backspacing back to a word autocorrect changed, even after typing on, brings back the strip you saw before the correction: what you typed, the correction and the other suggestion (cb1fddd, 2679987, 591f200)
+- Backspacing back to a word autocorrect changed, even after typing on, offers what you typed, the correction and the other suggestion for what you typed (cb1fddd, 2679987, 591f200, 018e3b3)
 - Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
 - Export diagnostics (Settings > About): a file to send the developer with your settings and how your taps and glides lean, leaving out learned words, email addresses, the clipboard, your terminal bar and anything typed (83479de)
 - Holding a lowercase letter offers its capital first in the row; sliding back down onto the key cancels the row and types the key itself (ee022cf)

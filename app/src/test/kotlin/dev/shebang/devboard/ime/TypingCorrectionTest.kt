@@ -18,6 +18,8 @@ class TypingCorrectionTest {
     private val ic = FakeInputConnection()
     private val learned = ArrayList<String>()
     private var shown: List<String> = emptyList()
+    /** Whether the strip shows what was typed behind a check mark (space would change it). */
+    private var checkMark = false
     private val suggester by lazy {
         Suggester(dictionary, null, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() })
     }
@@ -27,6 +29,11 @@ class TypingCorrectionTest {
         object : TextInputController.Ui {
             override fun showCandidates(words: List<String>) {
                 shown = words
+                checkMark = false
+            }
+            override fun showCorrection(typed: String, fix: String, other: String?) {
+                shown = listOfNotNull(typed, fix, other)
+                checkMark = true
             }
             override fun setComposing(composing: Boolean) = Unit
         },
@@ -186,14 +193,17 @@ class TypingCorrectionTest {
         type("wiht")
         // Before space: what was typed, the correction space will write, and one more suggestion.
         val before = shown
+        assertEquals(true, checkMark)
         assertEquals(3, before.size)
         assertEquals(listOf("wiht", "with"), before.take(2))
         type(" cat ")
         assertEquals("with cat ", ic.toString())
         repeat(5) { controller.backspace() }
-        // The word stays as corrected, and the strip is as it was before the correction.
+        // The word stays as corrected, and the strip offers the same words, without the check mark: space
+        // would leave the word as it is now.
         assertEquals("with", ic.toString())
         assertEquals(before, shown)
+        assertEquals(false, checkMark)
         controller.pickCandidate("wiht")
         assertEquals("wiht ", ic.toString())
         // Picked back, it stays as typed.

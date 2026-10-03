@@ -871,14 +871,15 @@ class TextInputController(
         val c = correctionEndingAtCursor(ic, text)
         reopenedCorrection = c
         if (c != null) {
-            // Back to a word autocorrect changed: it stays, and the strip is as it was before the correction:
-            // what was typed with the check mark, the correction, and the other suggestion for what was typed.
+            // Back to a word autocorrect changed: it stays, and the strip offers the words it offered before the
+            // correction: what was typed, the correction, and the other suggestion for what was typed. No check
+            // mark: space now leaves the word as it is, and the check mark means space would change it.
             reopenedGlide = null
             ui.setComposing(true)
             candidates = emptyList()
             candidatesFor = ""
             suggestGeneration++
-            ui.showCorrection(c.typed, text, c.other?.takeIf { !it.equals(text, ignoreCase = true) })
+            ui.showCandidates(listOf(c.typed, text, c.other?.takeIf { !it.equals(text, ignoreCase = true) }.orEmpty()))
             return
         }
         reopenedGlide = recentMatch(text)
