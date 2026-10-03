@@ -160,6 +160,18 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun aLateCorrectionAlsoRemembersTheStrip() {
+        controller.suggester = null
+        type("wiht")
+        controller.suggester = suggester
+        type(" cat ")
+        assertEquals("with cat ", ic.toString())
+        repeat(5) { controller.backspace() }
+        assertEquals("with", ic.toString())
+        assertEquals(listOf("wiht", "with", "wit"), shown)
+    }
+
+    @Test
     fun backspaceRightAfterAnAutocorrectPutsBackWhatWasTyped() {
         type("wiht ")
         controller.backspace()
@@ -171,12 +183,17 @@ class TypingCorrectionTest {
 
     @Test
     fun backspacingBackToACorrectedWordOffersWhatWasTyped() {
-        type("wiht cat ")
+        type("wiht")
+        // Before space: what was typed, the correction space will write, and one more suggestion.
+        val before = shown
+        assertEquals(3, before.size)
+        assertEquals(listOf("wiht", "with"), before.take(2))
+        type(" cat ")
         assertEquals("with cat ", ic.toString())
         repeat(5) { controller.backspace() }
-        // The word stays as corrected; what was typed is first on the strip.
+        // The word stays as corrected, and the strip is as it was before the correction.
         assertEquals("with", ic.toString())
-        assertEquals(listOf("wiht", "with", ""), shown)
+        assertEquals(before, shown)
         controller.pickCandidate("wiht")
         assertEquals("wiht ", ic.toString())
         // Picked back, it stays as typed.
@@ -189,7 +206,7 @@ class TypingCorrectionTest {
         type("with wiht cat ")
         assertEquals("with with cat ", ic.toString())
         repeat(5) { controller.backspace() }
-        assertEquals(listOf("wiht", "with", ""), shown)
+        assertEquals(listOf("wiht", "with"), shown.take(2))
         // The "with" typed right before it was never corrected.
         repeat(5) { controller.backspace() }
         assertEquals("with", ic.toString())
