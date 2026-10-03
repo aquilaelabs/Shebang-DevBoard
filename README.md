@@ -379,7 +379,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   editor's content insertion (`commitContent`, read access granted for that one picture through a
   `FileProvider` that serves only those pictures) where the field accepts its type; elsewhere the keyboard
   says the field takes no pictures. Checked on the emulator with a copied test card (`ClipboardImageTest`,
-  `-e clipimage 1`); inserting into an app that takes pictures is still to be tried on a phone. Both bar items draw original single-colour glyphs, like the mic.
+  `-e clipimage 1`), and inserting into an app that takes pictures works on the owner's phone (3 Oct). Both bar items draw original single-colour glyphs, like the mic.
 - **A next-word model** (the owner's request to use the GPU for suggestions too): an LSTM over words (32,000
   words, 128-wide word table shared by input and output, 384 units, 5M weights; 6.3 MB with the word table
   in 8 bits, which cost nothing measurable) reads the whole sentence before the cursor, where the n-grams read
@@ -798,3 +798,5 @@ Layout:
       the key: lifting types "a". *(verified on the emulator)*
 - [x] Emoji and clipboard panels from the bar: Recent emoji, a pinned copy and a picture in the history.
       *(verified on the emulator)*
+- [x] A copied picture pasted from the clipboard history into an app that takes pictures. *(verified on the
+      owner's phone)*
