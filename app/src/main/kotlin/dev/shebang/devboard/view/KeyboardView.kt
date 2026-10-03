@@ -39,6 +39,8 @@ class KeyboardView(context: Context) : View(context) {
         fun onKeyTap(key: Key, shift: ShiftState)
         /** Hold-to-repeat tick. The tap on release is suppressed once this has fired. */
         fun onKeyRepeat(key: Key)
+        /** Backspace held past [WORDS_AFTER_MS] with [holdDeletesWords] on: a whole word goes per tick. */
+        fun onBackspaceWordRepeat() = Unit
         /** Alternate chosen from the long-press popup. */
         fun onAlternate(key: Key, text: String)
         /** A touch became a glide: the points so far, x,y interleaved in [points], touch times in [times]. */
@@ -175,6 +177,8 @@ class KeyboardView(context: Context) : View(context) {
     private var popupOpenY = 0f
     private var popupEntered = false
     private var repeatFired = false
+    /** Holding backspace past [WORDS_AFTER_MS] deletes whole words (setting). */
+    var holdDeletesWords = true
     private var repeatInterval = 0L
     private var cursorDrag = false
     private var cursorDragAccum = 0f
@@ -213,6 +217,12 @@ class KeyboardView(context: Context) : View(context) {
             if (p < 0) return
             val key = pointerKey[p] ?: return
             repeatFired = true
+            if (key.action == KeyAction.BACKSPACE && holdDeletesWords && SystemClock.uptimeMillis() - pointerDownT[p] >= WORDS_AFTER_MS) {
+                // Held a while: whole words now, a little slower, so letting go stops at a word's edge.
+                listener?.onBackspaceWordRepeat()
+                handler.postDelayed(this, WORD_REPEAT_MS)
+                return
+            }
             listener?.onKeyRepeat(key)
             repeatInterval = (repeatInterval * REPEAT_ACCEL).toLong().coerceAtLeast(REPEAT_MIN_MS)
             handler.postDelayed(this, repeatInterval)
@@ -755,6 +765,9 @@ class KeyboardView(context: Context) : View(context) {
         private const val BACK_DOWN = 0.35f
         private const val DOUBLE_TAP_MS = 350L
         private const val REPEAT_DELAY_MS = 380L
+        /** How long backspace is held before it deletes whole words, and how often one goes then. */
+        const val WORDS_AFTER_MS = 1000L
+        private const val WORD_REPEAT_MS = 150L
         private const val REPEAT_START_MS = 80L
         private const val REPEAT_MIN_MS = 25L
         private const val REPEAT_ACCEL = 0.85f

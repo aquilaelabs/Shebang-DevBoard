@@ -988,6 +988,26 @@ class TextInputController(
      * The swipe from backspace ended: the [n] words go (the previewed selection, when it still is exactly
      * that; otherwise the words before the cursor), or with 0 the cursor is put back.
      */
+    /**
+     * Backspace held a while: the word before the cursor goes, with the spaces after it. Where the words
+     * cannot be seen (password and terminal fields, or nothing readable before the cursor) or text is
+     * selected, an ordinary backspace instead.
+     */
+    fun backspaceWord() {
+        val ic = connection() ?: return
+        if (field.isTerminal || field.isPassword || !ic.getSelectedText(0).isNullOrEmpty() ||
+            ic.getTextBeforeCursor(1, 0).isNullOrEmpty()
+        ) {
+            backspace()
+            return
+        }
+        dropTarget()
+        lastAutocorrect = null
+        lastGlide = null
+        lastActionWasSpace = false
+        deleteWords(1)
+    }
+
     fun deleteWords(n: Int) {
         val ic = connection() ?: return
         val anchor = deleteAnchor

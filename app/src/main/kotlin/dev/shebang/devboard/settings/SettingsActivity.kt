@@ -196,6 +196,7 @@ fun SettingsScreen(
             item { SwitchRow("Key sounds", "System key-click sounds", settings.keySounds) { v -> update { it.copy(keySounds = v) } } }
 
             item { SectionHeader("Typing") }
+            item { SwitchRow("Hold backspace for whole words", "After a second of holding backspace, it deletes a word at a time", settings.holdDeletesWords) { v -> update { it.copy(holdDeletesWords = v) } } }
             item { SwitchRow("Glide typing", "Slide across letters to write a word", settings.glide) { v -> update { it.copy(glide = v) } } }
             item { SwitchRow("Glide trail", "Draw the path while gliding", settings.glideTrail, enabled = settings.glide) { v -> update { it.copy(glideTrail = v) } } }
             item {

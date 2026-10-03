@@ -638,7 +638,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Caps-mode queries** (`getCursorCapsMode`, an IPC) run only at word boundaries, never after a letter that is
   still being composed. Autocorrect reuses the candidates the background thread already produced for the
   word, and never scans the dictionary on the main thread.
-- **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms.
+- **Backspace repeat**: 380 ms initial delay, then 80 ms shrinking by 15% per tick to 25 ms. Held for a
+  second (the owner's request; setting Hold backspace for whole words, on), it deletes a whole word, with
+  the spaces after it, every 150 ms: a little faster than characters at their quickest, and letting go
+  leaves a word's edge. Password and terminal fields, where the words cannot be read, keep deleting
+  characters.
   Arrows and Del repeat the same way on the bar and in code mode.
 - **Sticky modifiers**: tap = one-shot, second tap within 350 ms = locked, tap while locked = off.
   `KeySender` brackets each key with the modifier keys' own down/up events so apps tracking modifiers see a
@@ -786,6 +790,8 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip offers "wiht",
       "with", "whit" (no check mark: space leaves the word); tapping "wiht" puts it back. *(verified on the
       emulator)*
+- [x] Hold backspace on a long sentence: after a second it deletes whole words and stops at a word's edge;
+      with Hold backspace for whole words off it stops mid-word. *(verified on the emulator)*
 - [x] Type "see you soon " so predictions show, then clear the field from a hardware keyboard: the
       predictions go and the bar comes back. *(verified on the emulator)*
 - [x] Settings > About > Export diagnostics saves a file with no learned words or email addresses in it.

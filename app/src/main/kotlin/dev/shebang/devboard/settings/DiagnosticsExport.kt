@@ -79,6 +79,7 @@ object DiagnosticsExport {
             "keySounds" to JsonPrimitive(s.keySounds),
             "glide" to JsonPrimitive(s.glide),
             "glideTrail" to JsonPrimitive(s.glideTrail),
+            "holdDeletesWords" to JsonPrimitive(s.holdDeletesWords),
             "phraseGlide" to JsonPrimitive(s.phraseGlide),
             "learnWords" to JsonPrimitive(s.learnWords),
             "rememberEmails" to JsonPrimitive(s.rememberEmails),
