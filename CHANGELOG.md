@@ -97,3 +97,4 @@
 - On a taller keyboard the letters no longer grow into the number and accent hints; the bar's fade by the mic is shorter (3d7052c)
 - A correction that arrives after you have started the next word is no longer lost: it goes in ahead of the word you are typing (1484317)
 - Next-word suggestions no longer linger after the app changes the text (a message sent and the field cleared, a hardware keyboard) (591f200)
+- Learned words, adaptation, email addresses and clipboard history can no longer be wiped by a damaged save file: it is set aside instead of overwritten, and saves cannot be cut off half-written; a damaged settings file falls back to the defaults instead of stopping the keyboard (bb6d84e)

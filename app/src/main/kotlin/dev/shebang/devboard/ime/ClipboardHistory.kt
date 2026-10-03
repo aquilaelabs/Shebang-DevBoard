@@ -1,5 +1,6 @@
 package dev.shebang.devboard.ime
 
+import dev.shebang.devboard.store.JsonFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -41,19 +42,13 @@ class ClipboardHistory(private val file: File?, private val now: () -> Long = { 
         if (loaded) return
         loaded = true
         val f = file ?: return
-        if (!f.exists()) return
-        runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull()?.let { items = ArrayList(it.items) }
+        JsonFile(f).read(Stored.serializer(), json)?.let { items = ArrayList(it.items) }
     }
 
     @Synchronized
     private fun save() {
         val f = file ?: return
-        val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), Stored(items)))
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            tmp.renameTo(f)
-        }
+        JsonFile(f).write(Stored.serializer(), json, Stored(items))
     }
 
     /** The items to show, newest first, pinned ones first. */
@@ -122,6 +117,7 @@ class ClipboardHistory(private val file: File?, private val now: () -> Long = { 
         items.removeAll { it.key == key }
         deleteImages(gone)
         save()
+        file?.let { JsonFile(it).discardUnreadable() }
     }
 
     /** Forgets every unpinned copy. */
@@ -132,6 +128,7 @@ class ClipboardHistory(private val file: File?, private val now: () -> Long = { 
         items.removeAll { !it.pinned }
         deleteImages(gone)
         save()
+        file?.let { JsonFile(it).discardUnreadable() }
     }
 
     private fun deleteImages(gone: List<Item>) {

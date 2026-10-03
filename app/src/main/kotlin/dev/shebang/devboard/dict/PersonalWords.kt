@@ -1,5 +1,6 @@
 package dev.shebang.devboard.dict
 
+import dev.shebang.devboard.store.JsonFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -78,12 +79,11 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         if (loaded) return
         loaded = true
         val f = file ?: return
-        if (!f.exists()) return
         val stored = read(f) ?: return
         apply(stored)
     }
 
-    private fun read(f: File): Stored? = runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull()
+    private fun read(f: File): Stored? = JsonFile(f).read(Stored.serializer(), json)
 
     private fun apply(stored: Stored) {
         words.clear()
@@ -102,13 +102,13 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         total = total,
     )
 
-    private fun write(f: File, stored: Stored) {
-        val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), stored))
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            tmp.renameTo(f)
-        }
+    private fun write(f: File, stored: Stored) = JsonFile(f).write(Stored.serializer(), json, stored)
+
+    /** Copies set aside as unreadable (the vocabulary's or a kept day's) go when the user deletes words. */
+    private fun discardUnreadable() {
+        val f = file ?: return
+        val base = f.name.removeSuffix(".json")
+        f.parentFile?.listFiles()?.forEach { if (it.name.startsWith(base) && it.name.endsWith(".unreadable")) it.delete() }
     }
 
     /** Writes the vocabulary if it changed. Call off the main thread. */
@@ -167,7 +167,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         for (d in snapshotDays()) {
             val f = snapshotFile(d) ?: continue
             if (lower == null) {
-                f.delete()
+                JsonFile(f).delete()
                 continue
             }
             val st = read(f) ?: continue
@@ -233,6 +233,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         total = maxOf(0, total - e.count)
         pairs.keys.removeAll { it.startsWith(lower + "\u0001") || it.endsWith("\u0001" + lower) }
         scrubSnapshots(lower)
+        discardUnreadable()
         dirty = true
         vocabularyVersion++
         countsVersion++
@@ -246,6 +247,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         total = 0
         // Deleting everything deletes the kept copies too.
         scrubSnapshots(null)
+        discardUnreadable()
         snapshotDay = Int.MIN_VALUE
         dirty = true
         vocabularyVersion++

@@ -100,6 +100,7 @@ python-ml tools/lm_model/export.py lm.pt app/src/main/assets/dict/en_next_word.b
 | `input` | `ModifierState` (sticky modifier state machine), `CharKeyCodes` and `KeyEventPlan` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
 | `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideModel` (the learned reading of strokes), `GlideSession` (decoder thread fed by a lock-free ring), `GlideAdaptation` and `TapModel` (where this user's glides and taps land), `GlideTrace` (recorded glides), `KeyLayoutModel` |
 | `dict` | `Dictionary` (sorted word list with tiers), `PersonalWords` (learned words), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |
+| `store` | `JsonFile`: how the learned words, adaptation, emails and clipboard history are saved (atomic writes; an unreadable file set aside, never overwritten) |
 | `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `PersonalWordsScreen`, `AboutScreen`, `DiagnosticsExport`, `AppProfiles` (each app's mode and bar), `GlideRecorderView`, `GlideTraceStore` |
 
 The Shebang Voice add-on is the `voice` module (`dev.shebang.devboard.voice`); see its section below.
@@ -232,6 +233,16 @@ its own, locally:
 
 ## Decisions
 
+- **Saving what the keyboard learns** (B10): learned words, tap and glide adaptation, email addresses and the
+  clipboard history each save through one `JsonFile`: the new text goes to a temporary file, is synced to
+  storage and replaces the old file in one atomic rename, so a crash or a full disk mid-save cannot damage
+  it. A file this version cannot parse (damage, or a format a later update changed) is set aside as
+  `NAME.unreadable` and the store starts empty beside it, where it used to be overwritten by the next save;
+  a save stopped before its rename is recovered from its temporary file. Deleting words, addresses, copies
+  or adaptation also discards a set-aside copy, so nothing deleted lingers there; for the same reason no
+  backup of the previous version is kept. Formats change only by adding fields with defaults (read with
+  `ignoreUnknownKeys`), so no migration step is needed yet. Settings (DataStore) fall back to the defaults
+  when their file cannot be read, instead of failing every read, which stopped the keyboard from starting.
 - **Long-press row** (the owner's requests): a lowercase letter's row starts with its capital, ahead of the
   corner character and accents, and a letter with none of those still offers its capital (with shift on, the
   row is the capitals of its alternates, as before). Once the finger has reached up into the row, coming back

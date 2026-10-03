@@ -1,5 +1,6 @@
 package dev.shebang.devboard.ime
 
+import dev.shebang.devboard.store.JsonFile
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -25,19 +26,13 @@ class EmailMemory(private val file: File?, private val now: () -> Long = { Syste
         if (loaded) return
         loaded = true
         val f = file ?: return
-        if (!f.exists()) return
-        runCatching { json.decodeFromString(Stored.serializer(), f.readText()) }.getOrNull()?.let { addresses = ArrayList(it.addresses) }
+        JsonFile(f).read(Stored.serializer(), json)?.let { addresses = ArrayList(it.addresses) }
     }
 
     @Synchronized
     private fun save() {
         val f = file ?: return
-        val tmp = File(f.parentFile, f.name + ".tmp")
-        tmp.writeText(json.encodeToString(Stored.serializer(), Stored(addresses)))
-        if (!tmp.renameTo(f)) {
-            f.delete()
-            tmp.renameTo(f)
-        }
+        JsonFile(f).write(Stored.serializer(), json, Stored(addresses))
     }
 
     /** The addresses, most used first. */
@@ -81,6 +76,7 @@ class EmailMemory(private val file: File?, private val now: () -> Long = { Syste
     fun delete(address: String) {
         load()
         if (addresses.removeAll { it.address.equals(address, ignoreCase = true) }) save()
+        file?.let { JsonFile(it).discardUnreadable() }
     }
 
     @Synchronized
@@ -88,6 +84,7 @@ class EmailMemory(private val file: File?, private val now: () -> Long = { Syste
         load()
         addresses.clear()
         save()
+        file?.let { JsonFile(it).discardUnreadable() }
     }
 
     companion object {

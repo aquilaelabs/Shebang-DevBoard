@@ -2,9 +2,11 @@ package dev.shebang.devboard.settings
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -13,7 +15,12 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.Json
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "devboard_settings")
+// A settings file that cannot be read gives the defaults back instead of failing every read (which would
+// stop the keyboard from starting): settings are choices, easily made again; the learned data is elsewhere.
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "devboard_settings",
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+)
 
 /** DataStore-backed settings. One instance per process is fine; DataStore is a singleton per file. */
 class SettingsRepository(context: Context) {
