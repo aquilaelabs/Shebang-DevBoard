@@ -465,7 +465,9 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   High Contrast. Each is the same set of tokens (`Palettes`); keycap edges are derived from the key colours.
   Settings > Appearance picks one from a row of swatches drawn in its own colours, and the setup and
   settings screens wear it too. This replaces the System/Light/Dark choice and the Dynamic color switch.
-- **Sounds**: the system's own key-click effects via `AudioManager.playSoundEffect`; no bundled audio.
+- **Sounds**: the system's own key-click effects via `AudioManager.playSoundEffect`, for every key and button
+  that clicks; no bundled audio. Generated sounds of the keyboard's own were tried (3 Oct) and the owner
+  chose the stock system sounds.
 - **Haptics**: `VibrationEffect.createOneShot` at 8/12/18 ms and amplitude 60/140/255 for light/medium/strong.
 - **Bar editor**: reorder by dragging an item's handle (R3, replacing up/down buttons). The lifted row is
   drawn under the finger wherever the list has laid it out, so a swap never makes it jump; the others slide
