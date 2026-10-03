@@ -33,9 +33,20 @@ data class FieldInfo(
         get() = isTerminal || (!enterIsNewline && (editorAction == EditorInfo.IME_ACTION_NONE || editorAction == EditorInfo.IME_ACTION_UNSPECIFIED))
 
     companion object {
-        fun from(info: EditorInfo?): FieldInfo = from(info?.inputType ?: InputType.TYPE_NULL, info?.imeOptions ?: 0)
+        fun from(info: EditorInfo?): FieldInfo = from(
+            info?.inputType ?: InputType.TYPE_NULL,
+            info?.imeOptions ?: 0,
+            listOfNotNull(info?.hintText, info?.label, info?.fieldName).joinToString(" "),
+        )
 
-        fun from(inputType: Int, imeOptions: Int): FieldInfo {
+        /** Words in a field's hint, label or name that say it wants an email address ("Email", "Your e-mail"). */
+        private val EMAIL_HINT = Regex("\\be-?mail", RegexOption.IGNORE_CASE)
+
+        /**
+         * [hint] is the field's hint text, label and name: a plain one-line text field that asks for an email
+         * address there, without saying so in its input type (common in web forms), is taken as an email field.
+         */
+        fun from(inputType: Int, imeOptions: Int, hint: CharSequence = ""): FieldInfo {
             val klass = inputType and InputType.TYPE_MASK_CLASS
             val variation = inputType and InputType.TYPE_MASK_VARIATION
             val flags = inputType and InputType.TYPE_MASK_FLAGS
@@ -47,7 +58,7 @@ data class FieldInfo(
                 InputType.TYPE_CLASS_NUMBER -> variation == InputType.TYPE_NUMBER_VARIATION_PASSWORD
                 else -> false
             }
-            val variant = when (klass) {
+            val variantByType = when (klass) {
                 InputType.TYPE_CLASS_NUMBER -> FieldVariant.NUMBER
                 InputType.TYPE_CLASS_PHONE -> FieldVariant.PHONE
                 InputType.TYPE_CLASS_DATETIME -> FieldVariant.DATE
@@ -61,6 +72,11 @@ data class FieldInfo(
             val noSuggestions = klass == InputType.TYPE_CLASS_TEXT && (flags and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
             val multiline = klass == InputType.TYPE_CLASS_TEXT &&
                 (flags and (InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE)) != 0
+            // Only a plain one-line text field: not a subject line, a message, a name or a password.
+            val plainText = variation == InputType.TYPE_TEXT_VARIATION_NORMAL || variation == InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT
+            val variant = if (variantByType == FieldVariant.PLAIN && klass == InputType.TYPE_CLASS_TEXT && plainText && !multiline &&
+                EMAIL_HINT.containsMatchIn(hint)
+            ) FieldVariant.EMAIL else variantByType
             val action = imeOptions and EditorInfo.IME_MASK_ACTION
             val noEnterAction = (imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
             val enterIsNewline = !isTerminal && (multiline || noEnterAction)

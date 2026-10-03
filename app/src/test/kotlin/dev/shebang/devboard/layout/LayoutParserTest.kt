@@ -70,13 +70,14 @@ class LayoutParserTest {
     }
 
     @Test
-    fun textBottomRowSwapsCommaForAtAndSlashInEmailFields() {
+    fun textBottomRowSwapsTheCommaInEmailAndWebAddressFields() {
         val def = LayoutParser.parse(asset("layouts/text_qwerty.json"))
         val bottom = def.rows.last().keys
-        val plain = bottom.filter { it.visibleFor(FieldVariant.PLAIN) }.map { it.label ?: it.text ?: it.action }
-        val email = bottom.filter { it.visibleFor(FieldVariant.EMAIL) }.map { it.label ?: it.text ?: it.action }
-        assertEquals(listOf("#!", ",", "", ".", "⏎"), plain)
-        assertEquals(listOf("#!", "/", "@", "", ".", "⏎"), email)
+        fun row(v: FieldVariant) = bottom.filter { it.visibleFor(v) }.map { it.label ?: it.text ?: it.action }
+        assertEquals(listOf("#!", ",", "", ".", "⏎"), row(FieldVariant.PLAIN))
+        // An email field has @ where the comma was; a web address also gets /.
+        assertEquals(listOf("#!", "@", "", ".", "⏎"), row(FieldVariant.EMAIL))
+        assertEquals(listOf("#!", "/", "@", "", ".", "⏎"), row(FieldVariant.URL))
     }
 
     @Test

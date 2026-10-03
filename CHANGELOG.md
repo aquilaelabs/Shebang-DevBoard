@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Email fields have @ where the comma is (long-press it for the comma and _ - +), and fields whose hint asks for an email count as email fields too (c5ed723)
+
 ## 0.2.0: 2026-10-03
 
 ### Added

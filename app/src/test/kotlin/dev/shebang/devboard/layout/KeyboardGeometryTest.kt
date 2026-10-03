@@ -50,7 +50,10 @@ class KeyboardGeometryTest {
     fun spaceAbsorbsTheDifferenceWhenEmailKeysAppear() {
         val plainSpace = geometry(text, FieldVariant.PLAIN).keys.first { it.action == KeyAction.SPACE }
         val emailSpace = geometry(text, FieldVariant.EMAIL).keys.first { it.action == KeyAction.SPACE }
-        assertEquals(plainSpace.width - 100f, emailSpace.width, 1f)
+        val urlSpace = geometry(text, FieldVariant.URL).keys.first { it.action == KeyAction.SPACE }
+        // @ takes the comma's place one for one; a web address's extra / comes out of the space bar.
+        assertEquals(plainSpace.width, emailSpace.width, 1f)
+        assertEquals(plainSpace.width - 100f, urlSpace.width, 1f)
         assertTrue(geometry(text, FieldVariant.EMAIL).keys.any { it.def.text == "@" })
         assertTrue(geometry(text, FieldVariant.PLAIN).keys.none { it.def.text == "@" })
     }

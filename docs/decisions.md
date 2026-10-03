@@ -370,7 +370,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   the words change; results carry the glide's id so a late result for an abandoned glide is ignored. A
   glide owns the keyboard until it ends: other fingers are ignored.
 - **Text-mode bottom row**: `#!` 1.25, `,` 1, space (flex), `.` 1, enter 1.25 units. Email and URL fields
-  replace `,` with `/` and `@`; the space key absorbs the width difference so rows always sum to 10 units.
+  replace `,`: an email field with `@` in its place (the owner's request; long-press for `_ - + , & # %`, the
+  comma kept there for fields that take several addresses), a web-address field with `/` and `@`; the space
+  key absorbs any width difference so rows always sum to 10 units. A plain one-line text field whose hint,
+  label or name says "email" or "e-mail" is taken as an email field too (native apps pass a text field's
+  hint to the keyboard); a web page's text box says nothing but its type, so only `type="email"` counts
+  there.
 - **Numeric pad**: a 4-column pad (digits, backspace, `-`, `.`, `,`/`+` for phone, `#!`, enter) with
   long-press alternates for `+ * / # ( ) : ;`. Number, phone and date fields all use it.
 - **Code mode layout** (the owner's report: "?" was where muscle memory did not look): no study says where
