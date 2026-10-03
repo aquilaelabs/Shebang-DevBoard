@@ -44,6 +44,7 @@
 - Holding a lowercase letter offers its capital first in the row; sliding back down onto the key cancels the row and types the key itself (ee022cf)
 - A privacy policy, in Settings > About and in the repository: nothing leaves the phone, what is kept and how to delete it (84d8490)
 - Holding backspace deletes whole words after a second (setting: Hold backspace for whole words) (12a13dc)
+- Works with TalkBack: every key is spoken as you explore, and lifting on a key (or a double tap) types it (101122c)
 
 ### Changed
 

@@ -233,6 +233,14 @@ its own, locally:
 
 ## Decisions
 
+- **Screen readers** (R25): the keys are drawn on one canvas, so each is also a virtual view for TalkBack
+  (`KeyboardAccessibility`, an `ExploreByTouchHelper`): a finger exploring the keyboard hears each key
+  (the character, or "Delete", "Shift, caps lock", "Code mode", "Left"...), and lifting it on a key types
+  that key (lift-to-type, which TalkBack leaves to the keyboard, as AOSP's keyboard does it), or a double
+  tap types the focused key. Lift-to-type acts only while explore-by-touch is on, so a mouse hovering over
+  the keyboard types nothing. Glide, long-press rows and swipes are gestures exploration replaces, so they
+  are not offered then; the bar's chips, the strip, the panels and the mic are ordinary views with labels.
+  Checked with TalkBack on the emulator (typing, Delete, Space, Shift, a double tap typing once).
 - **Saving what the keyboard learns** (B10): learned words, tap and glide adaptation, email addresses and the
   clipboard history each save through one `JsonFile`: the new text goes to a temporary file, is synced to
   storage and replaces the old file in one atomic rename, so a crash or a full disk mid-save cannot damage
@@ -802,6 +810,8 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip offers "wiht",
       "with", "whit" (no check mark: space leaves the word); tapping "wiht" puts it back. *(verified on the
       emulator)*
+- [x] TalkBack on: exploring the keys speaks them, lifting types the key, a double tap types the focused
+      key once; Delete, Space and Shift work. *(verified on the emulator)*
 - [x] Hold backspace on a long sentence: after a second it deletes whole words and stops at a word's edge;
       with Hold backspace for whole words off it stops mid-word. *(verified on the emulator)*
 - [x] Type "see you soon " so predictions show, then clear the field from a hardware keyboard: the
