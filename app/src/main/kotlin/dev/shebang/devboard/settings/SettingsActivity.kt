@@ -304,6 +304,13 @@ fun SettingsScreen(
             }
             item {
                 ListItem(
+                    headlineContent = { Text("Privacy policy") },
+                    supportingContent = { Text("Nothing you type or say leaves your phone: the keyboard cannot connect to the internet. What it keeps, and how to delete it") },
+                    modifier = Modifier.clickable { onDoc("about/PRIVACY.md", "Privacy policy") },
+                )
+            }
+            item {
+                ListItem(
                     headlineContent = { Text("Export diagnostics") },
                     supportingContent = {
                         Text(

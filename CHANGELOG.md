@@ -42,6 +42,7 @@
 - Email addresses you type into email fields are remembered and offered on the strip as you type them again; turn it off in Settings > Learning, forget them in Personal words (d5dbf69)
 - Export diagnostics (Settings > About): a file to send the developer with your settings and how your taps and glides lean, leaving out learned words, email addresses, the clipboard, your terminal bar and anything typed (83479de)
 - Holding a lowercase letter offers its capital first in the row; sliding back down onto the key cancels the row and types the key itself (ee022cf)
+- A privacy policy, in Settings > About and in the repository: nothing leaves the phone, what is kept and how to delete it (84d8490)
 
 ### Changed
 
