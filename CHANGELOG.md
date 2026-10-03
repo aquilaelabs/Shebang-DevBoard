@@ -74,6 +74,7 @@
 - Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (4afa886)
 - Switching to code mode or the number pad no longer changes the keyboard's height (37d04b4)
 - Caps lock has its own shift glyph (two carets over a bar), so it no longer looks like one capital; backspace is drawn at the shift caret's thin weight (2c08853)
+- Shebang Voice has its own icon (the mic) instead of Android's default (eb90a44)
 
 ### Fixed
 

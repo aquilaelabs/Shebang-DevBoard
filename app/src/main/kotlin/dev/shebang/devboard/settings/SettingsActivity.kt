@@ -55,6 +55,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -350,7 +351,7 @@ private fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, value: 
 
 @Composable
 private fun SliderRow(title: String, valueLabel: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int, onChange: (Float) -> Unit) {
-    var local by remember(value) { mutableStateOf(value) }
+    var local by remember(value) { mutableFloatStateOf(value) }
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(title, style = MaterialTheme.typography.bodyLarge)
@@ -703,9 +704,9 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
     val context = LocalContext.current
     val store = remember { GlideTraceStore(context) }
     val scope = rememberCoroutineScope()
-    var count by remember { mutableStateOf(0) }
+    var count by remember { mutableIntStateOf(0) }
     var prompts by remember { mutableStateOf<List<String>>(emptyList()) }
-    var index by remember { mutableStateOf(0) }
+    var index by remember { mutableIntStateOf(0) }
     var confirmClear by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.count() }

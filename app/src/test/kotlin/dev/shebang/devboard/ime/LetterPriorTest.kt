@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import dev.shebang.devboard.dict.LetterPrior
 import dev.shebang.devboard.dict.NgramModelTest
@@ -35,7 +36,7 @@ class LetterPriorTest {
             }
         },
         Executor { it.run() },
-        Handler(),
+        Handler(Looper.getMainLooper()),
         postToMain = { it.run() },
     ).also {
         it.startInput(FieldInfo.from(inputType, 0))

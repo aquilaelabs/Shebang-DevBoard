@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -73,7 +74,7 @@ class EmailMemoryTest {
             override fun setComposing(composing: Boolean) = Unit
         },
         Executor { it.run() },
-        Handler(),
+        Handler(Looper.getMainLooper()),
         object : TextInputController.Learner {
             override fun learnWord(word: String, previous: String?, sentenceStart: Boolean) = Unit
             override fun learnGlide(observations: FloatArray) = Unit

@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.NgramModelTest
@@ -32,7 +33,7 @@ class FixPreviousGlideTest {
             override fun setComposing(composing: Boolean) = Unit
         },
         Executor { it.run() },
-        Handler(),
+        Handler(Looper.getMainLooper()),
         object : TextInputController.Learner {
             override fun learnWord(word: String, previous: String?, sentenceStart: Boolean) { learned += word }
             override fun learnGlide(observations: FloatArray) { glidesLearned += observations }

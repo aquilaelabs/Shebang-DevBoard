@@ -83,7 +83,7 @@ class DropDictationTest {
                 override fun setComposing(composing: Boolean) = Unit
             },
             java.util.concurrent.Executor { it.run() },
-            android.os.Handler(),
+            android.os.Handler(android.os.Looper.getMainLooper()),
             postToMain = { it.run() },
         ).also { it.startInput(FieldInfo.from(android.text.InputType.TYPE_CLASS_TEXT, 0)) }
         c.insertDictation("Call me now.")

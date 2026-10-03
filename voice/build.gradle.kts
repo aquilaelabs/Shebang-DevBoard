@@ -60,7 +60,7 @@ android {
     lint {
         abortOnError = true
         checkReleaseBuilds = false
-        disable += setOf("OldTargetApi", "GradleDependency", "AndroidGradlePluginVersion")
+        disable += setOf("OldTargetApi", "GradleDependency", "AndroidGradlePluginVersion", "ObsoleteSdkInt")
     }
 }
 

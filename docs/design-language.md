@@ -260,7 +260,7 @@ Keys are keycaps: a rounded face (radius 16% of the row height, clamped 4-12dp) 
 
 Applies to: icon
 
-Key glyphs are original, in a terminal idiom: backspace is a left chevron erasing toward a bar cursor, both at the caret's stroke weight, return a bent arrow ending in an open chevron, shift a caret that gains an underline while shift is on and becomes two carets over the underline for caps lock (which also fills the key with the accent). The #! launcher icon is original. The settings app uses Compose Material icons (Apache-2.0) for its own controls. No brand marks anywhere. The mic is a capsule on a cradle and stand with a block cursor for a foot.
+Key glyphs are original, in a terminal idiom: backspace is a left chevron erasing toward a bar cursor, both at the caret's stroke weight, return a bent arrow ending in an open chevron, shift a caret that gains an underline while shift is on and becomes two carets over the underline for caps lock (which also fills the key with the accent). The #! launcher icon is original; Shebang Voice's is the mic glyph in the same green on the same background. The settings app uses Compose Material icons (Apache-2.0) for its own controls. No brand marks anywhere. The mic is a capsule on a cradle and stand with a block cursor for a foot.
 
 ## Pages
 

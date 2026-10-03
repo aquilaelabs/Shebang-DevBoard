@@ -1007,7 +1007,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val accepted = info != null && androidx.core.view.inputmethod.EditorInfoCompat.getContentMimeTypes(info)
             .any { android.content.ClipDescription.compareMimeTypes(mime, it) }
         val conn = ic
-        if (!accepted || conn == null || info == null) {
+        if (!accepted || conn == null) {
             android.widget.Toast.makeText(this, "This field doesn't take pictures", android.widget.Toast.LENGTH_SHORT).show()
             return
         }
