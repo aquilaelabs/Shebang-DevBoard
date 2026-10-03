@@ -233,6 +233,11 @@ its own, locally:
 
 ## Decisions
 
+- **A local crash log** (R31): no crash reporting leaves the phone, so a crash used to leave no trace. The
+  app (`DevBoardApp`) records uncaught exceptions in `crash_log.json`: the exception types and stack frames
+  of the crash and its causes (30 frames, 12 per cause), never the messages, which can carry text the app was
+  handling; at most five distinct crashes, newest first, with how often each happened, and no dates. Export
+  diagnostics includes them, so a user can send them by choice. Checked on the emulator with `am crash`.
 - **Screen readers** (R25): the keys are drawn on one canvas, so each is also a virtual view for TalkBack
   (`KeyboardAccessibility`, an `ExploreByTouchHelper`): a finger exploring the keyboard hears each key
   (the character, or "Delete", "Shift, caps lock", "Code mode", "Left"...), and lifting it on a key types

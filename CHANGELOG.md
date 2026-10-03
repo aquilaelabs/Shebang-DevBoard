@@ -45,6 +45,7 @@
 - A privacy policy, in Settings > About and in the repository: nothing leaves the phone, what is kept and how to delete it (84d8490)
 - Holding backspace deletes whole words after a second (setting: Hold backspace for whole words) (12a13dc)
 - Works with TalkBack: every key is spoken as you explore, and lifting on a key (or a double tap) types it (101122c)
+- Crash reports stay on the phone (where the code failed, no messages or dates) and are included in Export diagnostics, so a crash can be sent by choice (a733a23)
 
 ### Changed
 

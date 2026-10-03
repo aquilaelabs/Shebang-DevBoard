@@ -21,6 +21,7 @@ All of it is in the app's private storage, which other apps cannot read. It is l
 - Clipboard history: up to 20 recent copies, text or pictures, each kept for 24 hours unless you pin it. Copies an app marks as sensitive (a password manager's, for example) are never kept.
 - Your settings, your terminal bars, and whether each app was last used in text or code mode.
 - Glides you record with Settings > Record glides, only if you use it. Only the words it prompts you to glide are recorded.
+- If the app crashes, where in its code it failed: up to five crash reports, with no text from the error or from anything you typed, and no dates.
 
 You can see and delete what was learned in Settings > Learning > Personal words: delete one word or email address, delete them all, go back to an earlier day, or reset tap and glide adaptation. The clipboard panel has Clear and a remove button on each copy.
 
@@ -42,6 +43,7 @@ It contains only:
 - how many words, word pairs and email addresses have been learned (counts, not the words or addresses)
 - how your taps and glides lean on each key, as numbers
 - glides you recorded with Record glides (the prompted words and the shape of each glide)
+- where the app crashed, if it did (the parts of its code that failed, without error messages)
 
 It does not contain anything you typed, your learned words, email addresses, your clipboard, your terminal bar keys or snippets, the names of apps you use, dates, or any account, serial number or other identifier for you or your phone.
 

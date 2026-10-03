@@ -26,6 +26,7 @@ class DiagnosticsExportTest {
         GlideAdaptation(null).exportJson(),
         GlideAdaptation(null).exportJson(),
         listOf(recording, "not json"),
+        listOf(dev.shebang.devboard.CrashLog.Crash("0.5.0", listOf("java.lang.IllegalStateException", "  at a.B.c(B.kt:1)"), 2)),
     )
 
     @Test
@@ -47,5 +48,6 @@ class DiagnosticsExportTest {
         // Recordings of prompted words come along; a damaged line is skipped.
         assertEquals(1, d["glideRecordings"]!!.jsonArray.size)
         assertEquals(DiagnosticsExport.LEFT_OUT.size, d["leftOut"]!!.jsonArray.size)
+        assertEquals(2, d["crashes"]!!.jsonArray.single().jsonObject["count"]!!.jsonPrimitive.int)
     }
 }

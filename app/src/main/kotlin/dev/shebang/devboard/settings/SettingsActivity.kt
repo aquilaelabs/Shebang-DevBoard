@@ -308,9 +308,9 @@ fun SettingsScreen(
                     headlineContent = { Text("Export diagnostics") },
                     supportingContent = {
                         Text(
-                            "Save a file to send to the developer if typing or gliding isn't working well: your settings, how your taps " +
-                                "and glides lean, and your recorded glides. Learned words, email addresses, the clipboard, your terminal " +
-                                "bar and anything you typed are left out."
+                            "Save a file to send to the developer if typing or gliding isn't working well, or the app crashed: your " +
+                                "settings, how your taps and glides lean, your recorded glides, and where the app crashed. Learned words, " +
+                                "email addresses, the clipboard, your terminal bar and anything you typed are left out."
                         )
                     },
                     modifier = Modifier.clickable { diagnosticsLauncher.launch("devboard-diagnostics.json") },
