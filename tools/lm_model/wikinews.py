@@ -12,6 +12,7 @@ in that folder; tools/lm_model/prep.py likewise).
 import bz2
 import re
 import sys
+
 # The dump is refused if it declares a DOCTYPE (see no_doctype), the only place entities can be defined, so
 # entity expansion and external entities cannot happen; Python's expat also ignores external entities and
 # caps expansion. defusedxml would add a dependency for no further protection here.
