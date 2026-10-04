@@ -3,6 +3,33 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **One-handed mode** (0.5.2): the keys take 77% of the width, docked left or right, and the space beside
+  them holds two large buttons: a chevron that moves the keys to the other side and a two-headed arrow
+  for full width. 77% puts the far edge within a thumb's reach on a 6.7-inch phone while each key stays
+  about as wide as a full keyboard's in landscape split view; the height is unchanged, so the app does not
+  move. The keys are laid out afresh for the narrower width (geometry, glide model, tap model), so glide
+  and autocorrect work as at full width; learned tap offsets are in key widths and carry over. The emoji
+  and clipboard panels still take the full width. It is a setting (Settings > Appearance > One-handed mode)
+  and a bar item, and the side is remembered while the mode is off.
+
+- **Editing from the bar goes through the app** (0.5.2): Undo, Redo, All, Cut, Copy and Paste ask the app
+  to do them (`InputConnection.performContextMenuAction`) instead of sending Ctrl+Z and friends. The old
+  default bar's Undo and Redo were Ctrl+Z keys, which a text field takes as undo but a terminal takes as
+  "suspend the job", and web pages and Compose fields often ignore. An app that does not take an action
+  (most terminals) gets nothing, except Paste, which then types the clipboard's text. They replace the
+  default bar's Undo and Redo; a bar already customised keeps what it has, and the editor's Action chip
+  adds any of them.
+
+- **A settings gear on the bar** (0.5.2): settings were reachable only from the launcher. The gear is the
+  default bar's third item, after emoji and clipboard, drawn as a single-colour glyph like them; it opens
+  settings in their own task and hides the keyboard.
+
+- **Adding a word by hand** (0.5.2): Settings > Learning > Personal words > Add a word. The word is known
+  at once (counted as used twice, the learning threshold), written as typed, and checked by the same rule
+  as learned words (2 to 32 letters, `'`, `-` and `_` inside), since the glide trie and the suggester work on
+  those. A word removed from the built-in dictionary is restored when added. Like learned words it can be
+  forgotten if it goes unused while thousands of others are learned (the 5,000-word cap); typing it keeps it.
+
 - **The Shebang mark** (the owner chose concept B of three): # and ! interlocked, the #'s bars cut parallel
   to the slanted ! with a 2.5-unit gap, so they break around it. The app icon draws the # in the accent
   green and the ! in white on the Night background; the #! key draws it in the key's text colour, so it

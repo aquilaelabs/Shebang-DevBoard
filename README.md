@@ -16,8 +16,11 @@ An Android keyboard (IME) for developers, written in Kotlin.
   they do in text mode; `%` and `^` are held on 5 and 6. No shift, no autocorrect.
 - **Terminal bar**: a horizontally scrolling strip of terminal keys (Esc, Tab, Ctrl, Alt, ^C, arrows, F1-F12,
   snippets...) that sends real `KeyEvent`s, so Termux and other terminals receive them. Sticky modifiers let
-  `Ctrl` then `c` on the main keyboard send Ctrl+C. Its first two items open the emoji panel and the
-  clipboard history (text and pictures, with pins).
+  `Ctrl` then `c` on the main keyboard send Ctrl+C. Its first items open the emoji panel, the
+  clipboard history (text and pictures, with pins) and settings; Undo, Redo, All, Cut, Copy and Paste ask
+  the app itself, so a terminal never gets a stray Ctrl+Z.
+- **One-handed mode**: the keys shrink to one side, with buttons beside them to switch sides or go back to
+  full width (from the bar or Settings > Appearance).
 - **Autocorrect that knows where you tapped**: a slip is weighed by where the finger came down, and the
   keyboard learns where your own taps land on each key.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no
@@ -28,7 +31,7 @@ An Android keyboard (IME) for developers, written in Kotlin.
   chips in the strip, in the keyboard's colours; tapping one fills the form.
 - **On-device only**: the sole permission is `VIBRATE`. No network code, no analytics. What the keyboard
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
-  deleted in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
+  deleted (or words added by hand) in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
   no-suggestion fields, or fields that ask for no learning. The one exception is email addresses typed into
   email fields, which are remembered so the strip can offer them again (Settings > Learning > Remember email
   addresses turns this off).
@@ -65,7 +68,7 @@ Rebuilding the word list, the word statistics and the models: [docs/data-and-mod
 |---|---|
 | `ime` | `DevBoardService` (the `InputMethodService`), `FieldInfo` (EditorInfo -> what the field allows), `TextInputController` (composing, suggestions, smart spacing, redoing a tapped word, what is learned when), `GlideText` (context word and casing), `LanguageLoader` and `LanguageBuilder` (background load and rebuilds with learned words), `SystemUserDictionary` (Android's personal dictionary), `ClipboardHistory` and `ClipboardChip`, `EmailMemory` (remembered addresses), `VoiceClient` (the Shebang Voice add-on) and `DictationCleanup`, `LayoutRepository`, `KeyboardSizing`, `Feedback` |
 | `layout` | JSON models (`LayoutDef`, `KeyDef`, `BarItem`), `LayoutParser`, `KeyboardGeometry` (pixel positions computed at runtime), `KeyCodeNames` |
-| `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `KeyIcons` (the key glyphs), `TerminalBarView`, `SuggestionStripView`, `AutofillStripView`, `TopStripView`, `EmojiPanelView`, `ClipboardPanelView` and `PanelKeys`, `MicButton`, `KeyboardTheme` and `Palettes` |
+| `view` | `KeyboardView` (one Canvas-drawn view with its own multitouch), `KeyPopup` (preview and alternates), `KeyIcons` (the key glyphs), `TerminalBarView`, `OneHandedPanelView`, `SuggestionStripView`, `AutofillStripView`, `TopStripView`, `EmojiPanelView`, `ClipboardPanelView` and `PanelKeys`, `MicButton`, `KeyboardTheme` and `Palettes` |
 | `input` | `ModifierState` (sticky modifier state machine), `CharKeyCodes` and `KeyEventPlan` (character -> keycode plans), `KeySender` (down/up KeyEvents with meta state) |
 | `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideModel` (the learned reading of strokes), `GlideSession` (decoder thread fed by a lock-free ring), `GlideAdaptation` and `TapModel` (where this user's glides and taps land), `GlideTrace` (recorded glides), `KeyLayoutModel` |
 | `dict` | `Dictionary` (sorted word list with tiers), `PersonalWords` (learned words), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |

@@ -41,6 +41,8 @@ class SettingsRepository(context: Context) {
             palette = p[Keys.PALETTE] ?: d.palette,
             heightScale = (p[Keys.HEIGHT_SCALE] ?: d.heightScale).coerceIn(0.7f, 1.4f),
             numberRow = p[Keys.NUMBER_ROW] ?: d.numberRow,
+            oneHanded = p[Keys.ONE_HANDED] ?: d.oneHanded,
+            oneHandedLeft = p[Keys.ONE_HANDED_LEFT] ?: d.oneHandedLeft,
             keyPreview = p[Keys.KEY_PREVIEW] ?: d.keyPreview,
             haptics = p[Keys.HAPTICS] ?: d.haptics,
             hapticStrength = (p[Keys.HAPTIC_STRENGTH] ?: d.hapticStrength).coerceIn(1, 3),
@@ -70,6 +72,8 @@ class SettingsRepository(context: Context) {
         p[Keys.PALETTE] = s.palette
         p[Keys.HEIGHT_SCALE] = s.heightScale
         p[Keys.NUMBER_ROW] = s.numberRow
+        p[Keys.ONE_HANDED] = s.oneHanded
+        p[Keys.ONE_HANDED_LEFT] = s.oneHandedLeft
         p[Keys.KEY_PREVIEW] = s.keyPreview
         p[Keys.HAPTICS] = s.haptics
         p[Keys.HAPTIC_STRENGTH] = s.hapticStrength
@@ -98,6 +102,8 @@ class SettingsRepository(context: Context) {
         val PALETTE = stringPreferencesKey("keyboard_theme")
         val HEIGHT_SCALE = floatPreferencesKey("height_scale")
         val NUMBER_ROW = booleanPreferencesKey("number_row")
+        val ONE_HANDED = booleanPreferencesKey("one_handed")
+        val ONE_HANDED_LEFT = booleanPreferencesKey("one_handed_left")
         val KEY_PREVIEW = booleanPreferencesKey("key_preview")
         val HAPTICS = booleanPreferencesKey("haptics")
         val HAPTIC_STRENGTH = intPreferencesKey("haptic_strength")

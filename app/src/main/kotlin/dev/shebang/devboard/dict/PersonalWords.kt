@@ -226,6 +226,39 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         if (words.size > MAX_WORDS || pairs.size > MAX_PAIRS) evict(day)
     }
 
+    /**
+     * Adds [word] by hand (Settings > Personal words): a word at once, offered, glided and corrected to like
+     * one used [NEW_WORD_THRESHOLD] times, and written as given ("GitHub" keeps its capitals). Adding a word
+     * already learned makes it known and takes the new spelling. Returns false for a word [isLearnable] refuses.
+     */
+    @Synchronized
+    fun add(word: String): Boolean {
+        val w = word.trim()
+        if (!isLearnable(w)) return false
+        load()
+        val lower = w.lowercase()
+        val day = today()
+        snapshotBefore(day)
+        val e = words[lower]
+        if (e == null) {
+            words[lower] = Entry(w, NEW_WORD_THRESHOLD, day, true)
+            total += NEW_WORD_THRESHOLD
+        } else {
+            if (e.count < NEW_WORD_THRESHOLD) {
+                total += NEW_WORD_THRESHOLD - e.count
+                e.count = NEW_WORD_THRESHOLD
+            }
+            e.display = w
+            e.lastDay = day
+            e.known = true
+        }
+        dirty = true
+        vocabularyVersion++
+        countsVersion++
+        if (words.size > MAX_WORDS) evict(day)
+        return true
+    }
+
     @Synchronized
     fun delete(lower: String) {
         load()

@@ -6,7 +6,7 @@ import kotlinx.serialization.json.Json
 /** One item on the terminal bar. Flat shape so the editor and import/export stay simple. */
 @Serializable
 data class BarItem(
-    /** "key", "modifier", "snippet", or a panel: "emoji" or "clipboard". */
+    /** "key", "modifier", "snippet", a panel ("emoji" or "clipboard"), or an "action". */
     val type: String,
     val label: String,
     /** key: keycode name from [KeyCodeNames]. */
@@ -19,12 +19,18 @@ data class BarItem(
     val text: String? = null,
     /** key: repeats while held (arrows, Del). */
     val repeat: Boolean = false,
+    /** action: one of [ACTIONS] (undo, copy, settings...). */
+    val action: String? = null,
 ) {
     val isKey: Boolean get() = type == TYPE_KEY
     val isModifier: Boolean get() = type == TYPE_MODIFIER
     val isSnippet: Boolean get() = type == TYPE_SNIPPET
     /** Opens a panel in place of the keys (the emoji or the clipboard history). */
     val isPanel: Boolean get() = type == TYPE_EMOJI || type == TYPE_CLIPBOARD
+    /** Something the keyboard does: an edit on the app's text (undo, cut, paste...), settings, one-handed mode. */
+    val isAction: Boolean get() = type == TYPE_ACTION
+    /** Drawn as a single-colour glyph rather than its label: the panels, settings and one-handed mode. */
+    val hasGlyph: Boolean get() = isPanel || (isAction && (action == ACTION_SETTINGS || action == ACTION_ONE_HANDED))
 
     fun validate() {
         when (type) {
@@ -35,6 +41,7 @@ data class BarItem(
             TYPE_MODIFIER -> requireNotNull(mod) { "modifier '$label' needs a mod" }
             TYPE_SNIPPET -> requireNotNull(text) { "snippet '$label' needs text" }
             TYPE_EMOJI, TYPE_CLIPBOARD -> Unit
+            TYPE_ACTION -> require(action in ACTIONS) { "action '$label' has unknown action $action" }
             else -> throw IllegalArgumentException("unknown bar item type '$type'")
         }
         require(label.isNotBlank()) { "bar item has an empty label" }
@@ -46,6 +53,28 @@ data class BarItem(
         const val TYPE_SNIPPET = "snippet"
         const val TYPE_EMOJI = "emoji"
         const val TYPE_CLIPBOARD = "clipboard"
+        const val TYPE_ACTION = "action"
+
+        const val ACTION_UNDO = "undo"
+        const val ACTION_REDO = "redo"
+        const val ACTION_SELECT_ALL = "select_all"
+        const val ACTION_CUT = "cut"
+        const val ACTION_COPY = "copy"
+        const val ACTION_PASTE = "paste"
+        const val ACTION_SETTINGS = "settings"
+        const val ACTION_ONE_HANDED = "one_handed"
+
+        /** Every action, in the editor's order, with its default label and what it does. */
+        val ACTIONS: Map<String, Pair<String, String>> = linkedMapOf(
+            ACTION_UNDO to ("Undo" to "Undoes the last edit in the app"),
+            ACTION_REDO to ("Redo" to "Redoes what Undo took back"),
+            ACTION_SELECT_ALL to ("All" to "Selects all the text"),
+            ACTION_CUT to ("Cut" to "Cuts the selection"),
+            ACTION_COPY to ("Copy" to "Copies the selection"),
+            ACTION_PASTE to ("Paste" to "Pastes what is on the clipboard"),
+            ACTION_SETTINGS to ("Settings" to "Opens the keyboard's settings"),
+            ACTION_ONE_HANDED to ("One-handed" to "Turns one-handed mode on or off"),
+        )
 
         fun key(label: String, code: String, vararg mods: String, repeat: Boolean = false) =
             BarItem(TYPE_KEY, label, code = code, mods = mods.toList(), repeat = repeat)
@@ -54,6 +83,7 @@ data class BarItem(
         fun snippet(label: String, text: String) = BarItem(TYPE_SNIPPET, label, text = text)
         fun emoji(label: String = "😀") = BarItem(TYPE_EMOJI, label)
         fun clipboard(label: String = "📋") = BarItem(TYPE_CLIPBOARD, label)
+        fun action(action: String, label: String = ACTIONS[action]?.first ?: action) = BarItem(TYPE_ACTION, label, action = action)
     }
 }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
@@ -40,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.ime.EmailMemory
 import dev.shebang.devboard.dict.PersonalWord
 import dev.shebang.devboard.dict.PersonalWords
+import dev.shebang.devboard.dict.RemovedWords
 import dev.shebang.devboard.glide.GlideAdaptation
 import dev.shebang.devboard.glide.SpaceHabit
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +74,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     var choosingDay by remember { mutableStateOf(false) }
     var confirmDay by remember { mutableStateOf<Int?>(null) }
     var query by remember { mutableStateOf("") }
+    var adding by remember { mutableStateOf(false) }
 
     fun refresh() {
         scope.launch {
@@ -108,6 +111,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             TopAppBar(
                 title = { Text("Personal words") },
                 navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+                actions = { IconButton(onClick = { adding = true }) { Icon(Icons.Filled.Add, contentDescription = "Add a word") } },
             )
             // Under the title, so the matches show below it while the keyboard is up.
             if (!words.isNullOrEmpty()) {
@@ -136,6 +140,14 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                         "no learning. A new word is glidable after you use it twice.",
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+            }
+            if (!searching) item {
+                ListItem(
+                    headlineContent = { Text("Add a word") },
+                    supportingContent = { Text("A name, a project or a term the keyboard should know: offered, glided and corrected to from now on.") },
+                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    modifier = Modifier.clickable { adding = true },
                 )
             }
             if (!searching) item {
@@ -257,6 +269,21 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
         }
     }
 
+    if (adding) {
+        AddWordDialog(
+            onDismiss = { adding = false },
+            onAdd = { word ->
+                adding = false
+                change {
+                    personal.add(word)
+                    // A word deleted from the built-in dictionary comes back when added by hand.
+                    val removed = RemovedWords.get(context.filesDir)
+                    val lower = word.trim().lowercase()
+                    removed.snapshot().filter { it.lowercase() == lower }.forEach { removed.restore(it) }
+                }
+            },
+        )
+    }
     if (confirmClearEmails) {
         AlertDialog(
             onDismissRequest = { confirmClearEmails = false },
@@ -313,6 +340,40 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
     }
+}
+
+/** A word typed by hand, checked as the keyboard checks what it learns. */
+@Composable
+private fun AddWordDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
+    var word by remember { mutableStateOf("") }
+    val w = word.trim()
+    val ok = PersonalWords.isLearnable(w)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add a word") },
+        text = {
+            OutlinedTextField(
+                value = word,
+                onValueChange = { word = it },
+                label = { Text("Word") },
+                singleLine = true,
+                isError = w.isNotEmpty() && !ok,
+                supportingText = {
+                    Text(
+                        if (w.isNotEmpty() && !ok) "2 to 32 letters; ' - and _ may go between them. No digits or spaces."
+                        else "Written as you type it here: GitHub keeps its capitals.",
+                    )
+                },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    autoCorrectEnabled = false,
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                ),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (ok) onAdd(w) }),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onAdd(w) }, enabled = ok) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"

@@ -80,3 +80,14 @@ Layout:
       *(verified on the emulator)*
 - [x] A copied picture pasted from the clipboard history into an app that takes pictures. *(verified on the
       owner's phone)*
+
+Usability items (0.5.2):
+- [x] Bar editing in an Android text field (Contacts): Undo empties typed text, Redo brings it back, All then
+      Cut empties the field, Paste puts the clipboard at the cursor. *(verified on the API 36 emulator)*
+- [x] The gear on the bar opens Settings. *(verified)*
+- [x] One-handed mode, from Settings > Appearance: keys docked right with the side panel on the left; the
+      chevron moves them left; the two-headed arrow goes back to full width; gliding "the" on the narrow
+      keys writes it. *(verified)*
+- [x] Personal words > Add a word: "k8s" is refused with the rule shown; "Zorbly" is added as used twice and
+      the strip offers it after typing "zorb". *(verified)*
+- [ ] Undo and Paste in a web page (Firefox or Chrome) and in Termux (Paste types the clipboard there).

@@ -42,11 +42,27 @@ object KeyIcons {
     private const val CLIPBOARD = "M5 5 H7 V21.5 H5 Z M17 5 H19 V21.5 H17 Z M7 19.5 H17 V21.5 H7 Z " +
         "M7 5 H9 V7 H7 Z M15 5 H17 V7 H15 Z M9 3 H15 V8 H9 Z M9 11 H15 V12.6 H9 Z M9 14.6 H13 V16.2 H9 Z"
 
+    /** A gear with eight teeth and a round hole (even-odd): settings. */
+    private const val GEAR = "M12.90 5.16 L14.25 2.98 L16.79 4.03 L16.20 6.53 L17.47 7.80 L19.97 7.21 L21.02 9.75 L18.84 11.10 L18.84 12.90 L21.02 14.25 L19.97 16.79 L17.47 16.20 L16.20 17.47 L16.79 19.97 L14.25 21.02 L12.90 18.84 L11.10 18.84 L9.75 21.02 L7.21 19.97 L7.80 17.47 L6.53 16.20 L4.03 16.79 L2.98 14.25 L5.16 12.90 L5.16 11.10 L2.98 9.75 L4.03 7.21 L6.53 7.80 L7.80 6.53 L7.21 4.03 L9.75 2.98 L11.10 5.16 Z M12 9 A3 3 0 1 0 12 15 A3 3 0 1 0 12 9 Z"
+
+    /** A phone's outline with a small block of keys inside, low and to one side: one-handed mode. */
+    private const val ONE_HANDED = "M5 2 H19 V22 H5 Z M7 4 V20 H17 V4 Z M8.5 12.5 H14 V18.5 H8.5 Z"
+
+    /** One-handed mode's side panel: a chevron toward the side the keys move to, and a two-headed arrow for full width. */
+    private const val DOCK_LEFT = "M14.6 4.5 L16 5.9 L9.9 12 L16 18.1 L14.6 19.5 L7.1 12 Z"
+    private const val DOCK_RIGHT = "M9.4 4.5 L16.9 12 L9.4 19.5 L8 18.1 L14.1 12 L8 5.9 Z"
+    private const val FULL_WIDTH = "M2.5 12 L7.5 7 L8.9 8.4 L6.3 11 H17.7 L15.1 8.4 L16.5 7 L21.5 12 L16.5 17 L15.1 15.6 L17.7 13 H6.3 L8.9 15.6 L7.5 17 Z"
+
     val backspace: Path = PathParser.createPathFromPathData(BACKSPACE)
     val shebang: Path = PathParser.createPathFromPathData(SHEBANG)
     val emoji: Path = PathParser.createPathFromPathData(EMOJI).apply { fillType = Path.FillType.EVEN_ODD }
     val clipboard: Path = PathParser.createPathFromPathData(CLIPBOARD)
     val mic: Path = PathParser.createPathFromPathData(MIC)
+    val gear: Path = PathParser.createPathFromPathData(GEAR).apply { fillType = Path.FillType.EVEN_ODD }
+    val oneHanded: Path = PathParser.createPathFromPathData(ONE_HANDED).apply { fillType = Path.FillType.EVEN_ODD }
+    val dockLeft: Path = PathParser.createPathFromPathData(DOCK_LEFT)
+    val dockRight: Path = PathParser.createPathFromPathData(DOCK_RIGHT)
+    val fullWidth: Path = PathParser.createPathFromPathData(FULL_WIDTH)
     val enter: Path = PathParser.createPathFromPathData(RETURN)
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
     val shiftOn: Path = PathParser.createPathFromPathData(SHIFT_ON)

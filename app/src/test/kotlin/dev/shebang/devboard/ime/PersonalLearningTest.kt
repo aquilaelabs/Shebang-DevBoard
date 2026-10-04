@@ -41,6 +41,32 @@ class PersonalLearningTest {
     }
 
     @Test
+    fun anAddedWordIsKnownAtOnceAndWrittenAsGiven() {
+        val f = tempFile()
+        val p = PersonalWords(f)
+        val v0 = p.vocabularyVersion
+        assertTrue(p.add(" GitHub "))
+        val w = p.list().single()
+        assertEquals("GitHub", w.display)
+        assertTrue(w.known)
+        assertEquals(PersonalWords.NEW_WORD_THRESHOLD, w.count)
+        assertEquals(v0 + 1, p.vocabularyVersion)
+        // A word seen once is not yet known; adding it by hand makes it one, with the new spelling.
+        p.learn("kubectl", null, false, inDictionary)
+        assertTrue(p.add("Kubectl"))
+        val k = p.list().first { it.lower == "kubectl" }
+        assertTrue(k.known)
+        assertEquals("Kubectl", k.display)
+        assertEquals(PersonalWords.NEW_WORD_THRESHOLD, k.count)
+        // Refused like anything the keyboard would not learn.
+        assertFalse(p.add("k8s"))
+        assertFalse(p.add("x"))
+        assertEquals(2, p.list().size)
+        p.save()
+        assertEquals(setOf("GitHub", "Kubectl"), PersonalWords(f).list().map { it.display }.toSet())
+    }
+
+    @Test
     fun dictionaryWordsAreKnownAtOnceAndOnlyCounted() {
         val p = PersonalWords(null)
         val v0 = p.vocabularyVersion

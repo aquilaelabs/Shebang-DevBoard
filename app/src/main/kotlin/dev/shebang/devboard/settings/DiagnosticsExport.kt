@@ -93,6 +93,7 @@ object DiagnosticsExport {
             "palette" to JsonPrimitive(s.palette),
             "heightScale" to JsonPrimitive(s.heightScale),
             "numberRow" to JsonPrimitive(s.numberRow),
+            "oneHanded" to JsonPrimitive(if (!s.oneHanded) "off" else if (s.oneHandedLeft) "left" else "right"),
             "keyPreview" to JsonPrimitive(s.keyPreview),
             "haptics" to JsonPrimitive(s.haptics),
             "hapticStrength" to JsonPrimitive(s.hapticStrength),

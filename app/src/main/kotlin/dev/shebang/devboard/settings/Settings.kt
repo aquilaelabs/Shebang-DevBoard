@@ -17,6 +17,10 @@ data class Settings(
     /** Multiplier on the base row height, 0.7..1.4. */
     val heightScale: Float = 1.0f,
     val numberRow: Boolean = false,
+    /** One-handed mode: narrower keys docked to one side ([oneHandedLeft]), a side panel in the space left. */
+    val oneHanded: Boolean = false,
+    /** One-handed mode docks the keys on the left; otherwise on the right. Kept while the mode is off. */
+    val oneHandedLeft: Boolean = false,
     val keyPreview: Boolean = true,
     val haptics: Boolean = true,
     /** 1 = light, 2 = medium, 3 = strong. */

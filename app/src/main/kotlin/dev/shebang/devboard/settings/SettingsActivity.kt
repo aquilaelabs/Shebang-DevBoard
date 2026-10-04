@@ -193,6 +193,14 @@ fun SettingsScreen(
             }
             item { SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } } }
             item { SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } } }
+            item {
+                // Also from the bar's one-handed item, and the side panel's arrows while it is on.
+                ChoiceRow(
+                    "One-handed mode",
+                    listOf("off" to "Off", "left" to "Left", "right" to "Right"),
+                    if (!settings.oneHanded) "off" else if (settings.oneHandedLeft) "left" else "right",
+                ) { v -> update { if (v == "off") it.copy(oneHanded = false) else it.copy(oneHanded = true, oneHandedLeft = v == "left") } }
+            }
 
             item { SectionHeader("Feedback") }
             item { SwitchRow("Haptics", "Vibrate on key press", settings.haptics) { v -> update { it.copy(haptics = v) } } }
@@ -530,12 +538,12 @@ fun BarEditorScreen(
                         )
                     },
                     headlineContent = {
-                        if (item.isPanel) {
+                        if (item.hasGlyph) {
                             // The same single-colour glyph the bar draws, with a name.
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                BarGlyph(if (item.type == BarItem.TYPE_EMOJI) dev.shebang.devboard.view.KeyIcons.emoji else dev.shebang.devboard.view.KeyIcons.clipboard)
+                                BarGlyph(dev.shebang.devboard.view.TerminalBarView.glyphFor(item))
                                 Spacer(Modifier.width(10.dp))
-                                Text(if (item.type == BarItem.TYPE_EMOJI) "Emoji" else "Clipboard")
+                                Text(dev.shebang.devboard.view.TerminalBarView.glyphName(item))
                             }
                         } else {
                             Text(item.label)
@@ -589,6 +597,7 @@ private fun BarGlyph(path: android.graphics.Path) {
 private fun describe(item: BarItem): String = when {
     item.type == BarItem.TYPE_EMOJI -> "Opens the emoji panel"
     item.type == BarItem.TYPE_CLIPBOARD -> "Opens the clipboard history"
+    item.isAction -> BarItem.ACTIONS[item.action]?.second ?: "Action"
     item.isModifier -> "Sticky modifier: ${item.mod}"
     item.isSnippet -> "Snippet: \"${item.text}\""
     else -> buildString {
@@ -635,6 +644,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
     var repeat by remember { mutableStateOf(false) }
     var mod by remember { mutableStateOf("ctrl") }
     var text by remember { mutableStateOf("") }
+    var action by remember { mutableStateOf(BarItem.ACTION_UNDO) }
 
     val item: BarItem? = runCatching {
         when (type) {
@@ -642,6 +652,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
             BarItem.TYPE_MODIFIER -> BarItem.modifier(label.ifBlank { mod.replaceFirstChar(Char::uppercase) }, mod)
             BarItem.TYPE_EMOJI -> if (label.isBlank()) BarItem.emoji() else BarItem.emoji(label)
             BarItem.TYPE_CLIPBOARD -> if (label.isBlank()) BarItem.clipboard() else BarItem.clipboard(label)
+            BarItem.TYPE_ACTION -> if (label.isBlank()) BarItem.action(action) else BarItem.action(action, label)
             else -> BarItem.snippet(label.ifBlank { text.trim() }, text)
         }.also { it.validate() }
     }.getOrNull()
@@ -659,7 +670,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard")) {
+                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard", BarItem.TYPE_ACTION to "Action")) {
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
                     }
                 }
@@ -688,6 +699,13 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     }
                     BarItem.TYPE_EMOJI -> Text("Opens the emoji panel in place of the keys.")
                     BarItem.TYPE_CLIPBOARD -> Text("Opens your recent copies in place of the keys.")
+                    BarItem.TYPE_ACTION -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // Three to a row: the edits, then settings and one-handed mode.
+                        for (row in BarItem.ACTIONS.keys.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (a in row) FilterChip(selected = action == a, onClick = { action = a }, label = { Text(BarItem.ACTIONS.getValue(a).first) })
+                        }
+                        Text(BarItem.ACTIONS.getValue(action).second + ".")
+                    }
                     else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Text to insert") })
                 }
                 Spacer(Modifier.width(1.dp))
