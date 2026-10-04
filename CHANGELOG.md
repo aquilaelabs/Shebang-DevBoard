@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (03a62b7)
+
+### Fixed
+
+- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (03a62b7)
+
 ## 0.5.2: 2026-10-03
 
 ### Added
