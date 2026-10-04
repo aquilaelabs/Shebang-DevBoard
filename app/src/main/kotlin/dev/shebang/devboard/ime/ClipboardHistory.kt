@@ -80,7 +80,7 @@ class ClipboardHistory(private val file: File?, private val now: () -> Long = { 
             "image/webp" -> "webp"
             else -> "jpg"
         }
-        val name = sha1(bytes).take(20) + "." + ext
+        val name = contentName(bytes) + "." + ext
         dir.mkdirs()
         val f = File(dir, name)
         if (!f.exists()) f.writeBytes(bytes)
@@ -148,8 +148,9 @@ class ClipboardHistory(private val file: File?, private val now: () -> Long = { 
         return items.size != before.size
     }
 
-    private fun sha1(bytes: ByteArray): String =
-        java.security.MessageDigest.getInstance("SHA-1").digest(bytes).joinToString("") { "%02x".format(it) }
+    /** A picture's file name from its content, so the same picture copied again is kept once. */
+    private fun contentName(bytes: ByteArray): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(bytes).take(20).joinToString("") { "%02x".format(it) }
 
     companion object {
         const val FILE = "clipboard_history.json"
