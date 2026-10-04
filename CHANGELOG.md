@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (193d0be)
+
 ### Changed
 
 - Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (03a62b7)
