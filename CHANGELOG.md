@@ -1,27 +1,22 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- One-handed mode: the keys shrink to the left or right side, with buttons beside them to switch sides or go back to full width (Settings > Appearance, or a terminal bar item) (8f59889)
-- Undo, Redo, Select all, Cut, Copy and Paste on the terminal bar, done by the app itself so a terminal never gets a stray Ctrl+Z (8f59889)
-- A settings gear on the terminal bar (8f59889)
-- Settings > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (8f59889)
-
-### Changed
-
-- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
-- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (3103ff7)
-- The setup screen shows your progress through the three steps, and finished steps fold away (3103ff7)
-
-## 0.5.1: 2026-10-03
+## 0.5.2: 2026-10-03
 
 ### Added
 
 - Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (78c89c1)
 - Settings > Learning > Built-in dictionary: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (21762e3)
 - Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (6764977)
+- One-handed mode: the keys shrink to the left or right side, with buttons beside them to switch sides or go back to full width (Settings > Appearance, or a terminal bar item) (3103ff7)
+- Undo, Redo, Select all, Cut, Copy and Paste on the terminal bar, done by the app itself so a terminal never gets a stray Ctrl+Z (3103ff7)
+- A settings gear on the terminal bar (3103ff7)
+- Settings > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (3103ff7)
+
+### Changed
+
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
+- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (dc18e4b)
+- The setup screen shows your progress through the three steps, and finished steps fold away (dc18e4b)
 
 ### Fixed
 
