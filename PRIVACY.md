@@ -42,6 +42,7 @@ It contains only:
 - your settings, with terminal bars recorded only as customised or not
 - how many words, word pairs and email addresses have been learned (counts, not the words or addresses)
 - how your taps and glides lean on each key, as numbers
+- how your last 500 glides ended up, as counts by word length: kept, fixed from the suggestions, glided again, edited or deleted (never the words)
 - glides you recorded with Record glides (the prompted words and the shape of each glide)
 - where the app crashed, if it did (the parts of its code that failed, without error messages)
 

@@ -6,6 +6,7 @@
 
 - Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (65298e0)
 - Settings > Learning > Built-in dictionary: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (78c89c1)
+- Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (21762e3)
 
 ### Fixed
 

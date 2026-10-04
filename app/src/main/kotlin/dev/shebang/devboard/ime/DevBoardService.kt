@@ -32,6 +32,7 @@ import androidx.core.view.WindowInsetsCompat
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.SpaceHabit
+import dev.shebang.devboard.glide.GlideOutcomes
 import dev.shebang.devboard.glide.GlideAdaptation
 import dev.shebang.devboard.glide.TapModel
 import dev.shebang.devboard.glide.PathMatch
@@ -85,6 +86,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private lateinit var feedback: Feedback
     /** Whether letters turning into spaces helps this user, and a space made so whose fate the next key tells. */
     private lateinit var spaceHabit: SpaceHabit
+    /** How recent glides ended up, for the diagnostics. */
+    private lateinit var glideOutcomes: GlideOutcomes
     private var spaceCheckPending = false
     private lateinit var text: TextInputController
     private val main = Handler(Looper.getMainLooper())
@@ -186,6 +189,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         )
         feedback = Feedback(this)
         spaceHabit = SpaceHabit.get(filesDir)
+        glideOutcomes = GlideOutcomes.get(filesDir)
         text = TextInputController({ currentInputConnection }, this, background, main, this)
         // Identifiers from the text are scored against a glide on the current key layout.
         text.identifierScorer = { stroke, letters -> geometry?.let { PathMatch.cost(glideModelFor(it), stroke, letters) } }
@@ -265,6 +269,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             adaptation.save()
             tapAdaptation.save()
             spaceHabit.save()
+            glideOutcomes.save()
         }
         val b = bundle ?: return
         if (personal.vocabularyVersion != b.vocabularyVersion || personal.countsVersion - b.countsVersion >= REBUILD_AFTER_WORDS) {
@@ -281,6 +286,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun learnTaps(observations: FloatArray) {
         if (!settings.adaptTaps) return
         background.execute { tapAdaptation.learn(observations) }
+    }
+
+    override fun glideOutcome(outcome: Int, letters: Int) {
+        glideOutcomes.add(outcome, letters)
     }
 
     override fun learnGlide(observations: FloatArray) {

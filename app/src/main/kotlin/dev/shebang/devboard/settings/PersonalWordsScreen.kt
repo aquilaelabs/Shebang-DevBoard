@@ -309,7 +309,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset glide and tap adaptation?") },
             text = { Text("Gliding and autocorrect go back to the keyboard's defaults and start learning your swipes and taps again.") },
-            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset(); SpaceHabit.get(context.filesDir).reset() } }) { Text("Reset") } },
+            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset(); SpaceHabit.get(context.filesDir).reset(); dev.shebang.devboard.glide.GlideOutcomes.get(context.filesDir).reset() } }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
     }

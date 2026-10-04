@@ -7,6 +7,7 @@ import android.view.inputmethod.EditorInfo
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.NgramModel
 import dev.shebang.devboard.dict.NgramModelTest
+import dev.shebang.devboard.glide.GlideOutcomes
 import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideWord
 import org.junit.Assert.assertEquals
@@ -30,6 +31,7 @@ class GlideCommitTest {
     private val learned = ArrayList<Triple<String, String?, Boolean>>()
     private val glidesLearned = ArrayList<FloatArray>()
     private val corrections = ArrayList<Pair<FloatArray?, Int>>()
+    private val outcomes = ArrayList<Int>()
 
     private val controller = TextInputController(
         { ic },
@@ -50,6 +52,9 @@ class GlideCommitTest {
             }
             override fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary) {
                 corrections += stroke to word
+            }
+            override fun glideOutcome(outcome: Int, letters: Int) {
+                outcomes += outcome
             }
         },
     ).also {
@@ -570,5 +575,55 @@ class GlideCommitTest {
         controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 0))
         type("someone ")
         assertTrue(learned.isEmpty())
+    }
+
+    // ---- How glides end up (for the diagnostics) -------------------------------------------------------
+
+    @Test
+    fun keptGlidesAreCountedWhenTheyAreFinal() {
+        glide("hello")
+        glide("world")
+        assertTrue(outcomes.isEmpty())
+        leaveField()
+        assertEquals(listOf(GlideOutcomes.KEPT, GlideOutcomes.KEPT), outcomes)
+    }
+
+    @Test
+    fun aGlideDeletedRightAwayCountsAsDeleted() {
+        glide("hello")
+        controller.backspace()
+        leaveField()
+        assertEquals(listOf(GlideOutcomes.DELETED), outcomes)
+    }
+
+    @Test
+    fun aStripSwapCountsAsFixedFromTheStrip() {
+        glide("form", runnersUp = listOf("from"))
+        controller.pickCandidate("from")
+        leaveField()
+        assertEquals(listOf(GlideOutcomes.STRIP), outcomes)
+    }
+
+    @Test
+    fun aWordGlidedAgainCountsOnceAsGlidedAgain() {
+        glide("hello")
+        glide("there")
+        userMovesCursor(2)
+        glide("help")
+        leaveField()
+        assertEquals(1, outcomes.count { it == GlideOutcomes.REDONE })
+        assertEquals(2, outcomes.count { it == GlideOutcomes.KEPT })
+        assertEquals(3, outcomes.size)
+    }
+
+    @Test
+    fun aWordFixedAfterItWasFinalIsNotCountedAgain() {
+        glide("hello")
+        leaveField()
+        userMovesCursor(2)
+        glide("help")
+        leaveField()
+        // hello was kept (its outcome is in); help, glided over it later, is a new glide of its own.
+        assertEquals(listOf(GlideOutcomes.KEPT, GlideOutcomes.KEPT), outcomes)
     }
 }

@@ -3,6 +3,15 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **Glide accuracy from real use** (the owner's question: can the keyboard measure it from the fixes?):
+  each glided word gets one outcome once it is final (the 8-word hold, or the field changing):
+  kept, fixed from the strip (a swap right after, or a pick after tapping into it), glided again, edited
+  (typed or backspaced into), deleted (backspace right after the glide, or a swipe-delete), or fixed by the
+  next glide. `GlideOutcomes` keeps the outcome and the word's length for the last 500, never the word, and
+  Export diagnostics reports them overall and by length; not where an app asks keyboards not to learn.
+  What it cannot see counts as kept: a fix after leaving the field or past the hold, and a wrong word never
+  noticed, so the real error rate is a little higher than it shows; a deletion may be a change of mind.
+
 - **The built-in dictionary can be edited** (the owner's design): Settings > Learning > Built-in dictionary
   lists the bundled words (search by prefix) with a delete button each; Removed lists the deleted ones with
   Restore and Restore all. Removed words (`RemovedWords`, exact spellings in `removed_words.json`) are left

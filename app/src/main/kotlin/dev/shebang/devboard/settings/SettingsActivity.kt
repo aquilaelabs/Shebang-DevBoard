@@ -322,7 +322,8 @@ fun SettingsScreen(
                     supportingContent = {
                         Text(
                             "Save a file to send to the developer if typing or gliding isn't working well, or the app crashed: your " +
-                                "settings, how your taps and glides lean, your recorded glides, and where the app crashed. Learned words, " +
+                                "settings, how your taps and glides lean, how your recent glides ended up, your recorded glides, and where " +
+                                "the app crashed. Learned words, " +
                                 "email addresses, the clipboard, your terminal bar and anything you typed are left out."
                         )
                     },
