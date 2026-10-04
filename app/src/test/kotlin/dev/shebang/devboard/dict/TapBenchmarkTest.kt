@@ -355,7 +355,7 @@ class TapBenchmarkTest {
             val f = fields(l)
             if (f[3] == "phrase") prompts["${f[0]}/${f[1]}/${f[2]}"] = f[4]
         }
-        class Tap(val meant: Char, val x: Float, val y: Float, val hit: String, val prefix: String, val c1: Int, val c2: Int)
+        class Tap(val meant: Char, val x: Float, val y: Float, val hit: String, val prefix: String, val c1: Int, val c2: Int, val who: String)
         val lm = GlideBenchmarkTest.lm
         fun ctx(w: String?) = if (w == null) NgramModel.SENTENCE_START else dictionary.indexOfLower(w).let { if (it < 0) NgramModel.UNKNOWN else lm.contextOf(it) }
         val first = HashMap<String, HashMap<Int, Pair<Float, Float>>>()
@@ -368,6 +368,20 @@ class TapBenchmarkTest {
         }
         val taps = ArrayList<Tap>()
         val bottom = "zxcvbnm"
+        // Each person's letter taps, where they landed against the key's middle (in pitches), for their offsets.
+        val aims = HashMap<String, Array<ArrayList<FloatArray>>>()
+        for ((trial, prompt) in prompts) {
+            val t = first[trial] ?: continue
+            val who = trial.substringBefore('/')
+            for ((i, ch) in prompt.withIndex()) {
+                if (!ch.isLetter()) continue
+                val c = ch.lowercaseChar()
+                val (x, y) = t[i] ?: continue
+                val k = c - 'a'
+                if (k !in 0..25 || !layout.hasLetter(c)) continue
+                aims.getOrPut(who) { Array(26) { ArrayList() } }[k] += floatArrayOf(x, y)
+            }
+        }
         for ((trial, prompt) in prompts) {
             val t = first[trial] ?: continue
             for ((i, ch) in prompt.withIndex()) {
@@ -381,7 +395,7 @@ class TapBenchmarkTest {
                 val before = Regex("[A-Za-z]+").findAll(prompt.substring(0, b)).map { it.value.lowercase() }.toList()
                 val c1 = ctx(before.getOrNull(before.size - 1))
                 val c2 = if (before.isEmpty()) NgramModel.UNKNOWN else ctx(before.getOrNull(before.size - 2))
-                taps += Tap(meant, x, y, h, prefix, c1, c2)
+                taps += Tap(meant, x, y, h, prefix, c1, c2, trial.substringBefore('/'))
             }
         }
         var model = TapModel(layout, TSI_DENSITY)
@@ -407,6 +421,59 @@ class TapBenchmarkTest {
         score("drawn edges (before)") { it.hit == "SPACE" }
         score("where taps land") { resolved(it, null) }
         score("+ the word's odds of ending") { resolved(it, prior(it)) }
+        // With each person's own offsets (learned from all their letter taps, shrunk toward their overall lean
+        // as the phone does), the space check by the drawn middles against following their aim and lean; then
+        // the same people as if each tapped [shift] key heights lower everywhere (someone who taps low).
+        val plain = TapModel(layout, TSI_DENSITY)
+        val savedAim = TapModel.SPACE_FOLLOWS_AIM
+        fun evaluate(shift: Float, label: String) {
+            val down = shift * plain.pitchY
+            val people = aims.mapValues { (_, per) ->
+                val dx = FloatArray(26)
+                val dy = FloatArray(26)
+                val all = per.flatMapIndexed { k, l -> l.map { p -> floatArrayOf((p[0] - layout.centerX[k]) / plain.pitchX, (p[1] + down - layout.centerY[k]) / plain.pitchY) } }
+                val mx = all.map { it[0] }.average().toFloat()
+                val my = all.map { it[1] }.average().toFloat()
+                for (k in 0 until 26) {
+                    val n = per[k].size
+                    val sx = per[k].sumOf { ((it[0] - layout.centerX[k]) / plain.pitchX).toDouble() }.toFloat()
+                    val sy = per[k].sumOf { ((it[1] + down - layout.centerY[k]) / plain.pitchY).toDouble() }.toFloat()
+                    dx[k] = ((sx + 5 * mx) / (n + 5)).coerceIn(-0.35f, 0.35f)
+                    dy[k] = ((sy + 5 * my) / (n + 5)).coerceIn(-0.35f, 0.35f)
+                }
+                TapModel(layout, TSI_DENSITY, dx + dy)
+            }
+            for (aim in listOf(false, true)) {
+                TapModel.SPACE_FOLLOWS_AIM = aim
+                var right = 0
+                var wrong = 0
+                for (tp in taps) {
+                    val m = people[tp.who]!!
+                    val p = prior(tp)
+                    val y = tp.y + down
+                    val hitNow = hit(tp.x, y) ?: continue
+                    val space = hitNow == "SPACE" || (hitNow.length == 1 && m.meansSpace(tp.x, y, m.nearestLetter(tp.x, y, prior = p) ?: hitNow[0], bar, p))
+                    if (tp.meant == ' ' && space) right++
+                    if (tp.meant != ' ' && space) wrong++
+                }
+                val rule = if (aim) "their aim and lean" else "the drawn middles"
+                println("TAPS SPACE ${label.padEnd(28)} by ${rule.padEnd(18)}: spaces typed ${pct(right, spaces)}, letters made spaces ${pct(wrong, letters)} ($wrong); wrong ${spaces - right + wrong}")
+            }
+        }
+        evaluate(0f, "as they tapped")
+        for (k in listOf(0.07f, 0.14f, 0.2f)) evaluate(k, "tapping $k keys lower")
+        if (System.getenv("TAPS_MARGIN") != null) {
+            val savedMargin = TapModel.SPACE_MARGIN
+            val savedFloor = TapModel.LETTER_FLOOR
+            for (m in listOf(0f, 0.1f)) for (fl in listOf(0.05, 0.1, 0.15, 0.2, 0.3)) {
+                TapModel.SPACE_MARGIN = m
+                TapModel.LETTER_FLOOR = fl
+                evaluate(0f, "margin $m floor $fl")
+            }
+            TapModel.SPACE_MARGIN = savedMargin
+            TapModel.LETTER_FLOOR = savedFloor
+        }
+        TapModel.SPACE_FOLLOWS_AIM = savedAim
         if (System.getenv("TAPS_SWEEP") == null) return
         val saved = Triple(TapModel.SPACE_BASE, TapModel.SPACE_FLOOR, TapModel.SPACE_LEAN_Y_DP)
         for (base in listOf(0.1, 0.18, 0.3)) for (floor in listOf(0.005, 0.02, 0.05, 0.1)) {

@@ -3,6 +3,35 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **Letters turning into spaces, made less eager** (the owner's report, 4 Oct: typing "toolchains", a tap
+  plainly on c became a space after "tool"). Three changes to the space-from-letters rule (see "Thumbs that
+  miss the space bar get a space" below):
+  1. A letter the word's odds call unlikely counts as at least 15% likely against the space
+     (`TapModel.LETTER_FLOOR`). The odds' own floor spreads 10% over 26 letters, so a word the dictionary
+     lacks ("tool" then "chains") made the letter cost more than any tap position could outweigh: such a c
+     turned into a space 0.01 of a key below its middle, now 0.19 to 0.34 below it (the key's edge is at
+     0.5). On TSI's 9,854 bottom-row and bar taps, with each person's offsets: letters made spaces 17 -> 5,
+     spaces typed 99.9% -> 99.8%, wrong 23 -> 14. Floors from 2% to 30% all lowered the total; 15% was
+     the lowest, chosen on the same data (one setting, a flat curve).
+  2. For someone who taps low (the owner's taps land 0.14 of a key below the middles, c 0.19), a tap
+     above where they aim at the letter stays the letter, and their lean moves where their space taps are
+     expected; only a lean down counts, so the check never loosens (TSI's people lean at most 0.03 down,
+     and nothing changes for them; with everyone moved 0.14 lower, letters made spaces 50 -> 43).
+  3. It learns whether it helps (`SpaceHabit`, the owner's earlier wish to detect rather than add a
+     toggle): each space made from a letter tap is kept, or taken back by the very next key being
+     backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
+     back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
+     would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **Addresses typed exactly** (the owner's report: Firefox's address bar autocorrected and added spaces).
+  In web-address and email fields there is no autocorrect (the strip still offers words), no "I" for a
+  lone i, no space the keyboard adds by itself (around a glide, after a strip pick, before a letter typed
+  after a glide, the double-space period) and no next-word suggestions; space itself types a space. A plain
+  one-line field whose hint reads like an address bar ("Search or enter address", "Search or type URL",
+  "URL", "web address") counts as a web-address field, as one asking for an email counts as an email field.
+- **Developer words** (from the same report): toolchain(s), monorepo(s), linter(s), runtimes, Dockerfile,
+  changelogs, subcommand(s), codegen, hotfix(es), dropdowns, websocket(s), backends, struct(s) were missing
+  and are added at tier 40 (offered and glidable, never autocorrected to).
+
 - **A local crash log** (R31): no crash reporting leaves the phone, so a crash used to leave no trace. The
   app (`DevBoardApp`) records uncaught exceptions in `crash_log.json`: the exception types and stack frames
   of the crash and its causes (30 frames, 12 per cause), never the messages, which can carry text the app was

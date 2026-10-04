@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (65298e0)
+
+### Fixed
+
+- A tap clearly on a letter near the space bar no longer turns into a space just because the word could end there (typing 'toolchains' used to give 'tool chains'); the keyboard also stops making spaces from letter taps if you keep deleting them (65298e0)
+- Web addresses and email addresses are typed exactly: no autocorrect and no spaces added for you in address bars and email fields (65298e0)
+
 ## 0.5.0: 2026-10-03
 
 ### Changed

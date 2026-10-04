@@ -93,3 +93,25 @@ OpenAI	40
 Anthropic	40
 Gmail	40
 McDonald's	40
+
+# Developer words (the owner typed "toolchains" and the keyboard read "tool" plus a space, 4 Oct)
+toolchain	40
+toolchains	40
+monorepo	40
+monorepos	40
+linter	40
+linters	40
+runtimes	40
+Dockerfile	40
+changelogs	40
+subcommand	40
+subcommands	40
+codegen	40
+hotfix	40
+hotfixes	40
+dropdowns	40
+websocket	40
+websockets	40
+backends	40
+struct	40
+structs	40

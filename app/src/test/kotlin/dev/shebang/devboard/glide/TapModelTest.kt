@@ -98,5 +98,36 @@ class TapModelTest {
         }
         assertTrue(line(0.9f) < line(0.1f))
     }
-}
 
+    /** Odds where the word looks finished ([end]) and [c] continues no word the dictionary knows. */
+    private fun oddsWithout(c: Char, end: Float): FloatArray {
+        val p = FloatArray(27) { (1f - end) / 25f }
+        p[c - 'a'] = 0.0001f
+        p[dev.shebang.devboard.dict.LetterPrior.END] = end
+        return p
+    }
+
+    @Test
+    fun aLetterTheDictionaryDoesNotExpectStillWinsWhereTheTapIsOnIt() {
+        // "tool" is a word and "toolchains" was not: a tap 0.15 of a key below the middle of c (the key's edge
+        // is at 0.5). Before the floor, any tap below 0.01 here was a space.
+        val onC = y('c') + 0.15f * model.pitchY
+        assertTrue(!model.meansSpace(x('c'), onC, 'c', bar, oddsWithout('c', 0.9f)))
+        val saved = TapModel.LETTER_FLOOR
+        TapModel.LETTER_FLOOR = 0.0
+        try {
+            assertTrue("without the floor this was a space", model.meansSpace(x('c'), onC, 'c', bar, oddsWithout('c', 0.9f)))
+        } finally {
+            TapModel.LETTER_FLOOR = saved
+        }
+    }
+
+    @Test
+    fun someoneWhoTapsLowKeepsTheirLetters() {
+        val low = FloatArray(52).also { o -> for (i in 26 until 52) o[i] = 0.2f }
+        val lowTapper = TapModel(layout, density, low)
+        // Where this person usually hits c: never a space, however finished the word looks.
+        val theirC = y('c') + 0.2f * model.pitchY
+        assertTrue(!lowTapper.meansSpace(x('c'), theirC, 'c', bar, odds(0.98f)))
+    }
+}

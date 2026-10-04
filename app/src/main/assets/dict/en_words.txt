@@ -4311,6 +4311,7 @@ backdrop	40
 backdrops	40
 backed	10
 backend	40
+backends	40
 backer	35
 backers	35
 backfield	50
@@ -10228,6 +10229,7 @@ changed	10
 changeling	50
 changelings	50
 changelog	40
+changelogs	40
 changeover	20
 changeovers	40
 changes	10
@@ -11839,6 +11841,7 @@ coddling	50
 code	10
 codebase	40
 coded	10
+codegen	40
 codeine	50
 codependency	50
 codependent	50
@@ -18726,6 +18729,7 @@ docility	50
 dock	35
 docked	35
 Docker	40
+Dockerfile	40
 docket	40
 docketed	40
 docketing	40
@@ -19416,6 +19420,7 @@ droopy	50
 drop	10
 Dropbox	50
 dropdown	40
+dropdowns	40
 droplet	50
 droplets	50
 dropout	35
@@ -30284,6 +30289,8 @@ hotel	10
 hotelier	50
 hoteliers	50
 hotels	35
+hotfix	40
+hotfixes	40
 hothead	35
 hotheaded	35
 hotheadedly	50
@@ -36702,6 +36709,8 @@ linseed	50
 lint	35
 lintel	50
 lintels	50
+linter	40
+linters	40
 Linton	50
 Linus	50
 Linux	50
@@ -40841,6 +40850,8 @@ monopolizing	35
 monopoly	20
 monorail	35
 monorails	35
+monorepo	40
+monorepos	40
 monosyllabic	50
 monosyllable	35
 monosyllables	35
@@ -54802,6 +54813,7 @@ runoffs	50
 runs	10
 runt	35
 runtime	40
+runtimes	40
 runts	35
 runway	35
 runways	35
@@ -61658,6 +61670,8 @@ stropping	50
 strops	50
 strove	35
 struck	10
+struct	40
+structs	40
 structural	20
 structuralist	35
 structurally	50
@@ -61836,6 +61850,8 @@ subbasements	50
 subbed	35
 subbing	35
 subclass	50
+subcommand	40
+subcommands	40
 subcommittee	35
 subcommittees	35
 subcompact	50
@@ -65201,6 +65217,8 @@ toolbar	40
 toolbars	50
 toolbox	50
 toolboxes	50
+toolchain	40
+toolchains	40
 tooled	35
 tooling	35
 toolkit	35
@@ -70202,6 +70220,8 @@ webpages	35
 webs	35
 website	40
 websites	40
+websocket	40
+websockets	40
 Webster	50
 Websters	50
 wed	20

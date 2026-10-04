@@ -586,7 +586,7 @@ class TextInputController(
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
-            if (glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
+            if (!field.isAddress && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
                 ic.getSelectedText(0).isNullOrEmpty() &&
                 ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
             ) {
@@ -694,7 +694,7 @@ class TextInputController(
         val now = clock()
         if (isComposing) {
             endWord(ic, " ", correct = true, deferOk = true)
-        } else if (settings.doubleSpacePeriod && field.allowsComposing && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
+        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isAddress && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
             ic.commitText(". ", 1)
@@ -715,7 +715,7 @@ class TextInputController(
      */
     private fun showPredictions(ic: InputConnection) {
         // Not in code mode, where the next word is rarely English.
-        if (!settings.nextWord || codeMode || !field.allowsComposing || isComposing || target != null) return
+        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isAddress || isComposing || target != null) return
         val model = predictionModel ?: return
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
@@ -1129,7 +1129,7 @@ class TextInputController(
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
         val untouched = reopenedUnchanged
         reopened = null
-        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
+        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && !field.isAddress &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
             !capitalisedOnPurpose(ic, typed)
         var commit = typed
@@ -1144,7 +1144,7 @@ class TextInputController(
                 defer = false
             }
         }
-        commit = pronounCase(commit)
+        if (!field.isAddress) commit = pronounCase(commit)
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
         ic.beginBatchEdit()
@@ -1153,7 +1153,7 @@ class TextInputController(
         ic.endBatchEdit()
         word.setLength(0)
         clearCandidates()
-        if (commit != pronounCase(typed)) {
+        if (commit != (if (field.isAddress) typed else pronounCase(typed))) {
             lastAutocorrect = Autocorrected(typed, commit, after)
             rememberCorrection(ic, typed, commit, after.length, other)
         }
@@ -1411,7 +1411,7 @@ class TextInputController(
         val context = ic?.let { currentContext(it) }
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
-        val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
+        val correctable = settings.autocorrect && field.allowsComposing && !field.isAddress && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
             (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
@@ -1533,10 +1533,11 @@ class TextInputController(
             reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
             reopenedCorrection = null
             learnTyped(ic, chosen)
-            ic.commitText("$chosen ", 1)
+            // An address goes on as typed: no space after the word.
+            ic.commitText(if (field.isAddress) chosen else "$chosen ", 1)
             word.setLength(0)
             clearCandidates()
-            lastActionWasSpace = true
+            lastActionWasSpace = !field.isAddress
             lastSpaceTime = clock()
             showPredictions(ic)
         }
@@ -1835,6 +1836,7 @@ class TextInputController(
 
     /** No space at the field start, after whitespace or a newline, or after an opening bracket. */
     private fun needsLeadingSpace(ic: InputConnection): Boolean {
+        if (field.isAddress) return false
         val before = ic.getTextBeforeCursor(1, 0)
         if (before.isNullOrEmpty()) return false
         return !GlideText.atWordStart(before, 1)
@@ -1842,6 +1844,7 @@ class TextInputController(
 
     /** A space after the glide when a word follows the cursor directly. */
     private fun needsTrailingSpace(ic: InputConnection): Boolean {
+        if (field.isAddress) return false
         val after = ic.getTextAfterCursor(1, 0)
         return !after.isNullOrEmpty() && after[0].isLetterOrDigit()
     }

@@ -27,6 +27,8 @@ class TapModel(
     private val spaceSigmaY = SPACE_SIGMA_Y_DP * density
     val pitchX: Float
     val pitchY: Float
+    /** This user's overall vertical lean (the mean of the letters' learned offsets down), in pixels. */
+    private val userLeanY: Float
 
     init {
         val q = 'q' - 'a'
@@ -38,6 +40,8 @@ class TapModel(
         if (py <= 0f) py = layout.keyHeight
         pitchX = px
         pitchY = py
+        // Only a lean down counts: it moves the space taps' expected place down, away from the letters.
+        userLeanY = maxOf(0f, offsets?.let { o -> (26 until minOf(52, o.size)).map { o[it] }.average().toFloat() * py } ?: 0f)
     }
 
     /** Where this user's taps on [c] centre, in pixels; null when the layout has no key for it. */
@@ -104,14 +108,21 @@ class TapModel(
      */
     fun meansSpace(x: Float, y: Float, c: Char, bar: Bar, prior: FloatArray?): Boolean {
         val i = c - 'a'
-        if (i !in 0..25 || !layout.hasLetter(c) || y <= layout.centerY[i]) return false
+        if (i !in 0..25 || !layout.hasLetter(c)) return false
+        // Above the letter's middle, or above where this user aims at it when they aim lower, the tap stays
+        // the letter: the check only grows stricter for someone who taps low, never looser.
+        val below = if (SPACE_FOLLOWS_AIM) maxOf(layout.centerY[i], aimY(c) ?: layout.centerY[i]) else layout.centerY[i]
+        if (y <= below + SPACE_MARGIN * pitchY) return false
         val n = nats(x, y, c) ?: return false
         val end = prior?.getOrNull(LetterPrior.END)?.takeIf { !it.isNaN() }
         val pSpace = (end?.toDouble() ?: SPACE_BASE).coerceIn(SPACE_FLOOR, 1 - SPACE_FLOOR)
         // -ln of each density, with its constants, so the bar and a key compare.
+        // A letter the word's odds call unlikely (often just a word the dictionary lacks: "tool" + "chains")
+        // costs at most what [LETTER_FLOOR] does, so where the tap landed still decides.
         val letter = n + ln(2 * Math.PI * sigma * sigma) - ln(1 - pSpace) +
-            if (prior != null) PRIOR_WEIGHT * LetterPrior.cost(prior, c) else ln(26.0)
-        val dy = (y - bar.centerY - spaceLeanY) / spaceSigmaY
+            if (prior != null) PRIOR_WEIGHT * minOf(LetterPrior.cost(prior, c), -ln(LETTER_FLOOR)) else ln(26.0)
+        // Someone who taps low on the letters taps low on the bar too.
+        val dy = (y - bar.centerY - spaceLeanY - (if (SPACE_FOLLOWS_AIM) userLeanY else 0f)) / spaceSigmaY
         val off = (if (x < bar.left) bar.left - x else if (x > bar.right) x - bar.right else 0f) / sigma
         val space = 0.5 * (dy * dy + off * off) + ln(sqrt(2 * Math.PI) * spaceSigmaY) + ln(maxOf(1f, bar.right - bar.left).toDouble()) - ln(pSpace)
         return space < letter
@@ -142,5 +153,11 @@ class TapModel(
         var SPACE_BASE = 0.18
         /** The space's odds are kept between this and 1 minus it, whatever the word says. */
         var SPACE_FLOOR = 0.02
+        /** The least likely a letter counts as, against a space, whatever the word's odds say. */
+        var LETTER_FLOOR = 0.15
+        /** How far below that (in key heights) a tap must land before it can be a space. */
+        var SPACE_MARGIN = 0f
+        /** The space check follows where this user aims and how low they tap (false: the drawn middles, for benchmarks). */
+        var SPACE_FOLLOWS_AIM = true
     }
 }
