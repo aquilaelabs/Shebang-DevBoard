@@ -46,6 +46,8 @@ object DiagnosticsExport {
         glides: JsonObject,
         recordings: List<String>,
         crashes: List<CrashLog.Crash> = emptyList(),
+        spaceHabit: Triple<Float, Float, Boolean>? = null,
+        glideOutcomes: JsonObject? = null,
     ): JsonObject = buildJsonObject {
         put("format", JsonPrimitive("shebang-devboard-diagnostics"))
         put("version", JsonPrimitive(1))
@@ -67,6 +69,14 @@ object DiagnosticsExport {
         })
         put("tapAdaptation", taps)
         put("glideAdaptation", glides)
+        glideOutcomes?.let { put("glideOutcomes", it) }
+        spaceHabit?.let { (undone, kept, on) ->
+            put("spaceFromLetters", buildJsonObject {
+                put("undone", JsonPrimitive(undone))
+                put("kept", JsonPrimitive(kept))
+                put("on", JsonPrimitive(on))
+            })
+        }
         put("glideRecordings", JsonArray(recordings.mapNotNull { line -> runCatching { json.parseToJsonElement(line) }.getOrNull() }))
         put("crashes", JsonArray(crashes.map { c ->
             buildJsonObject {
@@ -125,6 +135,8 @@ object DiagnosticsExport {
             GlideAdaptation.get(dir).exportJson(),
             traces,
             CrashLog.read(File(dir, CrashLog.FILE)),
+            dev.shebang.devboard.glide.SpaceHabit.get(dir).summary(),
+            dev.shebang.devboard.glide.GlideOutcomes.get(dir).summary(),
         )
         out.write(pretty.encodeToString(JsonObject.serializer(), doc).toByteArray())
     }

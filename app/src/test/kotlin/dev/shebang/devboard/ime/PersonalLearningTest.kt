@@ -192,4 +192,37 @@ class PersonalLearningTest {
         assertTrue(bundle.dictionary.indexOfLower("x2") < 0)
         assertEquals(1, bundle.systemWords)
     }
+
+    @Test
+    fun aRemovedBuiltInWordIsGoneAndLearningDoesNotBringItBack() {
+        val p = PersonalWords(null)
+        repeat(3) { p.learn("toolbox", null, false, inDictionary) }
+        val bundle = LanguageBuilder.build(dictionary, data, p.snapshot(), emptyList(), p.vocabularyVersion, p.countsVersion, removed = setOf("toolbox"), removedVersion = 1)
+        assertTrue(bundle.dictionary.indexOfLower("toolbox") < 0)
+        assertTrue(bundle.suggester.suggest("toolbo", 3).none { it.word == "toolbox" })
+        assertEquals(1, bundle.removedVersion)
+        // Its neighbours stay.
+        assertTrue(bundle.dictionary.indexOfLower("toolbar") >= 0)
+        assertEquals(dictionary.size - 1, bundle.dictionary.size)
+    }
+
+    @Test
+    fun removedWordsAreKeptAndRestored() {
+        val dir = java.nio.file.Files.createTempDirectory("removed").toFile()
+        try {
+            val f = File(dir, dev.shebang.devboard.dict.RemovedWords.FILE)
+            val r = dev.shebang.devboard.dict.RemovedWords(f)
+            r.remove("toolbox")
+            r.remove("GitHub")
+            assertEquals(listOf("GitHub", "toolbox"), dev.shebang.devboard.dict.RemovedWords(f).list())
+            r.restore("toolbox")
+            assertEquals(listOf("GitHub"), dev.shebang.devboard.dict.RemovedWords(f).list())
+            val v = r.version
+            r.restoreAll()
+            assertTrue(r.version > v)
+            assertTrue(dev.shebang.devboard.dict.RemovedWords(f).list().isEmpty())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

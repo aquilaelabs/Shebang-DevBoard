@@ -31,6 +31,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.PersonalWords
+import dev.shebang.devboard.glide.SpaceHabit
+import dev.shebang.devboard.glide.GlideOutcomes
 import dev.shebang.devboard.glide.GlideAdaptation
 import dev.shebang.devboard.glide.TapModel
 import dev.shebang.devboard.glide.PathMatch
@@ -82,6 +84,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private lateinit var languageLoader: LanguageLoader
     private lateinit var glideSession: GlideSession
     private lateinit var feedback: Feedback
+    /** Whether letters turning into spaces helps this user, and a space made so whose fate the next key tells. */
+    private lateinit var spaceHabit: SpaceHabit
+    /** How recent glides ended up, for the diagnostics. */
+    private lateinit var glideOutcomes: GlideOutcomes
+    private var spaceCheckPending = false
     private lateinit var text: TextInputController
     private val main = Handler(Looper.getMainLooper())
     private val background = Executors.newSingleThreadExecutor { r -> Thread(r, "devboard-bg").apply { isDaemon = true } }
@@ -181,6 +188,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             onLanguage = { b -> main.post { offerBundle(b) } },
         )
         feedback = Feedback(this)
+        spaceHabit = SpaceHabit.get(filesDir)
+        glideOutcomes = GlideOutcomes.get(filesDir)
         text = TextInputController({ currentInputConnection }, this, background, main, this)
         // Identifiers from the text are scored against a glide on the current key layout.
         text.identifierScorer = { stroke, letters -> geometry?.let { PathMatch.cost(glideModelFor(it), stroke, letters) } }
@@ -259,6 +268,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             personal.save()
             adaptation.save()
             tapAdaptation.save()
+            spaceHabit.save()
+            glideOutcomes.save()
         }
         val b = bundle ?: return
         if (personal.vocabularyVersion != b.vocabularyVersion || personal.countsVersion - b.countsVersion >= REBUILD_AFTER_WORDS) {
@@ -275,6 +286,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun learnTaps(observations: FloatArray) {
         if (!settings.adaptTaps) return
         background.execute { tapAdaptation.learn(observations) }
+    }
+
+    override fun glideOutcome(outcome: Int, letters: Int) {
+        glideOutcomes.add(outcome, letters)
     }
 
     override fun learnGlide(observations: FloatArray) {
@@ -454,7 +469,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             applyBar()
         }
         // Words deleted in settings (same process) take effect the next time the keyboard opens.
-        bundle?.let { if (it.vocabularyVersion != personal.vocabularyVersion) languageLoader.rebuild() }
+        bundle?.let {
+            if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
+        }
         modifiers.clearAll()
         strip?.bar?.updateModifiers(modifiers)
         keyboard?.setShift(ShiftState.OFF, notify = false)
@@ -670,6 +687,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onKeyTap(key: Key, shift: ShiftState) {
         // Typing while listening ends the dictation; what was said is still written.
         if (voice.active) voice.stop()
+        // A space made from a letter tap is taken back if this key is backspace, else kept.
+        settleSpaceCheck(undone = key.action == KeyAction.BACKSPACE)
+        if (key.action == KeyAction.SPACE && keyboard?.lastSpaceFromLetter == true) spaceCheckPending = true
         when (key.action) {
             KeyAction.SHIFT -> return
             KeyAction.BACKSPACE -> {
@@ -737,6 +757,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onKeyRepeat(key: Key) {
+        settleSpaceCheck(undone = key.action == KeyAction.BACKSPACE)
         when (key.action) {
             KeyAction.BACKSPACE -> text.backspace()
             else -> if (key.keyCode != 0) {
@@ -761,7 +782,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         afterEdit()
     }
 
+    private fun settleSpaceCheck(undone: Boolean) {
+        if (!spaceCheckPending) return
+        spaceCheckPending = false
+        if (!spaceHabit.record(undone)) keyboard?.spaceFromLetters = false
+    }
+
     override fun onGlideStart(points: FloatArray, times: LongArray, count: Int) {
+        settleSpaceCheck(undone = false)
         if (voice.active) voice.stop()
         val g = geometry ?: return
         val lang = glideLanguage ?: return
@@ -1081,7 +1109,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun setSpaceFromLetters(on: Boolean) {
-        keyboard?.spaceFromLetters = on
+        keyboard?.spaceFromLetters = on && spaceHabit.enabled()
     }
 
     override fun showCorrection(typed: String, fix: String, other: String?) {

@@ -136,6 +136,9 @@ class KeyboardView(context: Context) : View(context) {
 
     /** Whether a letter tap just above the space bar may be taken as a space ([spaceInstead]). */
     var spaceFromLetters = false
+    /** Whether the last tap reported was a letter tap turned into a space. */
+    var lastSpaceFromLetter = false
+        private set
 
     /**
      * The space bar, when a tap that came down on a letter of the row above it more likely meant the bar:
@@ -366,6 +369,8 @@ class KeyboardView(context: Context) : View(context) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
             // Always the enter icon, whatever the field's action (search, send, go): the user's choice.
             KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enter, fg, false)
+            // The #! key wears the Shebang mark.
+            KeyAction.MODE_CODE -> drawIcon(canvas, KeyIcons.shebang, fg, false)
             KeyAction.SHIFT -> drawIcon(canvas, when (shiftState) {
                 ShiftState.OFF -> KeyIcons.shift
                 ShiftState.ON -> KeyIcons.shiftOn
@@ -731,7 +736,9 @@ class KeyboardView(context: Context) : View(context) {
             else -> {
                 lastTapX = pointerDownX[id]
                 lastTapY = pointerDownY[id]
-                l?.onKeyTap(spaceInstead(key, lastTapX, lastTapY) ?: key, shiftState)
+                val space = spaceInstead(key, lastTapX, lastTapY)
+                lastSpaceFromLetter = space != null
+                l?.onKeyTap(space ?: key, shiftState)
             }
         }
         popup.dismiss()

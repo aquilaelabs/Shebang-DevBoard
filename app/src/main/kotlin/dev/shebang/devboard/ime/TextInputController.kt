@@ -10,6 +10,7 @@ import dev.shebang.devboard.dict.NgramModel
 import dev.shebang.devboard.dict.SlipCost
 import dev.shebang.devboard.dict.Suggester
 import dev.shebang.devboard.dict.Suggestion
+import dev.shebang.devboard.glide.GlideOutcomes
 import dev.shebang.devboard.glide.GlideContext
 import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideWord
@@ -72,6 +73,8 @@ class TextInputController(
         fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary)
         /** Where a word typed right was tapped: triples (letter, du, dv) from [TapModel.observation]. */
         fun learnTaps(observations: FloatArray) = Unit
+        /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
+        fun glideOutcome(outcome: Int, letters: Int) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -316,6 +319,8 @@ class TextInputController(
         var sentenceStart: Boolean,
         var observations: FloatArray?,
         val stroke: FloatArray?,
+        /** How this word ends up if it is kept from now on: as glided, or fixed from the strip or by the next glide. */
+        var fixedBy: Int = GlideOutcomes.KEPT,
     )
 
     /** The last glide, not yet learned: backspace can still remove it and the strip can still swap its last word. */
@@ -586,7 +591,7 @@ class TextInputController(
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
-            if (glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
+            if (!field.isAddress && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
                 ic.getSelectedText(0).isNullOrEmpty() &&
                 ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
             ) {
@@ -597,11 +602,11 @@ class TextInputController(
                 resetTaps(0)
                 // Typing on at the end of a word that is not composing (the field dropped it, or the cursor was
                 // put there): the whole word is composed, so the underline and a strip pick cover all of it.
-                recomposeWordBeforeCursor(ic)?.let { text -> recentMatch(text)?.let { abandon(it) } }
+                recomposeWordBeforeCursor(ic)?.let { text -> recentMatch(text)?.let { abandon(it, GlideOutcomes.EDITED) } }
                 reopenedGlide = null
             }
             word.append(text)
-            reopenedGlide?.let { g -> if (!reopenedUnchanged) { abandon(g); reopenedGlide = null } }
+            reopenedGlide?.let { g -> if (!reopenedUnchanged) { abandon(g, GlideOutcomes.EDITED); reopenedGlide = null } }
             for (k in text.indices) {
                 tapXs += if (text.length == 1) tapX else Float.NaN
                 tapYs += if (text.length == 1) tapY else Float.NaN
@@ -694,7 +699,7 @@ class TextInputController(
         val now = clock()
         if (isComposing) {
             endWord(ic, " ", correct = true, deferOk = true)
-        } else if (settings.doubleSpacePeriod && field.allowsComposing && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
+        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isAddress && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
             ic.commitText(". ", 1)
@@ -715,7 +720,7 @@ class TextInputController(
      */
     private fun showPredictions(ic: InputConnection) {
         // Not in code mode, where the next word is rarely English.
-        if (!settings.nextWord || codeMode || !field.allowsComposing || isComposing || target != null) return
+        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isAddress || isComposing || target != null) return
         val model = predictionModel ?: return
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
@@ -810,6 +815,7 @@ class TextInputController(
             repeat(minOf(glide.words, pending.size)) {
                 val w = pending.removeAt(pending.size - 1)
                 recent.remove(w)
+                outcome(w, GlideOutcomes.DELETED)
             }
             lastGlide = null
             clearCandidates()
@@ -818,7 +824,7 @@ class TextInputController(
         settle()
         if (isComposing) {
             // Backing up into a glided word and taking letters off it: it was wrong.
-            reopenedGlide?.let { abandon(it) }
+            reopenedGlide?.let { abandon(it, GlideOutcomes.EDITED) }
             reopenedGlide = null
             if (tapXs.size == word.length) {
                 tapXs.removeAt(tapXs.size - 1)
@@ -1047,9 +1053,10 @@ class TextInputController(
         repeat(fromPending) {
             val w = pending.removeAt(pending.size - 1)
             recent.remove(w)
+            outcome(w, GlideOutcomes.DELETED)
         }
         // Words before the last glide that went too were glided before it, if they were glided at all.
-        if (pending.isEmpty()) repeat(minOf(n - fromPending, held.size)) { abandon(held.last()) }
+        if (pending.isEmpty()) repeat(minOf(n - fromPending, held.size)) { abandon(held.last(), GlideOutcomes.DELETED) }
         settle()
     }
 
@@ -1129,7 +1136,7 @@ class TextInputController(
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
         val untouched = reopenedUnchanged
         reopened = null
-        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing &&
+        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && !field.isAddress &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
             !capitalisedOnPurpose(ic, typed)
         var commit = typed
@@ -1144,7 +1151,7 @@ class TextInputController(
                 defer = false
             }
         }
-        commit = pronounCase(commit)
+        if (!field.isAddress) commit = pronounCase(commit)
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
         ic.beginBatchEdit()
@@ -1153,7 +1160,7 @@ class TextInputController(
         ic.endBatchEdit()
         word.setLength(0)
         clearCandidates()
-        if (commit != pronounCase(typed)) {
+        if (commit != (if (field.isAddress) typed else pronounCase(typed))) {
             lastAutocorrect = Autocorrected(typed, commit, after)
             rememberCorrection(ic, typed, commit, after.length, other)
         }
@@ -1306,15 +1313,22 @@ class TextInputController(
         while (held.isNotEmpty()) retire(held.removeFirst())
     }
 
-    /** A glided word the user changed or replaced: never learned as it was glided. */
-    private fun abandon(w: GlidedWord) {
-        pending.remove(w)
-        held.remove(w)
+    /** A glided word the user changed or replaced ([how]): never learned as it was glided. */
+    private fun abandon(w: GlidedWord, how: Int) {
+        // Counted only while it was still open: a word redone after it was final has had its outcome.
+        val open = pending.remove(w) or held.remove(w)
         recent.remove(w)
+        if (open) outcome(w, how)
+    }
+
+    /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */
+    private fun outcome(w: GlidedWord, how: Int) {
+        if (!field.noPersonalizedLearning) learner.glideOutcome(how, w.text.length)
     }
 
     /** A glided word is final: learn it, and where its stroke passed its letters. */
     private fun retire(w: GlidedWord) {
+        outcome(w, w.fixedBy)
         if (!field.allowsLearning) return
         learner.learnWord(w.text, w.previous, w.sentenceStart)
         w.observations?.let { learner.learnGlide(it) }
@@ -1411,7 +1425,7 @@ class TextInputController(
         val context = ic?.let { currentContext(it) }
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
-        val correctable = settings.autocorrect && field.allowsComposing && !reopenedUnchanged &&
+        val correctable = settings.autocorrect && field.allowsComposing && !field.isAddress && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
             (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
@@ -1451,7 +1465,7 @@ class TextInputController(
             val dictionary = dictionaryInUse
             val prev = previousOf(textBeforeTarget(ic))
             // A word being redone is not learned as it was; the rest of the last glide is final now.
-            t.glided?.let { abandon(it) }
+            t.glided?.let { abandon(it, GlideOutcomes.STRIP) }
             settle()
             if (replaceTarget(t, chosen)) {
                 val idx = dictionary?.indexOfLower(chosen.lowercase()) ?: -1
@@ -1512,6 +1526,7 @@ class TextInputController(
                     learner.correction(last.stroke, glide.alternativeWords[idx], dictionary)
                 }
                 last.text = chosen
+                last.fixedBy = GlideOutcomes.STRIP
                 last.word = last.word.lockedAs(glide.alternativeWords[idx])
                 last.observations = null
             }
@@ -1524,7 +1539,7 @@ class TextInputController(
                 // Another reading of a glided word picked after backspacing to it: a correction.
                 val idx = dictionary.indexOfLower(chosen.lowercase())
                 if (idx >= 0) learner.correction(g.stroke, idx, dictionary)
-                abandon(g)
+                abandon(g, GlideOutcomes.STRIP)
             }
             reopened = null
             // Picking the word exactly as typed (the strip's check mark), or as first typed before autocorrect
@@ -1533,10 +1548,11 @@ class TextInputController(
             reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
             reopenedCorrection = null
             learnTyped(ic, chosen)
-            ic.commitText("$chosen ", 1)
+            // An address goes on as typed: no space after the word.
+            ic.commitText(if (field.isAddress) chosen else "$chosen ", 1)
             word.setLength(0)
             clearCandidates()
-            lastActionWasSpace = true
+            lastActionWasSpace = !field.isAddress
             lastSpaceTime = clock()
             showPredictions(ic)
         }
@@ -1694,7 +1710,7 @@ class TextInputController(
         lastActionWasSpace = false
         reviseBefore(ic, result, dictionary)
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
-        target?.glided?.let { abandon(it) }
+        target?.glided?.let { abandon(it, GlideOutcomes.REDONE) }
         settle()
         ownEdit()
         val t = target
@@ -1771,6 +1787,7 @@ class TextInputController(
         ic.commitText(text + after, 1)
         ic.endBatchEdit()
         r.word.text = text
+        r.word.fixedBy = GlideOutcomes.NEXT_GLIDE
         r.word.word = r.word.word.revisedTo(w)
         r.word.observations = null
         lastGlide?.let { g ->
@@ -1835,6 +1852,7 @@ class TextInputController(
 
     /** No space at the field start, after whitespace or a newline, or after an opening bracket. */
     private fun needsLeadingSpace(ic: InputConnection): Boolean {
+        if (field.isAddress) return false
         val before = ic.getTextBeforeCursor(1, 0)
         if (before.isNullOrEmpty()) return false
         return !GlideText.atWordStart(before, 1)
@@ -1842,6 +1860,7 @@ class TextInputController(
 
     /** A space after the glide when a word follows the cursor directly. */
     private fun needsTrailingSpace(ic: InputConnection): Boolean {
+        if (field.isAddress) return false
         val after = ic.getTextAfterCursor(1, 0)
         return !after.isNullOrEmpty() && after[0].isLetterOrDigit()
     }

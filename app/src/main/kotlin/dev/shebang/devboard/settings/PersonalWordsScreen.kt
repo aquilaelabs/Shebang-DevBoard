@@ -41,6 +41,7 @@ import dev.shebang.devboard.ime.EmailMemory
 import dev.shebang.devboard.dict.PersonalWord
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.glide.GlideAdaptation
+import dev.shebang.devboard.glide.SpaceHabit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -308,7 +309,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             onDismissRequest = { confirmReset = false },
             title = { Text("Reset glide and tap adaptation?") },
             text = { Text("Gliding and autocorrect go back to the keyboard's defaults and start learning your swipes and taps again.") },
-            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset() } }) { Text("Reset") } },
+            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset(); SpaceHabit.get(context.filesDir).reset(); dev.shebang.devboard.glide.GlideOutcomes.get(context.filesDir).reset() } }) { Text("Reset") } },
             dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
         )
     }

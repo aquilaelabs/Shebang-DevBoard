@@ -224,6 +224,32 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun webAddressesAreTypedExactly() {
+        controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, 0))
+        // No autocorrect, and no capital for a lone i.
+        type("wiht i ")
+        assertEquals("wiht i ", ic.toString())
+        // A strip pick adds no space; a glide adds none before or after.
+        ic.text.setLength(0)
+        ic.cursor = 0
+        type("githu")
+        controller.pickCandidate("github")
+        assertEquals("github", ic.toString())
+        controller.typeText(".")
+        glide("net")
+        assertEquals("github.net", ic.toString())
+    }
+
+    @Test
+    fun anAddressBarFoundByItsHintIsAWebAddressField() {
+        val bar = FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0, "Search or enter address")
+        assertEquals(dev.shebang.devboard.layout.FieldVariant.URL, bar.variant)
+        assertEquals(true, bar.isAddress)
+        assertEquals(dev.shebang.devboard.layout.FieldVariant.URL, FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0, "Search or type URL").variant)
+        assertEquals(dev.shebang.devboard.layout.FieldVariant.PLAIN, FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0, "Search").variant)
+    }
+
+    @Test
     fun wordsTypedRightAreLeftAlone() {
         type("the quick brown fox is ill ")
         assertEquals("the quick brown fox is ill ", ic.toString())

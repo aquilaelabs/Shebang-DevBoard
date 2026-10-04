@@ -12,7 +12,11 @@ in that folder; tools/lm_model/prep.py likewise).
 import bz2
 import re
 import sys
-import xml.etree.ElementTree as ET
+
+# The dump is refused if it declares a DOCTYPE (see no_doctype), the only place entities can be defined, so
+# entity expansion and external entities cannot happen; Python's expat also ignores external entities and
+# caps expansion. defusedxml would add a dependency for no further protection here.
+import xml.etree.ElementTree as ET  # nosemgrep: python.lang.security.use-defused-xml.use-defused-xml
 
 NS = "{http://www.mediawiki.org/xml/export-0.11/}"
 
@@ -62,8 +66,19 @@ def clean(wikitext):
     return " ".join(lines)
 
 
+def no_doctype(src):
+    """Stops on a DOCTYPE in the prolog: a MediaWiki dump never has one, and entities can only be declared there."""
+    with bz2.open(src, "rb") as fh:
+        head = fh.read(64 * 1024)
+    start = head.find(b"<mediawiki")
+    prolog = head if start < 0 else head[:start]
+    if b"<!DOCTYPE" in prolog.upper() or b"<!ENTITY" in prolog.upper():
+        sys.exit(f"{src}: declares a DOCTYPE; not a MediaWiki dump")
+
+
 def main():
     src, out = sys.argv[1], sys.argv[2]
+    no_doctype(src)
     pages = kept = sentences = words = 0
     with bz2.open(src, "rb") as fh, open(out, "w", encoding="utf-8") as w:
         for _event, el in ET.iterparse(fh):

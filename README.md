@@ -1,3 +1,5 @@
+<img src="docs/logo/shebang-icon.svg" width="96" alt="The Shebang mark: # and ! interlocked">
+
 # Shebang DevBoard
 
 An Android keyboard (IME) for developers, written in Kotlin.
@@ -85,6 +87,8 @@ in `assets/dict/en_next_word.bin` and the glide model in `assets/glide/glide_mod
 - [Shebang Voice](docs/voice.md): the speech add-on.
 - [Manual checklist](docs/manual-checklist.md): what to check by hand, and what has been.
 - [Design language](docs/design-language.md): the themes, keys and pages.
+- [Logo](docs/logo/): the Shebang mark as an app icon (SVG, and a 512 px PNG for app stores), on light
+  backgrounds and in one colour; `tools/shebang_mark.py` draws it.
 - [Privacy policy](PRIVACY.md) and [credits](THIRD_PARTY_NOTICES.md).
 - The [wiki](https://github.com/aquilaelabs/Shebang-DevBoard/wiki) is the guide for people using the keyboard.
 

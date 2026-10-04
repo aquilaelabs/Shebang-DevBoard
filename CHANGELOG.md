@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.5.2: 2026-10-03
+
+### Changed
+
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
+
+## 0.5.1: 2026-10-03
+
+### Added
+
+- Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (78c89c1)
+- Settings > Learning > Built-in dictionary: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (21762e3)
+- Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (6764977)
+
+### Fixed
+
+- A tap clearly on a letter near the space bar no longer turns into a space just because the word could end there (typing 'toolchains' used to give 'tool chains'); the keyboard also stops making spaces from letter taps if you keep deleting them (78c89c1)
+- Web addresses and email addresses are typed exactly: no autocorrect and no spaces added for you in address bars and email fields (78c89c1)
+
 ## 0.5.0: 2026-10-03
 
 ### Changed

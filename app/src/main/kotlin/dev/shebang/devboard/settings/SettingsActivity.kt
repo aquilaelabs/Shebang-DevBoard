@@ -96,6 +96,7 @@ class SettingsActivity : ComponentActivity() {
             val profiles = remember { AppProfiles(this@SettingsActivity) }
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
+            var dictionary by remember { mutableStateOf(false) }
             // A document from the About section (asset path and title), while it is open.
             var aboutDoc by remember { mutableStateOf<Pair<String, String>?>(null) }
             DevBoardTheme(settings.palette) {
@@ -103,6 +104,9 @@ class SettingsActivity : ComponentActivity() {
                 if (doc != null) {
                     BackHandler { aboutDoc = null }
                     AboutDocScreen(title = doc.second, asset = doc.first, onBack = { aboutDoc = null })
+                } else if (dictionary) {
+                    BackHandler { dictionary = false }
+                    DictionaryScreen(onBack = { dictionary = false })
                 } else if (personalWords) {
                     BackHandler { personalWords = false }
                     PersonalWordsScreen(onBack = { personalWords = false })
@@ -137,6 +141,7 @@ class SettingsActivity : ComponentActivity() {
                         onEditBar = { editingBar = true },
                         onRecordGlides = { recording = true },
                         onPersonalWords = { personalWords = true },
+                        onDictionary = { dictionary = true },
                         onDoc = { asset, title -> aboutDoc = asset to title },
                         onBack = { finish() },
                     )
@@ -154,6 +159,7 @@ fun SettingsScreen(
     onEditBar: () -> Unit,
     onRecordGlides: () -> Unit,
     onPersonalWords: () -> Unit,
+    onDictionary: () -> Unit,
     onDoc: (asset: String, title: String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -249,6 +255,13 @@ fun SettingsScreen(
                     modifier = Modifier.clickable(onClick = onPersonalWords),
                 )
             }
+            item {
+                ListItem(
+                    headlineContent = { Text("Built-in dictionary") },
+                    supportingContent = { Text("Every word the keyboard ships with: delete ones you never want offered, and restore them any time") },
+                    modifier = Modifier.clickable(onClick = onDictionary),
+                )
+            }
 
             item { SectionHeader("Corrections") }
             item { SwitchRow("Fix the last glided word", "When the next glide makes it unlikely, the word glided just before is corrected; tap it to change it back", settings.fixPreviousGlide) { v -> update { it.copy(fixPreviousGlide = v) } } }
@@ -309,7 +322,8 @@ fun SettingsScreen(
                     supportingContent = {
                         Text(
                             "Save a file to send to the developer if typing or gliding isn't working well, or the app crashed: your " +
-                                "settings, how your taps and glides lean, your recorded glides, and where the app crashed. Learned words, " +
+                                "settings, how your taps and glides lean, how your recent glides ended up, your recorded glides, and where " +
+                                "the app crashed. Learned words, " +
                                 "email addresses, the clipboard, your terminal bar and anything you typed are left out."
                         )
                     },

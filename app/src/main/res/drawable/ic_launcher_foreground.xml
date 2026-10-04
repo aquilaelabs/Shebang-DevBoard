@@ -1,16 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The Shebang mark: # and ! interlocked, the #'s bars cut parallel to the slanted !. Original to this
+     project (MIT). Plain shapes with real gaps, no painted-over knockout, so the same drawing serves as the
+     monochrome layer for themed icons. Generated from the geometry in tools/shebang_mark.py; the key glyph
+     (KeyIcons.SHEBANG) comes from the same script. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group>
-        <!-- '#' : two slanted verticals -->
-        <path android:fillColor="#7BE0A6" android:pathData="M41,32 L47,32 L41,76 L35,76 Z" />
-        <path android:fillColor="#7BE0A6" android:pathData="M55,32 L61,32 L55,76 L49,76 Z" />
-        <!-- '#' : two horizontals -->
-        <path android:fillColor="#7BE0A6" android:pathData="M30,44 L66,44 L66,50 L30,50 Z" />
-        <path android:fillColor="#7BE0A6" android:pathData="M28,58 L64,58 L64,64 L28,64 Z" />
-        <!-- '!' : bar and dot -->
-        <path android:fillColor="#F2F4F8" android:pathData="M72,32 L79,32 L77.5,62 L73.5,62 Z" />
-        <path android:fillColor="#F2F4F8" android:pathData="M75.5,68 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
-    </group>
+    <!-- The # in the accent green. -->
+    <path android:fillColor="#7BE0A6" android:pathData="M53.52 36.90 L48.12 74.70 A3.15 3.15 0 0 1 41.88 73.80 L47.28 36.00 A3.15 3.15 0 0 1 53.52 36.90 Z M34.20 45.90 L60.18 45.90 L59.45 52.20 L34.20 52.20 A3.15 3.15 0 0 1 34.20 45.90 Z M71.90 45.90 L73.80 45.90 A3.15 3.15 0 0 1 73.80 52.20 L71.01 52.20 Z M32.40 58.50 L58.73 58.50 L58.00 64.80 L32.40 64.80 A3.15 3.15 0 0 1 32.40 58.50 Z M70.12 58.50 L72.00 58.50 A3.15 3.15 0 0 1 72.00 64.80 L69.24 64.80 Z" />
+    <!-- The ! in key-text white. -->
+    <path android:fillColor="#ECEFF4" android:pathData="M64.35 29.25 L72.00 29.25 L67.05 64.35 L60.30 64.35 Z M57.60 74.25 A4.5 4.5 0 1 1 66.60 74.25 A4.5 4.5 0 1 1 57.60 74.25 Z" />
 </vector>
