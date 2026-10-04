@@ -81,8 +81,22 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
-- **Addresses typed exactly** (the owner's report: Firefox's address bar autocorrected and added spaces).
-  In web-address and email fields there is no autocorrect (the strip still offers words), no "I" for a
+- **Punctuation takes the place of the space after a word** (B11, the owner's report: a space before
+  punctuation after a glided or autocorrected word). The space that ended a word (the space key,
+  autocorrect on space, a strip pick, a predicted word, a phrase glide lifted in the space bar) is
+  provisional: `. , ! ? ; : )` typed next goes against the word ("the ." becomes "the.") and the space comes
+  back in front of the next letter typed ("the. next"), as other Android keyboards do. Quotes are left
+  out, since one may open a quotation. Not in code mode or terminals, after a second space or after
+  punctuation, nor once the cursor has been moved. In web-address fields the space does not come back, so
+  "github" picked from the strip, then ".io", is "github.io".
+- **Web-address fields space words again** (the owner, 4 Oct: an address bar is also a search box).
+  Strip picks, glides and predictions space words as in any text field, and the double-space period works;
+  autocorrect and the lone-i capital stay off so typed addresses are not changed, and `/` keeps the comma's
+  place. A glide right after `. / : @ - _ # ? = & ~` joins on without a space, so glided addresses stay whole.
+  Email fields keep every rule below. Chrome's address bar asks keyboards for no suggestions, so suggestions
+  and glide stay off there whatever this says.
+- **Addresses typed exactly** (the owner's report: Firefox's address bar autocorrected and added spaces;
+  the spacing part since changed for web-address fields, above). In web-address and email fields there is no autocorrect (the strip still offers words), no "I" for a
   lone i, no space the keyboard adds by itself (around a glide, after a strip pick, before a letter typed
   after a glide, the double-space period) and no next-word suggestions; space itself types a space. A plain
   one-line field whose hint reads like an address bar ("Search or enter address", "Search or type URL",

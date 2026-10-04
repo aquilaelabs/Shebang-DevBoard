@@ -571,6 +571,19 @@ class GlideCommitTest {
     }
 
     @Test
+    fun punctuationTakesTheSpaceOnlyRightAfterTheWordEnded() {
+        // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
+        glide("hello", trailingSpace = true)
+        type(".")
+        assertEquals("hello.", ic.toString())
+        // The cursor put after some other space: punctuation typed there just goes in.
+        type(" a b ")
+        userMovesCursor(9)
+        type(",")
+        assertEquals("hello. a ,b ", ic.toString())
+    }
+
+    @Test
     fun noLearningInEmailFields() {
         controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 0))
         type("someone ")
