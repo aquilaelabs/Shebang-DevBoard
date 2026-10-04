@@ -3,6 +3,13 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **The Shebang mark** (the owner chose concept B of three): # and ! interlocked, the #'s bars cut parallel
+  to the slanted ! with a 2.5-unit gap, so they break around it. The app icon draws the # in the accent
+  green and the ! in white on the Night background; the #! key draws it in the key's text colour, so it
+  follows every theme (TalkBack still says "Code mode"). The gaps are real shapes, not a background-coloured
+  knockout, so the same drawing is the icon's monochrome layer for Android's themed icons.
+  `tools/shebang_mark.py` holds the geometry and writes both the icon's paths and `KeyIcons.SHEBANG`.
+
 - **Glide accuracy from real use** (the owner's question: can the keyboard measure it from the fixes?):
   each glided word gets one outcome once it is final (the 8-word hold, or the field changing):
   kept, fixed from the strip (a swap right after, or a pick after tapping into it), glided again, edited

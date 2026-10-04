@@ -369,6 +369,8 @@ class KeyboardView(context: Context) : View(context) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
             // Always the enter icon, whatever the field's action (search, send, go): the user's choice.
             KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enter, fg, false)
+            // The #! key wears the Shebang mark.
+            KeyAction.MODE_CODE -> drawIcon(canvas, KeyIcons.shebang, fg, false)
             KeyAction.SHIFT -> drawIcon(canvas, when (shiftState) {
                 ShiftState.OFF -> KeyIcons.shift
                 ShiftState.ON -> KeyIcons.shiftOn

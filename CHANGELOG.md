@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (239882a)
+
 ## 0.5.1: 2026-10-03
 
 ### Added
