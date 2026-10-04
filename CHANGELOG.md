@@ -9,6 +9,11 @@
 - A settings gear on the terminal bar (8f59889)
 - Settings > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (8f59889)
 
+### Changed
+
+- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (3103ff7)
+- The setup screen shows your progress through the three steps, and finished steps fold away (3103ff7)
+
 ## 0.5.2: 2026-10-03
 
 ### Changed
