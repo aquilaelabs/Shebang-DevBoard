@@ -1,6 +1,40 @@
 # Changelog
 
-## 0.2.0: 2026-10-03
+## 0.5.0: 2026-10-03
+
+### Changed
+
+- Key preview and alternates draw inside the keyboard window; autocorrect and auto-capitalisation no longer do dictionary or editor work per keystroke on the main thread (9b385ff)
+- Glide typing decodes while the finger moves and shows the word in the strip before you lift; it is far more accurate and uses the word before the cursor (33a992d)
+- Glide reads real, imprecise swipes far better: tuned on a public set of a million real swipes, it picks the right word 89% of the time there, up from 81% (14a9011)
+- Swipe adaptation learns slowly, ignores sloppy glides and only takes so much each day, so one careless day cannot throw it off (14a9011)
+- A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (60444dd)
+- Suggestions while typing rank by how common words really are, so the likelier word comes first (2b0b9cf)
+- With the number row on, the top-row letters no longer show or hold the digits (e9d5e53)
+- Autocorrect leaves code alone: words like getUser, max_retries or user2, and any word already used in the text around the cursor (6ed70d9)
+- Glide reads the two words before it, not one, from a larger language model (Tatoeba plus Common Voice's public-domain sentences): real swipes right first time 88.9% -> 91.0%, phrase glides 90.9% -> 91.2%. The app is 5.6 MB larger (7a090a2)
+- Typed suggestions and autocorrect take the words before into account, as glide does: 'cut my haie' becomes 'hair', 'she can vook' becomes 'cook'. Words you typed right are still never changed (1a78b83)
+- Holding backspace (or any repeating key) buzzes once when pressed instead of on every repeat; the key sound still repeats (afecda7)
+- Autocorrect is on by default (it was off unless switched on in Settings); a word that begins a name in the code around, like 'max' of 'maxRetries', is left alone (3d46dff)
+- Autocorrect fixes a few more typos and picks the wrong word less often (real taps: 78.4% of typos fixed instead of 77.7%); taps leave unusual words such as names alone a little more (0171d36)
+- Autofill chips sit centred in the strip, and a sideways swipe puts them away so the terminal bar is back (bbf878b)
+- The enter key always shows the enter icon; it no longer turns into an oversized 'Search', 'Go' or 'Send' label (it still does what the field asks) (fc07c2f)
+- Reorder the terminal bar by dragging an item's handle in the bar editor, instead of up and down buttons (c7bba27)
+- Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (9c9b1ac)
+- Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (0a85acd)
+- A tap that lands low on a letter just above the space bar types a space when the word looks finished, so thumbs that fall short of the bar still get their space (369c718)
+- Autocorrect keeps the letters of a word you typed an apostrophe into (only the apostrophe may move), and leaves words joined by punctuation alone (f-droid, node.js) (5d8d5f1)
+- Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (3d7052c)
+- A word typed without its apostrophe gets one from the words before it: "I think its" becomes "I think it's", while "the dog wagged its" stays (1e952c8)
+- Code mode's symbols are laid out like the usual phone symbol page (? and ! at the right of the third row), with backspace, comma, period and enter where they are in text mode; % and ^ are held on 5 and 6 (694ee3a)
+- Glide forgives stopping short at turns, the way thumbs actually move: 91.0% of real swipes right instead of 90.6% (1484317)
+- Glide reads strokes with a model trained on 900,000 real swipes: 93.7% of words right first time instead of 91.0% (a36a242)
+- Suggestions after a space read the whole sentence with a model trained on the GPU: the next word is among the three 39% of the time instead of 36%, and glide gets the word right a little more often (4afa886)
+- Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (d777355)
+- Switching to code mode or the number pad no longer changes the keyboard's height (3402fd4)
+- Caps lock has its own shift glyph (two carets over a bar), so it no longer looks like one capital; backspace is drawn at the shift caret's thin weight (cb1fddd)
+- Shebang Voice has its own icon (the mic) instead of Android's default (bd73d5d)
+- Email fields have @ where the comma is (long-press it for the comma and _ - +), and fields whose hint asks for an email count as email fields too (5f7d634)
 
 ### Added
 
@@ -46,39 +80,6 @@
 - Holding backspace deletes whole words after a second (setting: Hold backspace for whole words) (1de6725)
 - Works with TalkBack: every key is spoken as you explore, and lifting on a key (or a double tap) types it (df9c56a)
 - Crash reports stay on the phone (where the code failed, no messages or dates) and are included in Export diagnostics, so a crash can be sent by choice (1aaea6a)
-
-### Changed
-
-- Key preview and alternates draw inside the keyboard window; autocorrect and auto-capitalisation no longer do dictionary or editor work per keystroke on the main thread (9b385ff)
-- Glide typing decodes while the finger moves and shows the word in the strip before you lift; it is far more accurate and uses the word before the cursor (33a992d)
-- Glide reads real, imprecise swipes far better: tuned on a public set of a million real swipes, it picks the right word 89% of the time there, up from 81% (14a9011)
-- Swipe adaptation learns slowly, ignores sloppy glides and only takes so much each day, so one careless day cannot throw it off (14a9011)
-- A look of its own: keys drawn as raised keycaps, original backspace, return and shift glyphs, and a cursor mark on the space bar (60444dd)
-- Suggestions while typing rank by how common words really are, so the likelier word comes first (2b0b9cf)
-- With the number row on, the top-row letters no longer show or hold the digits (e9d5e53)
-- Autocorrect leaves code alone: words like getUser, max_retries or user2, and any word already used in the text around the cursor (6ed70d9)
-- Glide reads the two words before it, not one, from a larger language model (Tatoeba plus Common Voice's public-domain sentences): real swipes right first time 88.9% -> 91.0%, phrase glides 90.9% -> 91.2%. The app is 5.6 MB larger (7a090a2)
-- Typed suggestions and autocorrect take the words before into account, as glide does: 'cut my haie' becomes 'hair', 'she can vook' becomes 'cook'. Words you typed right are still never changed (1a78b83)
-- Holding backspace (or any repeating key) buzzes once when pressed instead of on every repeat; the key sound still repeats (afecda7)
-- Autocorrect is on by default (it was off unless switched on in Settings); a word that begins a name in the code around, like 'max' of 'maxRetries', is left alone (3d46dff)
-- Autocorrect fixes a few more typos and picks the wrong word less often (real taps: 78.4% of typos fixed instead of 77.7%); taps leave unusual words such as names alone a little more (0171d36)
-- Autofill chips sit centred in the strip, and a sideways swipe puts them away so the terminal bar is back (bbf878b)
-- The enter key always shows the enter icon; it no longer turns into an oversized 'Search', 'Go' or 'Send' label (it still does what the field asks) (fc07c2f)
-- Reorder the terminal bar by dragging an item's handle in the bar editor, instead of up and down buttons (c7bba27)
-- Dragging bar items in the editor is smooth (the other rows slide out of the way) and the list scrolls when you hold an item near the top or bottom (9c9b1ac)
-- Swiping the chips away is a real swipe: they move with your finger and slide off, or spring back if you let go early (0a85acd)
-- A tap that lands low on a letter just above the space bar types a space when the word looks finished, so thumbs that fall short of the bar still get their space (369c718)
-- Autocorrect keeps the letters of a word you typed an apostrophe into (only the apostrophe may move), and leaves words joined by punctuation alone (f-droid, node.js) (5d8d5f1)
-- Tapping space with the cursor inside a word splits it there; holding space moves past the word; the keyboard picker moved to holding #! (3d7052c)
-- A word typed without its apostrophe gets one from the words before it: "I think its" becomes "I think it's", while "the dog wagged its" stays (1e952c8)
-- Code mode's symbols are laid out like the usual phone symbol page (? and ! at the right of the third row), with backspace, comma, period and enter where they are in text mode; % and ^ are held on 5 and 6 (694ee3a)
-- Glide forgives stopping short at turns, the way thumbs actually move: 91.0% of real swipes right instead of 90.6% (1484317)
-- Glide reads strokes with a model trained on 900,000 real swipes: 93.7% of words right first time instead of 91.0% (a36a242)
-- Suggestions after a space read the whole sentence with a model trained on the GPU: the next word is among the three 39% of the time instead of 36%, and glide gets the word right a little more often (4afa886)
-- Autocorrect leaves a word alone when it looks meant as typed: cleanly tapped words the dictionary lacks, names capitalised mid-sentence and words in capitals; wrong corrections are halved (d777355)
-- Switching to code mode or the number pad no longer changes the keyboard's height (3402fd4)
-- Caps lock has its own shift glyph (two carets over a bar), so it no longer looks like one capital; backspace is drawn at the shift caret's thin weight (cb1fddd)
-- Shebang Voice has its own icon (the mic) instead of Android's default (bd73d5d)
 
 ### Removed
 

@@ -48,6 +48,20 @@ class FieldInfoTest {
     }
 
     @Test
+    fun aPlainFieldAskingForAnEmailIsAnEmailField() {
+        val text = InputType.TYPE_CLASS_TEXT
+        assertEquals(FieldVariant.EMAIL, FieldInfo.from(text, 0, "Email").variant)
+        assertEquals(FieldVariant.EMAIL, FieldInfo.from(text or InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT, 0, "Your e-mail address").variant)
+        assertEquals(FieldVariant.EMAIL, FieldInfo.from(text, 0, "Email or username").variant)
+        // Not a word containing it, a field of another kind, or a message.
+        assertEquals(FieldVariant.PLAIN, FieldInfo.from(text, 0, "Gmail search").variant)
+        assertEquals(FieldVariant.PLAIN, FieldInfo.from(text or InputType.TYPE_TEXT_VARIATION_EMAIL_SUBJECT, 0, "Email subject").variant)
+        assertEquals(FieldVariant.PLAIN, FieldInfo.from(text or InputType.TYPE_TEXT_FLAG_MULTI_LINE, 0, "Compose email").variant)
+        assertEquals(FieldVariant.PLAIN, FieldInfo.from(text, 0, "Name").variant)
+        assertEquals(true, FieldInfo.from(text or InputType.TYPE_TEXT_VARIATION_PASSWORD, 0, "Email password").isPassword)
+    }
+
+    @Test
     fun enterFollowsImeOptions() {
         val go = FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_GO)
         assertEquals(EditorInfo.IME_ACTION_GO, go.editorAction)

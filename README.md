@@ -19,7 +19,7 @@ An Android keyboard (IME) for developers, written in Kotlin.
 - **Autocorrect that knows where you tapped**: a slip is weighed by where the finger came down, and the
   keyboard learns where your own taps land on each key.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no
-  suggestions or glide; number/phone/date fields get a numeric pad; email/URL fields get `@` and `/`.
+  suggestions or glide; number/phone/date fields get a numeric pad; email fields get `@` in place of the comma (also fields whose hint asks for an email), web-address fields `/` and `@`.
 - **Email addresses** typed into email fields are offered there again as you type, and **Export
   diagnostics** saves a file you can send the developer, with nothing personal in it.
 - **Autofill in the strip** (Android 11+): the password manager's or autofill service's suggestions show as

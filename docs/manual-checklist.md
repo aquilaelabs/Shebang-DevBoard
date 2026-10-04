@@ -46,8 +46,9 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [ ] Password: no suggestions, no glide, no preview text left anywhere.
 - [x] Autofill (with a test autofill service on the emulator): chips in the strip in the keyboard's colours;
   tapping one filled the username and password.
-- [x] Email: `@` and `/` on the bottom row. *(verified on the emulator in Contacts)*
-- [ ] URL: `@` and `/` on the bottom row; no auto-capitalisation in URL or email fields.
+- [x] Email: `@` where the comma was, long-press for `_ - + , & # %`; the next plain field has the comma
+      back. *(verified on the emulator in Chrome, `type="email"`)*
+- [ ] URL: `/` and `@` on the bottom row; no auto-capitalisation in URL or email fields.
 - [x] Email field: an address typed there and left is offered in an empty email field and fills it in.
       *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
