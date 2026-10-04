@@ -460,7 +460,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             applyBar()
         }
         // Words deleted in settings (same process) take effect the next time the keyboard opens.
-        bundle?.let { if (it.vocabularyVersion != personal.vocabularyVersion) languageLoader.rebuild() }
+        bundle?.let {
+            if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
+        }
         modifiers.clearAll()
         strip?.bar?.updateModifiers(modifiers)
         keyboard?.setShift(ShiftState.OFF, notify = false)

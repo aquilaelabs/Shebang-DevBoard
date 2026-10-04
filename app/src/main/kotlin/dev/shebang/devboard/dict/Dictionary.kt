@@ -135,6 +135,14 @@ class Dictionary(
         return Dictionary(w as Array<String>, l as Array<String>, t)
     }
 
+    /** This dictionary without [remove] (exact spellings), in the same order. */
+    fun withoutWords(remove: Set<String>): Dictionary {
+        if (remove.isEmpty()) return this
+        val keep = (0 until size).filter { words[it] !in remove }
+        if (keep.size == size) return this
+        return Dictionary(Array(keep.size) { words[keep[it]] }, Array(keep.size) { lower[keep[it]] }, IntArray(keep.size) { tiers[keep[it]] })
+    }
+
     /** Relative frequency weight for a tier; the ratio between tiers is what matters for ranking. */
     fun weight(index: Int): Double = tierWeight(tiers[index])
 

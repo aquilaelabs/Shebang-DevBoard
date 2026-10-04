@@ -3,6 +3,13 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **The built-in dictionary can be edited** (the owner's design): Settings > Learning > Built-in dictionary
+  lists the bundled words (search by prefix) with a delete button each; Removed lists the deleted ones with
+  Restore and Restore all. Removed words (`RemovedWords`, exact spellings in `removed_words.json`) are left
+  out when the language is built, so they are not suggested, glided or corrected to, and a learned word
+  does not bring one back; Android's personal dictionary still can, being the user's own list. The keyboard
+  rebuilds the next time it opens after an edit.
+
 - **Letters turning into spaces, made less eager** (the owner's report, 4 Oct: typing "toolchains", a tap
   plainly on c became a space after "tool"). Three changes to the space-from-letters rule (see "Thumbs that
   miss the space bar get a space" below):

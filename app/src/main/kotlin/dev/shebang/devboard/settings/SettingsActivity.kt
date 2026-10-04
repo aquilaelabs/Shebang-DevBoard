@@ -96,6 +96,7 @@ class SettingsActivity : ComponentActivity() {
             val profiles = remember { AppProfiles(this@SettingsActivity) }
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
+            var dictionary by remember { mutableStateOf(false) }
             // A document from the About section (asset path and title), while it is open.
             var aboutDoc by remember { mutableStateOf<Pair<String, String>?>(null) }
             DevBoardTheme(settings.palette) {
@@ -103,6 +104,9 @@ class SettingsActivity : ComponentActivity() {
                 if (doc != null) {
                     BackHandler { aboutDoc = null }
                     AboutDocScreen(title = doc.second, asset = doc.first, onBack = { aboutDoc = null })
+                } else if (dictionary) {
+                    BackHandler { dictionary = false }
+                    DictionaryScreen(onBack = { dictionary = false })
                 } else if (personalWords) {
                     BackHandler { personalWords = false }
                     PersonalWordsScreen(onBack = { personalWords = false })
@@ -137,6 +141,7 @@ class SettingsActivity : ComponentActivity() {
                         onEditBar = { editingBar = true },
                         onRecordGlides = { recording = true },
                         onPersonalWords = { personalWords = true },
+                        onDictionary = { dictionary = true },
                         onDoc = { asset, title -> aboutDoc = asset to title },
                         onBack = { finish() },
                     )
@@ -154,6 +159,7 @@ fun SettingsScreen(
     onEditBar: () -> Unit,
     onRecordGlides: () -> Unit,
     onPersonalWords: () -> Unit,
+    onDictionary: () -> Unit,
     onDoc: (asset: String, title: String) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -247,6 +253,13 @@ fun SettingsScreen(
                     headlineContent = { Text("Personal words") },
                     supportingContent = { Text("Review or delete what was learned and the email addresses remembered, or reset glide adaptation") },
                     modifier = Modifier.clickable(onClick = onPersonalWords),
+                )
+            }
+            item {
+                ListItem(
+                    headlineContent = { Text("Built-in dictionary") },
+                    supportingContent = { Text("Every word the keyboard ships with: delete ones you never want offered, and restore them any time") },
+                    modifier = Modifier.clickable(onClick = onDictionary),
                 )
             }
 

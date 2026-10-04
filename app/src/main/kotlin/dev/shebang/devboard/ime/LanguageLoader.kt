@@ -27,6 +27,8 @@ class LanguageLoader(
 ) {
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "devboard-language").apply { isDaemon = true } }
     private val started = AtomicBoolean(false)
+    /** Built-in words the user removed (Settings > Learning > Built-in dictionary). */
+    val removedWords = dev.shebang.devboard.dict.RemovedWords.get(context.filesDir)
     private val rebuildQueued = AtomicBoolean(false)
     private var base: Dictionary? = null
     private var data: NgramData? = null
@@ -44,7 +46,7 @@ class LanguageLoader(
             val dict = context.assets.open(DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }
             base = dict
             val t1 = SystemClock.elapsedRealtime()
-            onDictionary(Suggester(dict))
+            onDictionary(Suggester(dict.withoutWords(removedWords.snapshot())))
             data = context.assets.open(dev.shebang.devboard.dict.NgramModel.ASSET).use { NgramData.load(it) }
             glideModel = runCatching { context.assets.open(GlideModel.ASSET).use { GlideModel.load(it) } }
                 .onFailure { Log.w(TAG, "no glide model", it) }.getOrNull()
@@ -73,7 +75,8 @@ class LanguageLoader(
         val counts = personal.countsVersion
         val snapshot = if (learnWords) personal.snapshot() else PersonalSnapshot.EMPTY
         val system = SystemUserDictionary.read(context)
-        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts, glideModel, nextWord)
+        val removedVersion = removedWords.version
+        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts, glideModel, nextWord, removedWords.snapshot(), removedVersion)
         Log.i(TAG, "$why: ${bundle.dictionary.size} words (${bundle.dictionary.size - b.size} personal or system, " +
             "${bundle.systemWords} from the system dictionary), trie ${bundle.glide.trie.nodeCount} nodes in " +
             "${SystemClock.elapsedRealtime() - t0} ms")
