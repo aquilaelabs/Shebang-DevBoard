@@ -9,6 +9,7 @@
 ### Fixed
 
 - Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (03a62b7)
+- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (a38e598)
 
 ## 0.5.2: 2026-10-03
 
