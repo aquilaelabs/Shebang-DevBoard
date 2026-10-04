@@ -91,3 +91,6 @@ Usability items (0.5.2):
 - [x] Personal words > Add a word: "k8s" is refused with the rule shown; "Zorbly" is added as used twice and
       the strip offers it after typing "zorb". *(verified)*
 - [ ] Undo and Paste in a web page (Firefox or Chrome) and in Termux (Paste types the clipboard there).
+- [x] Redesigned settings and setup, in Night and Day: home page status and summaries, Appearance, Typing
+      and glide, Learning and privacy, Personal words, Terminal bar and the bar editor (drag still reorders).
+      *(verified on the API 36 emulator, debug and the signed 0.5.2 release)*
