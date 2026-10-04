@@ -31,15 +31,15 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [ ] Double-tap a word to select it, then glide: it is replaced. *(unit-tested; injected taps arrive too far
       apart to make a double-tap on the emulator)*
 - [x] A word typed twice ("kubectl") is glidable after the keyboard hides and reopens; a word added to
-      Android's personal dictionary is glidable; Settings > Personal words lists learned words.
+      Android's personal dictionary is glidable; Settings > Learning and privacy > Personal words lists learned words.
       *(verified on the emulator, except the Personal words screen)*
-- [x] Settings > Personal words lists learned words; delete removes one; Undo recent learning lists the kept
+- [x] Settings > Learning and privacy > Personal words lists learned words; delete removes one; Undo recent learning lists the kept
       days and going back to the start of today restores the counts of that morning. *(verified on the
       emulator: "world" went from 5 uses back to 4 and "hello" from 3 to 2)*
 - [ ] Reset glide adaptation zeroes the glide and correction counts.
 - [x] Phrase gliding on: "hello", dip below the middle of the space bar, "world" in one stroke writes
       "hello world"; lifting inside the space bar adds a space. *(verified on the emulator)*
-- [x] Settings > Record glides: gliding the prompted word stores it, the count goes up, the next word
+- [x] Settings > Typing and glide > Record glides: gliding the prompted word stores it, the count goes up, the next word
       appears; the exported file replays in `RecordedGlidesTest`. *(verified on the emulator with injected
       strokes; export through the file picker not exercised)*
 - [ ] Record a few hundred glides on the Pixel and run `RecordedGlidesTest`.

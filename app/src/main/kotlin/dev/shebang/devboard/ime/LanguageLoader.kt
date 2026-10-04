@@ -27,7 +27,7 @@ class LanguageLoader(
 ) {
     private val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "devboard-language").apply { isDaemon = true } }
     private val started = AtomicBoolean(false)
-    /** Built-in words the user removed (Settings > Learning > Built-in dictionary). */
+    /** Built-in words the user removed (Settings > Learning and privacy > Built-in dictionary). */
     val removedWords = dev.shebang.devboard.dict.RemovedWords.get(context.filesDir)
     private val rebuildQueued = AtomicBoolean(false)
     private var base: Dictionary? = null

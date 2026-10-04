@@ -31,9 +31,9 @@ An Android keyboard (IME) for developers, written in Kotlin.
   chips in the strip, in the keyboard's colours; tapping one fills the form.
 - **On-device only**: the sole permission is `VIBRATE`. No network code, no analytics. What the keyboard
   learns (word counts, word pairs, swipe offsets) stays in the app's private files, can be reviewed and
-  deleted (or words added by hand) in Settings > Personal words, and is never taken from password, number, email, URL, terminal or
+  deleted (or words added by hand) in Settings > Learning and privacy > Personal words, and is never taken from password, number, email, URL, terminal or
   no-suggestion fields, or fields that ask for no learning. The one exception is email addresses typed into
-  email fields, which are remembered so the strip can offer them again (Settings > Learning > Remember email
+  email fields, which are remembered so the strip can offer them again (Settings > Learning and privacy > Remember email
   addresses turns this off).
 
 ## Screenshots
@@ -43,7 +43,9 @@ An Android keyboard (IME) for developers, written in Kotlin.
 | <img src="docs/screenshots/suggestions.png" width="270" alt="Suggestions after a space"> | <img src="docs/screenshots/glide.png" width="270" alt="Gliding with the trail and a live preview"> | <img src="docs/screenshots/code-mode.png" width="270" alt="Code mode"> |
 | Next-word suggestions from the whole sentence | Glide typing: the trail, and the word read before you lift | Code mode: every symbol on one page |
 | <img src="docs/screenshots/emoji.png" width="270" alt="Emoji panel"> | <img src="docs/screenshots/clipboard.png" width="270" alt="Clipboard history"> | <img src="docs/screenshots/settings.png" width="180" alt="Settings"> |
-| The emoji panel, from the terminal bar | Clipboard history with pins and pictures | Settings (Night theme) |
+| The emoji panel, from the terminal bar | Clipboard history with pins and pictures | Settings: every page at a glance (Night theme) |
+| <img src="docs/screenshots/setup.png" width="180" alt="Setup"> | <img src="docs/screenshots/one-handed.png" width="180" alt="One-handed mode"> | <img src="docs/screenshots/appearance.png" width="180" alt="Appearance settings"> |
+| Setup in three steps, with a field to try it | One-handed mode, docked left | Appearance: themes, height, one-handed mode |
 
 ## Build and install
 
@@ -73,7 +75,7 @@ Rebuilding the word list, the word statistics and the models: [docs/data-and-mod
 | `glide` | `LexiconTrie` (the dictionary as a tree of key sequences), `StreamingGlideDecoder` (beam search while the finger moves, exact re-alignment after lift, joint decoding across words), `GlideModel` (the learned reading of strokes), `GlideSession` (decoder thread fed by a lock-free ring), `GlideAdaptation` and `TapModel` (where this user's glides and taps land), `GlideTrace` (recorded glides), `KeyLayoutModel` |
 | `dict` | `Dictionary` (sorted word list with tiers), `PersonalWords` (learned words), `NgramModel` (word, word-pair and three-word statistics), `NextWordModel` (the neural next-word model), `WordPredictions` (the strip's next words from both), `Suggester` (prefix completion + edit-distance correction), `LetterPrior` |
 | `store` | `JsonFile`: how the learned words, adaptation, emails and clipboard history are saved (atomic writes; an unreadable file set aside, never overwritten) |
-| `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `PersonalWordsScreen`, `AboutScreen`, `DiagnosticsExport`, `AppProfiles` (each app's mode and bar), `GlideRecorderView`, `GlideTraceStore` |
+| `settings` | `Settings`, `SettingsRepository` (DataStore), `SetupActivity`, `SettingsActivity` with the bar editor and the glide recorder (Compose + Material 3), `SettingsPages` (the home page and its eight pages) and `SettingsUi` (cards, rows and glyphs), `PersonalWordsScreen`, `AboutScreen`, `DiagnosticsExport`, `AppProfiles` (each app's mode and bar), `GlideRecorderView`, `GlideTraceStore` |
 
 The Shebang Voice add-on is the `voice` module (`dev.shebang.devboard.voice`); see its section below.
 

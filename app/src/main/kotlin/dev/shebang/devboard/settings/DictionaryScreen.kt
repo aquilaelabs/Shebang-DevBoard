@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
@@ -106,30 +107,31 @@ fun DictionaryScreen(onBack: () -> Unit) {
         }
     }) { padding ->
         val words = all
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
+        ) {
             if (words == null) {
-                item { Text("Loading…", modifier = Modifier.padding(16.dp)) }
+                item { PageNote("Loading…") }
                 return@LazyColumn
             }
             val q = query.trim().lowercase()
             val shown = words.filter { it !in removed && (q.isEmpty() || it.lowercase().startsWith(q)) }
             if (q.isEmpty()) item {
-                Text(
+                PageNote(
                     "The ${"%,d".format(words.size - removed.size)} words this keyboard ships with. A word you delete is no longer offered, " +
-                        "glided or used as a correction; restore it from Removed. Words you added to Android's personal " +
-                        "dictionary and words the keyboard learned are not listed here.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        "glided or used as a correction; restore it from Removed. Words in Android's personal dictionary " +
+                        "and words the keyboard learned are not listed here.",
                 )
             }
-            if (shown.isEmpty()) item { Text("No words start with \"${query.trim()}\".", modifier = Modifier.padding(16.dp)) }
-            items(shown, key = { it }) { w ->
-                ListItem(
-                    headlineContent = { Text(w) },
-                    trailingContent = {
+            item { GroupTitle(if (q.isEmpty()) "Words" else "Starting with \"${query.trim()}\"") }
+            if (shown.isEmpty()) item { CardRow(0, 1) { CardListItem("No words start with \"${query.trim()}\"") } }
+            itemsIndexed(shown, key = { _, w -> w }) { i, w ->
+                CardRow(i, shown.size) {
+                    CardListItem(w, trailing = {
                         IconButton(onClick = { change { store.remove(w) } }) { Icon(Icons.Filled.Delete, contentDescription = "Delete $w") }
-                    },
-                )
+                    })
+                }
             }
         }
     }
@@ -147,21 +149,17 @@ private fun RemovedWordsList(removed: List<String>, onRestore: (String) -> Unit,
             actions = { if (removed.isNotEmpty()) TextButton(onClick = { confirmAll = true }) { Text("Restore all") } },
         )
     }) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
-            if (removed.isEmpty()) item { Text("No words removed. The built-in dictionary is as it shipped.", modifier = Modifier.padding(16.dp)) }
-            else item {
-                Text(
-                    "Words you deleted from the built-in dictionary. Restore one to have it offered and glided again.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                HorizontalDivider()
-            }
-            items(removed, key = { it }) { w ->
-                ListItem(
-                    headlineContent = { Text(w) },
-                    trailingContent = { TextButton(onClick = { onRestore(w) }) { Text("Restore") } },
-                )
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
+        ) {
+            if (removed.isEmpty()) item { PageNote("No words removed. The built-in dictionary is as it shipped.") }
+            else item { PageNote("Words you deleted from the built-in dictionary. Restore one to have it offered and glided again.") }
+            if (removed.isNotEmpty()) item { GroupTitle("Removed (${removed.size})") }
+            itemsIndexed(removed, key = { _, w -> w }) { i, w ->
+                CardRow(i, removed.size) {
+                    CardListItem(w, trailing = { TextButton(onClick = { onRestore(w) }) { Text("Restore") } })
+                }
             }
         }
     }

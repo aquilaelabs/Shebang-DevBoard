@@ -227,7 +227,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     }
 
     /**
-     * Adds [word] by hand (Settings > Personal words): a word at once, offered, glided and corrected to like
+     * Adds [word] by hand (Settings > Learning and privacy > Personal words): a word at once, offered, glided and corrected to like
      * one used [NEW_WORD_THRESHOLD] times, and written as given ("GitHub" keeps its capitals). Adding a word
      * already learned makes it known and takes the new spelling. Returns false for a word [isLearnable] refuses.
      */

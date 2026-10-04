@@ -90,7 +90,7 @@ simulator) second:
 | A swiper who lands 0.15 key right and 0.3 row low, before and after ten days of adapting (`GlideAdaptationTest`) | | 84.0% before, 91.3% after |
 
 The looser matching costs a little on the simulator's neat strokes and wins much more on real ones. Record
-your own with **Settings > Record glides**, which prompts common words on the real keyboard and keeps each
+your own with **Settings > Typing and glide > Record glides**, which prompts common words on the real keyboard and keeps each
 glide with its timing and the key positions until you export it. Put exported `.jsonl` files in
 `app/src/test/resources/glide/traces/` (or point `DEVBOARD_TRACES` at them). The dataset is not in the
 repository; download `test.jsonl`, `dev.jsonl` and `swipe-5/layouts/qwerty.json` into one folder and run:
@@ -112,15 +112,15 @@ its own, locally:
 - **Words you use.** Each word committed in a field that allows learning is counted with the word before
   it. Words the dictionary lacks become glidable and suggestable on their second use. Counts are mixed into
   word frequencies (30% at most, reached after 2,000 words) and word pairs into the bigram model once a
-  context has been seen 5 times. Settings > Personal words lists them with a delete button each.
+  context has been seen 5 times. Settings > Learning and privacy > Personal words lists them with a delete button each.
 - **How you swipe.** Where each kept glide passed each letter, relative to the key centre, moves that
   letter's key centre for decoding, shrunk toward the average lean of all your glides. A correction (a
   tapped word glided again, or swapped for an alternative) re-aligns the word's original stroke, when it
   was glided lately, to the word you meant and counts twice, when the stroke plausibly was that word. It
   learns slowly and ignores sloppy glides, and only so much counts each day, so one careless day cannot
-  throw it off. Reset in Settings > Personal words.
+  throw it off. Reset in Settings > Learning and privacy > Personal words.
 - **Going back.** The learned words and the swipe adaptation as they stood at the start of each of the last
-  14 days are kept; Settings > Personal words > Undo recent learning goes back to any of them. Deleting a
+  14 days are kept; Settings > Learning and privacy > Personal words > Undo recent learning goes back to any of them. Deleting a
   word deletes it from those days too.
 - **Android's personal dictionary.** Its words (English, or with no locale) join the vocabulary when the
   keyboard loads.

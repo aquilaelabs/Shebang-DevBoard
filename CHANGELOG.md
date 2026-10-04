@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- One-handed mode: the keys shrink to the left or right side, with buttons beside them to switch sides or go back to full width (Settings > Appearance, or a terminal bar item) (8f59889)
+- Undo, Redo, Select all, Cut, Copy and Paste on the terminal bar, done by the app itself so a terminal never gets a stray Ctrl+Z (8f59889)
+- A settings gear on the terminal bar (8f59889)
+- Settings > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (8f59889)
+
 ## 0.5.2: 2026-10-03
 
 ### Changed

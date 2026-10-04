@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -131,138 +134,137 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             }
         }
     }) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding)) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
+        ) {
             // While searching, only the matching words.
-            if (!searching) item {
-                Text(
-                    "Learned on this phone from what you type and glide, and never sent anywhere. No words are learned in " +
-                        "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
-                        "no learning. A new word is glidable after you use it twice.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            if (!searching) item {
-                ListItem(
-                    headlineContent = { Text("Add a word") },
-                    supportingContent = { Text("A name, a project or a term the keyboard should know: offered, glided and corrected to from now on.") },
-                    leadingContent = { Icon(Icons.Filled.Add, contentDescription = null) },
-                    modifier = Modifier.clickable { adding = true },
-                )
-            }
-            if (!searching) item {
-                ListItem(
-                    headlineContent = { Text("Reset glide and tap adaptation") },
-                    supportingContent = {
-                        Text("Learned from ${plural(glides, "glide")} and ${plural(corrections, "correction")}. Resetting forgets how your swipes lean off each key.")
-                    },
-                    modifier = Modifier.clickable { confirmReset = true },
-                )
-            }
-            if (!searching) item {
-                val today = (System.currentTimeMillis() / 86_400_000L).toInt()
-                ListItem(
-                    headlineContent = { Text("Undo recent learning") },
-                    supportingContent = {
-                        Text(
-                            if (restoreDays.isEmpty()) "Nothing to undo yet. The keyboard keeps where things stood at the start of each of the last ${PersonalWords.KEEP_DAYS} days."
-                            else "Go back to how learned words and swipe and tap adaptation stood at the start of a recent day, if a sloppy day taught the keyboard the wrong things."
-                        )
-                    },
-                    modifier = Modifier.clickable(enabled = restoreDays.isNotEmpty()) { choosingDay = true },
-                )
-                if (choosingDay) {
-                    AlertDialog(
-                        onDismissRequest = { choosingDay = false },
-                        title = { Text("Go back to the start of") },
-                        text = {
-                            Column {
-                                for (d in restoreDays) {
-                                    ListItem(
-                                        headlineContent = { Text(dayLabel(d, today)) },
-                                        modifier = Modifier.clickable {
-                                            choosingDay = false
-                                            confirmDay = d
-                                        },
-                                    )
-                                }
-                            }
-                        },
-                        confirmButton = {},
-                        dismissButton = { TextButton(onClick = { choosingDay = false }) { Text("Cancel") } },
-                    )
-                }
-            }
-            if (!searching) item {
-                ListItem(
-                    headlineContent = { Text("Android personal dictionary") },
-                    supportingContent = { Text("Words added there are also glidable. Tap to open it.") },
-                    modifier = Modifier.clickable {
-                        try {
-                            context.startActivity(Intent(android.provider.Settings.ACTION_USER_DICTIONARY_SETTINGS))
-                        } catch (_: ActivityNotFoundException) {
-                            // Some phones do not ship the screen; the words are still read when present.
-                        }
-                    },
-                )
-            }
-            if (!searching && emails.isNotEmpty()) {
-                item { HorizontalDivider() }
+            if (!searching) {
                 item {
-                    ListItem(
-                        headlineContent = { Text("Email addresses") },
-                        supportingContent = { Text("Entered in email fields, and offered there as you type them again. Tap to forget them all.") },
-                        modifier = Modifier.clickable { confirmClearEmails = true },
+                    PageNote(
+                        "Learned on this phone from what you type and glide, and never sent anywhere. Nothing is learned in " +
+                            "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
+                            "no learning. A new word is glidable after you use it twice.",
                     )
                 }
-                items(emails, key = { "email:" + it.address.lowercase() }) { e ->
-                    ListItem(
-                        headlineContent = { Text(e.address) },
-                        supportingContent = { Text(if (e.count == 1) "Entered once" else "Entered ${e.count} times") },
-                        trailingContent = {
-                            IconButton(onClick = {
-                                scope.launch {
-                                    emails = withContext(Dispatchers.IO) {
-                                        emailMemory.delete(e.address)
-                                        emailMemory.list()
+                item {
+                    SettingsGroup("Words") {
+                        NavRow("Add a word", "A name, a project or a term: offered, glided and corrected to from now on", opensPage = false) { adding = true }
+                        RowDivider()
+                        NavRow("Android personal dictionary", "Words added there are glidable too", opensPage = false) {
+                            try {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_USER_DICTIONARY_SETTINGS))
+                            } catch (_: ActivityNotFoundException) {
+                                // Some phones do not ship the screen; the words are still read when present.
+                            }
+                        }
+                    }
+                }
+                item { Spacer(Modifier.height(GroupGap)) }
+                item {
+                    val today = (System.currentTimeMillis() / 86_400_000L).toInt()
+                    SettingsGroup("Adaptation") {
+                        NavRow(
+                            "Reset glide and tap adaptation",
+                            "Learned from ${plural(glides, "glide")} and ${plural(corrections, "correction")}. Resetting forgets how your swipes and taps lean off each key.",
+                            opensPage = false,
+                        ) { confirmReset = true }
+                        RowDivider()
+                        NavRow(
+                            "Undo recent learning",
+                            if (restoreDays.isEmpty()) "Nothing to undo yet. Where things stood at the start of each of the last ${PersonalWords.KEEP_DAYS} days is kept."
+                            else "Go back to how words and adaptation stood at the start of a recent day, if a sloppy day taught the wrong things.",
+                            opensPage = false,
+                            enabled = restoreDays.isNotEmpty(),
+                        ) { choosingDay = true }
+                    }
+                    if (choosingDay) {
+                        AlertDialog(
+                            onDismissRequest = { choosingDay = false },
+                            title = { Text("Go back to the start of") },
+                            text = {
+                                Column {
+                                    for (d in restoreDays) {
+                                        ListItem(
+                                            headlineContent = { Text(dayLabel(d, today)) },
+                                            modifier = Modifier.clickable {
+                                                choosingDay = false
+                                                confirmDay = d
+                                            },
+                                        )
                                     }
                                 }
-                            }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Forget ${e.address}")
-                            }
-                        },
-                    )
-                }
-            }
-            if (!searching) item { HorizontalDivider() }
-            val list = words
-            when {
-                list == null -> item { Text("Loading…", modifier = Modifier.padding(16.dp)) }
-                list.isEmpty() -> item { Text("No learned words yet.", modifier = Modifier.padding(16.dp)) }
-                else -> {
-                    if (!searching) item {
-                        ListItem(
-                            headlineContent = { Text("Delete all learned words") },
-                            supportingContent = { Text(plural(list.size, "word")) },
-                            modifier = Modifier.clickable { confirmClear = true },
+                            },
+                            confirmButton = {},
+                            dismissButton = { TextButton(onClick = { choosingDay = false }) { Text("Cancel") } },
                         )
                     }
-                    val q = query.trim().lowercase()
-                    val shown = if (q.isEmpty()) list else list.filter { q in it.lower || q in it.display.lowercase() }
-                    if (shown.isEmpty()) item { Text("No learned words match \"${query.trim()}\".", modifier = Modifier.padding(16.dp)) }
-                    items(shown, key = { it.lower }) { w ->
-                        ListItem(
-                            headlineContent = { Text(w.display) },
-                            supportingContent = {
-                                val used = if (w.count == 1) "Used once" else "Used ${w.count} times"
-                                Text(if (w.known) used else "$used · new word, glidable after 2 uses")
-                            },
-                            trailingContent = {
-                                IconButton(onClick = { change { personal.delete(w.lower) } }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Delete ${w.display}")
-                                }
+                }
+            }
+            if (!searching && emails.isNotEmpty()) {
+                item { Spacer(Modifier.height(GroupGap)) }
+                item { GroupTitle("Email addresses") }
+                val rows = emails.size + 1
+                item {
+                    CardRow(0, rows) {
+                        CardListItem(
+                            "Forget all addresses",
+                            "Entered in email fields and offered there again as you type them",
+                            modifier = Modifier.clickable { confirmClearEmails = true },
+                        )
+                    }
+                }
+                itemsIndexed(emails, key = { _, e -> "email:" + e.address.lowercase() }) { i, e ->
+                    CardRow(i + 1, rows) {
+                        CardListItem(
+                            e.address,
+                            if (e.count == 1) "Entered once" else "Entered ${e.count} times",
+                            trailing = {
+                                IconButton(onClick = {
+                                    scope.launch {
+                                        emails = withContext(Dispatchers.IO) {
+                                            emailMemory.delete(e.address)
+                                            emailMemory.list()
+                                        }
+                                    }
+                                }) { Icon(Icons.Filled.Delete, contentDescription = "Forget ${e.address}") }
                             },
                         )
+                    }
+                }
+            }
+            if (!searching) item { Spacer(Modifier.height(GroupGap)) }
+            val list = words
+            when {
+                list == null -> item { PageNote("Loading…") }
+                list.isEmpty() -> {
+                    item { GroupTitle("Learned words") }
+                    item { CardRow(0, 1) { CardListItem("No learned words yet", "Words you type and glide show up here") } }
+                }
+                else -> {
+                    val q = query.trim().lowercase()
+                    val shown = if (q.isEmpty()) list else list.filter { q in it.lower || q in it.display.lowercase() }
+                    item { GroupTitle(if (searching) "Matching words" else "Learned words (${list.size})") }
+                    val head = if (searching) 0 else 1
+                    if (!searching) item {
+                        CardRow(0, shown.size + head) {
+                            CardListItem("Delete all learned words", plural(list.size, "word"), modifier = Modifier.clickable { confirmClear = true })
+                        }
+                    }
+                    if (shown.isEmpty()) item { CardRow(0, 1) { CardListItem("No learned words match \"${query.trim()}\"") } }
+                    itemsIndexed(shown, key = { _, w -> w.lower }) { i, w ->
+                        CardRow(i + head, shown.size + head) {
+                            val used = if (w.count == 1) "Used once" else "Used ${w.count} times"
+                            CardListItem(
+                                w.display,
+                                if (w.known) used else "$used · new word, glidable after 2 uses",
+                                trailing = {
+                                    IconButton(onClick = { change { personal.delete(w.lower) } }) {
+                                        Icon(Icons.Filled.Delete, contentDescription = "Delete ${w.display}")
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -288,7 +290,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirmClearEmails = false },
             title = { Text("Forget all email addresses?") },
-            text = { Text("The keyboard stops offering them until you enter them again. Settings > Remember email addresses turns remembering off.") },
+            text = { Text("The keyboard stops offering them until you enter them again. Settings > Learning and privacy > Remember email addresses turns remembering off.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClearEmails = false

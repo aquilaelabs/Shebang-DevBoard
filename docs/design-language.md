@@ -296,34 +296,35 @@ Applies to: glide, preview, strip
 
 During a glide the suggestion strip shows a single full-width bold line (the words that lift would write). After lift it returns to three slots: runner-up, chosen word (bold, middle), third. Glided words go straight into the field; the keyboard never rewrites text on its own. To redo a word the user taps inside it or selects it: it is underlined (the field's composing underline) and the strip shows it in the middle slot with its alternatives either side; the next glide or a tapped alternative replaces it, keeping its capitals. A cursor at a word's edge targets nothing, so a glide there adds a word; space with a word targeted moves past it.
 
-### the launcher setup screen with three steps and a test field (Android app)
+### the launcher setup screen: the mark, three steps with progress, and a test field (Android app)
 
 Platform: an Android app: Material's shapes and elevation, 48dp touch targets, the app's sections as a bottom bar, and the system's back gesture respected.
-Layout of the launcher setup screen with three steps and a test field on a phone frame (6 columns by 12 rows), from the Mobile app template, numbered in drawing order (a later block draws over an earlier one where they overlap):
-  1. Header (the band at the top): Shebang DevBoard, across the top, row 1 of 12
-  2. Text (a block of prose): one-line pitch, across the middle, row 2 of 12
-  3. Card (a box holding one thing): 1 Enable the keyboard (Done / button), across the middle, rows 3 to 4 of 12
-  4. Card (a box holding one thing): 2 Select it (Done / Choose keyboard), across the middle, rows 5 to 6 of 12
-  5. Card (a box holding one thing): 3 Try it: multiline test field, across the middle, rows 7 to 9 of 12
-  6. Button (an action to press): Open DevBoard settings, across the middle, row 11 of 12
+Layout of the launcher setup screen: the mark, three steps with progress, and a test field on a phone frame (6 columns by 12 rows), from the Mobile app template, numbered in drawing order (a later block draws over an earlier one where they overlap):
+  1. Image (a picture or a media block): the Shebang mark, 72dp, rounded, on the left, columns 1 to 2 of 6, row 1 of 12
+  2. Header (the band at the top): Shebang DevBoard (headline) and a two-line pitch, across the middle, rows 2 to 3 of 12
+  3. Text (a block of prose): progress line: N of 3 done / All set, across the middle, row 4 of 12
+  4. Card (a box holding one thing): 1 Turn it on (number disc or check; text and button until done), across the middle, row 5 of 12
+  5. Card (a box holding one thing): 2 Make it your keyboard (Choose keyboard), across the middle, row 6 of 12
+  6. Card (a box holding one thing): 3 Try it: multiline test field, across the middle, rows 7 to 9 of 12
+  7. Button (an action to press): Open settings (filled once set up, outlined before), across the middle, row 11 of 12
 Notes:
-  Material 3, dynamic colour when available. Step state is re-checked on resume and every second while visible because the system sends no broadcast.
+  No app bar: the mark and name head the page under the status bar. Steps are cards of the theme's key colour with 8dp corners; a step not done shows a tinted number disc, its explanation and a 6dp-cornered button; once done it shrinks to its header with a filled check disc and Done. Step 1 says Android's warning about keyboards and that this one has no network. Step state is re-checked on resume and every second while visible because the system sends no broadcast.
 
-### the settings screen, the terminal-bar editor and personal words (Android app)
+### the settings: a home page of categories, a page per category, the bar editor and personal words (Android app)
 
 Platform: an Android app: Material's shapes and elevation, 48dp touch targets, the app's sections as a bottom bar, and the system's back gesture respected.
-Layout of the settings screen, the terminal-bar editor and personal words on a phone frame (6 columns by 28 rows: the frame shows 12 of them, and the page scrolls), from the Settings template, numbered in drawing order (a later block draws over an earlier one where they overlap):
-  1. Header (the band at the top): DevBoard settings, across the top, row 1 of 28
-  2. List (rows of like things): Appearance: theme swatches (Auto, Wallpaper, 12 themes), height slider, number row, key preview, across the middle, rows 2 to 6 of 28
-  3. List (rows of like things): Feedback: haptics, strength chips, key sounds, across the middle, rows 7 to 9 of 28
-  4. List (rows of like things): Typing: glide, trail, phrase gliding, Record glides, across the middle, rows 10 to 13 of 28
-  5. List (rows of like things): Learning: learn words I type, adapt glide to my swiping, Personal words, across the middle, rows 14 to 16 of 28
-  6. List (rows of like things): Corrections: autocorrect, auto-capitalize, double-space period, across the middle, rows 17 to 18 of 28
-  7. List (rows of like things): Terminal bar: strip behaviour chips, Edit terminal bar, across the middle, rows 19 to 20 of 28
-  8. List (rows of like things): Bar editor: items with up/down/remove, + add dialog, More: export/import/reset, across the middle, rows 21 to 24 of 28
-  9. List (rows of like things): Personal words: search under the title (only matches show), note, reset, undo learning, Android dictionary, words, across the bottom, rows 25 to 28 of 28
+Layout of the settings: a home page of categories, a page per category, the bar editor and personal words on a phone frame (6 columns by 28 rows: the frame shows 12 of them, and the page scrolls), from the Settings template, numbered in drawing order (a later block draws over an earlier one where they overlap):
+  1. Header (the band at the top): Settings (large title that collapses on scroll), across the top, rows 1 to 2 of 28
+  2. Card (a box holding one thing): the mark, name, version; current-keyboard status with Set up when not, across the middle, rows 3 to 4 of 28
+  3. List (rows of like things): Keyboard: Appearance, Typing and glide, Corrections and suggestions, Sound and vibration, Terminal bar, Voice typing, across the middle, rows 5 to 10 of 28
+  4. List (rows of like things): Your data: Learning and privacy, across the middle, row 11 of 28
+  5. List (rows of like things): About, across the middle, row 12 of 28
+  6. Header (the band at the top): a category page: large title, back arrow, across the middle, rows 14 to 15 of 28
+  7. List (rows of like things): titled groups of switch, choice, slider and link rows on cards, across the middle, rows 16 to 19 of 28
+  8. List (rows of like things): Bar editor: which app's bar on a card, then Items (N) as card rows with drag handle and remove; + add, More, across the middle, rows 21 to 24 of 28
+  9. List (rows of like things): Personal words: search under the title, note, Words and Adaptation groups, emails, Learned words (N) as card rows, across the bottom, rows 25 to 28 of 28
 Notes:
-  Switch rows are ListItems with a trailing Switch; choices are FilterChip rows; the bar editor is a second screen inside the same activity. Personal words is a third screen in the same activity: a plain explanation first, then actions as ListItems, then each learned word with its use count and a trailing delete icon; clearing all, resetting adaptation and undoing recent learning confirm in an AlertDialog; undo first lists the kept days (Today, Yesterday, then weekday and date).
+  Each home row has a 40dp tile tinted with the accent holding a single-colour glyph of the project's own drawing (keyboard, glide stroke, text with check, speaker, prompt, mic, padlock, i in a ring), a title, a one-line summary of how the page stands (Night theme · 100% height; Glide on · trail on) and a chevron. Pages: Appearance (Theme swatches; Size and layout: height slider, one-handed Off/Left/Right, number row, key preview), Typing and glide (Glide typing group with Record glides; Keys), Corrections and suggestions (As you type; Suggestions; Code mode), Sound and vibration, Terminal bar (strip mode and Edit terminal bar), Voice typing, Learning and privacy (What it learns; Words: Personal words, Built-in dictionary), About (licence, source, credits, privacy; Help: Export diagnostics). Rows sit on cards of the theme's key colour, 8dp corners, hairlines between rows, group titles in the accent; page margins 14dp, 10dp between groups. Small choices are segmented buttons with 6dp outer corners. Long lists (words, bar items, removed words) are card rows across lazy items: the first and last take the corners. Clearing, resetting and undoing confirm in an AlertDialog. The keyboard's bar gear opens the home page.
 
 ### the glide recorder: prompts common words and records glides on a copy of the keyboard (Android app)
 

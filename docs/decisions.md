@@ -3,6 +3,15 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **Settings as a home page of categories** (0.5.2, the owner's ask for a polished layout): one long list of
+  about forty rows became a home page and eight pages. The home page shows the app, whether it is the
+  current keyboard (with Set up when not), and one row per page with a glyph and a summary of how that page
+  stands, so most people read what they need without opening anything. Rows sit on cards of the theme's key
+  colour with the design's small radii and spacing; small choices are segmented buttons. The category
+  glyphs are drawn for this project, in the key glyphs' idiom, since the Material core icon set has no
+  keyboard, speaker or prompt. Setup lost its app bar for the mark and name, gained a progress line, and
+  a finished step shrinks to its header.
+
 - **One-handed mode** (0.5.2): the keys take 77% of the width, docked left or right, and the space beside
   them holds two large buttons: a chevron that moves the keys to the other side and a two-headed arrow
   for full width. 77% puts the far edge within a thumb's reach on a 6.7-inch phone while each key stays
@@ -24,7 +33,7 @@ data. Newest first at the top, then the original design notes.
   default bar's third item, after emoji and clipboard, drawn as a single-colour glyph like them; it opens
   settings in their own task and hides the keyboard.
 
-- **Adding a word by hand** (0.5.2): Settings > Learning > Personal words > Add a word. The word is known
+- **Adding a word by hand** (0.5.2): Settings > Learning and privacy > Personal words > Add a word. The word is known
   at once (counted as used twice, the learning threshold), written as typed, and checked by the same rule
   as learned words (2 to 32 letters, `'`, `-` and `_` inside), since the glide trie and the suggester work on
   those. A word removed from the built-in dictionary is restored when added. Like learned words it can be
@@ -46,7 +55,7 @@ data. Newest first at the top, then the original design notes.
   What it cannot see counts as kept: a fix after leaving the field or past the hold, and a wrong word never
   noticed, so the real error rate is a little higher than it shows; a deletion may be a change of mind.
 
-- **The built-in dictionary can be edited** (the owner's design): Settings > Learning > Built-in dictionary
+- **The built-in dictionary can be edited** (the owner's design): Settings > Learning and privacy > Built-in dictionary
   lists the bundled words (search by prefix) with a delete button each; Removed lists the deleted ones with
   Restore and Restore all. Removed words (`RemovedWords`, exact spellings in `removed_words.json`) are left
   out when the language is built, so they are not suggested, glided or corrected to, and a learned word
@@ -130,8 +139,8 @@ data. Newest first at the top, then the original design notes.
   three that begin with what is typed back to a space, comma or semicolon, most used first (with nothing
   typed, the most used), raising the strip in Auto mode like next-word predictions; so one name at two
   providers shows both until the provider is typed. A pick replaces what was typed. No offers in
-  no-suggestion fields (the standing rule). Settings > Learning > Remember email addresses (on) turns it
-  off; Settings > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
+  no-suggestion fields (the standing rule). Settings > Learning and privacy > Remember email addresses (on) turns it
+  off; Settings > Learning and privacy > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
   word alone in the middle slot spans the strip, so a long address keeps its name and its domain.
 - **Clipboard chip** (the user's request): text copied in the last three minutes gets a chip in the strip's
   top row (the autofill row, ahead of any autofill chips) while no word is composed: "Paste" and the clip's
@@ -315,7 +324,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **When nothing fits**: after the wider retry, the decoder falls back to the candidates the preview last
   showed rather than drop the gesture; one backspace removes the result.
 - **Whose glides tune the decoder** (the user's decision): the shipped parameters are tuned on the FUTO
-  dataset only. Glides recorded with **Settings > Record glides** (by the author or sent in by users as
+  dataset only. Glides recorded with **Settings > Typing and glide > Record glides** (by the author or sent in by users as
   exported `.jsonl`) are replayed by `RecordedGlidesTest` to measure, never to tune: a trial search on
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
@@ -436,7 +445,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   uncorrected glides after ten sober days moves no key more than 0.042 of a key and leaves the next
   morning's accuracy unchanged (91.3% both). The state at the start of each of the last 14 days is kept, in
   `glide_adaptation.json` and, for learned words, as `personal_words.day-N.json` beside the vocabulary;
-  Settings > Personal words > Undo recent learning restores both to the start of a chosen day. Deleting a
+  Settings > Learning and privacy > Personal words > Undo recent learning restores both to the start of a chosen day. Deleting a
   word rewrites the kept days without it, and deleting everything deletes them, so going back never
   brings a deleted word back.
 - **Android's personal dictionary**: read through `UserDictionary.Words` when the language loads, words of
