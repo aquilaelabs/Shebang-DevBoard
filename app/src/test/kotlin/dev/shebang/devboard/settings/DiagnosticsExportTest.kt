@@ -40,6 +40,21 @@ class DiagnosticsExportTest {
     }
 
     @Test
+    fun wordListsAreCountsOnly() {
+        val store = dev.shebang.devboard.dict.WordPackStore(java.nio.file.Files.createTempDirectory("packs").toFile())
+        store.import("Secret project names", "Zorblaxian\nQuuxify\n".byteInputStream())
+        store.setEnabled("names", false)
+        val packs = DiagnosticsExport.wordPacksJson(store)
+        val text = Json.encodeToString(JsonObject.serializer(), packs)
+        assertFalse(text.contains("Zorblaxian"))
+        assertFalse(text.contains("Secret"))
+        assertEquals("false", packs["names"]!!.jsonPrimitive.content)
+        assertEquals("true", packs["dev"]!!.jsonPrimitive.content)
+        assertEquals(1, packs["importedLists"]!!.jsonPrimitive.int)
+        assertEquals(2, packs["importedWords"]!!.jsonPrimitive.int)
+    }
+
+    @Test
     fun learningIsCountsAndAdaptationIsNumbers() {
         val d = doc()
         assertEquals(12, d["learned"]!!.jsonObject["words"]!!.jsonPrimitive.int)

@@ -374,7 +374,8 @@ class NgramModel private constructor(
             val mix = if (personalUni != null) PERSONAL_MIX * minOf(1.0, personalTokens / PERSONAL_MIN_TOKENS).coerceAtLeast(0.05) else 0.0
             val uniCost = FloatArray(dictionary.size) { i ->
                 val id = lmIdOfWord[i]
-                val base = ((if (id != 0) data.lmCount[id].toDouble() else 0.0) + pseudo[i]) / norm
+                // A pack's word counts a little less than a regular word as common as it (WordPacks.weight).
+                val base = ((if (id != 0) data.lmCount[id].toDouble() else 0.0) + pseudo[i]) / norm * WordPacks.weight(dictionary.packs[i].toInt())
                 val p = if (personalUni != null) (1 - mix) * base + mix * personalUni[i] / personalNorm else base
                 (-ln(p)).toFloat()
             }

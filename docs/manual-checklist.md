@@ -94,3 +94,9 @@ Usability items (0.5.2):
 - [x] Redesigned settings and setup, in Night and Day: home page status and summaries, Appearance, Typing
       and glide, Learning and privacy, Personal words, Terminal bar and the bar editor (drag still reorders).
       *(verified on the API 36 emulator, debug and the signed 0.5.2 release)*
+- [x] Settings > Dictionaries: the regular words show "Always on" and the three packs have switches;
+      importing a three-word text file from Downloads adds a list, and the strip offers its word after "zorbl";
+      with Computer terms off "cpu" then space gives "cup", with it on "CPU". *(verified on the API 36
+      emulator)*
+- [ ] On a phone: import a large list (tens of thousands of words) and see how long the keyboard takes to
+      be ready afterwards.

@@ -166,6 +166,9 @@ class Suggester(
         // a slip ("thar" for "that") or the name itself without its capitals ("google" for "Google").
         val recase = known >= 0 && typed == lower && !dict.hasLowercaseSpelling(lower)
         if (known >= 0 && !recase) return contractionFor(typed, known, candidates, context)
+        // A development word, computer term or word of the user's own lists, typed as it is spelled: meant, so it
+        // takes its capitals ("cpu" -> "CPU") rather than becoming an everyday word a slip away ("cup").
+        if (recase && !asUnknown && WordPacks.keepsTypedForm(dict.packs[known].toInt())) return dict.words[known]
         val maxD = if (lower.length >= 6 || (taps != null && lower.length >= TAP_TWO_SLIPS_FROM)) 2 else 1
         var best: String? = null
         var bestScore = 0.0

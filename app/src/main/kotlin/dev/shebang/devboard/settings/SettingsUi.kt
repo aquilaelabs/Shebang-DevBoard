@@ -85,6 +85,7 @@ internal object SettingsIcons {
     private const val LOCK = "M5 10 H19 V21 H5 Z M11 13.5 H13 V17.5 H11 Z M7 10 V7.5 A5 5 0 0 1 17 7.5 V10 H15 V7.5 A3 3 0 0 0 9 7.5 V10 Z"
     private const val TERMINAL = "M3.5 7.4 L4.9 6 L10.9 12 L4.9 18 L3.5 16.6 L8.1 12 Z M12 16 H20.5 V18 H12 Z"
     private const val INFO = "M12 2.5 A9.5 9.5 0 1 0 12 21.5 A9.5 9.5 0 1 0 12 2.5 Z M12 4.5 A7.5 7.5 0 1 1 12 19.5 A7.5 7.5 0 1 1 12 4.5 Z M11 10.5 H13 V17 H11 Z M11 7 H13 V9 H11 Z"
+    private const val BOOK = "M2.5 5.2 C5.2 4.2 8.4 4.4 11 6 V20 C8.4 18.5 5.2 18.4 2.5 19.3 Z M13 6 C15.6 4.4 18.8 4.2 21.5 5.2 V19.3 C18.8 18.4 15.6 18.5 13 20 Z"
     private const val CHEVRON = "M9.4 5.5 L15.9 12 L9.4 18.5 L8 17.1 L13.1 12 L8 6.9 Z"
 
     private fun even(d: String): Path = PathParser.createPathFromPathData(d).apply { fillType = Path.FillType.EVEN_ODD }
@@ -101,6 +102,8 @@ internal object SettingsIcons {
     val lock = even(LOCK)
     /** A prompt and cursor: Terminal bar. */
     val terminal = even(TERMINAL)
+    /** An open book: Dictionaries. */
+    val book: Path = PathParser.createPathFromPathData(BOOK)
     /** An i in a ring: About. */
     val info = even(INFO)
     /** A chevron: a row that opens a page. */

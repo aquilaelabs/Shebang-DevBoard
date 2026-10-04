@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.RemovedWords
+import dev.shebang.devboard.dict.WordPacks
 import dev.shebang.devboard.ime.LanguageLoader
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -53,13 +54,19 @@ fun DictionaryScreen(onBack: () -> Unit) {
     val store = remember { RemovedWords.get(context.filesDir) }
     val scope = rememberCoroutineScope()
     var all by remember { mutableStateOf<List<String>?>(null) }
+    // The pack each word comes from, for the label under words that are not regular ones.
+    var packOf by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var removed by remember { mutableStateOf<Set<String>>(emptySet()) }
     var query by remember { mutableStateOf("") }
     var showRemoved by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         val (words, gone) = withContext(Dispatchers.IO) {
-            val d = context.assets.open(LanguageLoader.DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }
+            val parts = listOf(context.assets.open(LanguageLoader.DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }) +
+                WordPacks.builtIn.mapNotNull { p -> runCatching { context.assets.open(p.asset).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it, p.id) } }.getOrNull() }
+            val d = Dictionary.merge(parts)
+            val titles = WordPacks.builtIn.associate { it.id to it.title }
+            packOf = (0 until d.size).filter { d.packs[it].toInt() != WordPacks.REGULAR }.associate { d.words[it] to (titles[d.packs[it].toInt()] ?: "") }
             d.words.toList() to store.snapshot()
         }
         all = words
@@ -119,7 +126,7 @@ fun DictionaryScreen(onBack: () -> Unit) {
             val shown = words.filter { it !in removed && (q.isEmpty() || it.lowercase().startsWith(q)) }
             if (q.isEmpty()) item {
                 PageNote(
-                    "The ${"%,d".format(words.size - removed.size)} words this keyboard ships with. A word you delete is no longer offered, " +
+                    "The ${"%,d".format(words.size - removed.size)} words this keyboard ships with, its packs' included. A word you delete is no longer offered, " +
                         "glided or used as a correction; restore it from Removed. Words in Android's personal dictionary " +
                         "and words the keyboard learned are not listed here.",
                 )
@@ -128,7 +135,7 @@ fun DictionaryScreen(onBack: () -> Unit) {
             if (shown.isEmpty()) item { CardRow(0, 1) { CardListItem("No words start with \"${query.trim()}\"") } }
             itemsIndexed(shown, key = { _, w -> w }) { i, w ->
                 CardRow(i, shown.size) {
-                    CardListItem(w, trailing = {
+                    CardListItem(w, packOf[w], trailing = {
                         IconButton(onClick = { change { store.remove(w) } }) { Icon(Icons.Filled.Delete, contentDescription = "Delete $w") }
                     })
                 }

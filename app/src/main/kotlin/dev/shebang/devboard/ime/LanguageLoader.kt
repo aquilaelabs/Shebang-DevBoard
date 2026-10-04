@@ -9,6 +9,7 @@ import dev.shebang.devboard.dict.NgramData
 import dev.shebang.devboard.dict.PersonalSnapshot
 import dev.shebang.devboard.dict.PersonalWords
 import dev.shebang.devboard.dict.Suggester
+import dev.shebang.devboard.dict.WordPacks
 import dev.shebang.devboard.glide.GlideModel
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -29,6 +30,14 @@ class LanguageLoader(
     private val started = AtomicBoolean(false)
     /** Built-in words the user removed (Settings > Learning and privacy > Built-in dictionary). */
     val removedWords = dev.shebang.devboard.dict.RemovedWords.get(context.filesDir)
+    /** Which word packs are on, and the lists the user imported (Settings > Dictionaries). */
+    val packs = dev.shebang.devboard.dict.WordPackStore.get(context.filesDir)
+    /** [packs]' version the current word list reflects. */
+    @Volatile
+    var packsVersion = -1
+        private set
+    private var regular: Dictionary? = null
+    private val packCache = HashMap<Int, Dictionary>()
     private val rebuildQueued = AtomicBoolean(false)
     private var base: Dictionary? = null
     private var data: NgramData? = null
@@ -43,7 +52,7 @@ class LanguageLoader(
         if (!started.compareAndSet(false, true)) return
         executor.execute {
             val t0 = SystemClock.elapsedRealtime()
-            val dict = context.assets.open(DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }
+            val dict = loadBase()
             base = dict
             val t1 = SystemClock.elapsedRealtime()
             onDictionary(Suggester(dict.withoutWords(removedWords.snapshot())))
@@ -55,6 +64,44 @@ class LanguageLoader(
             personal.load()
             buildNow("load", t1)
             Log.i(TAG, "dictionary ${dict.size} words in ${t1 - t0} ms")
+        }
+    }
+
+    /**
+     * The regular words merged with the packs that are on and the user's own lists that are on (their words the
+     * rest lacks). Parsed packs are kept, so turning one on or off again is quick. On the loader thread.
+     */
+    private fun loadBase(): Dictionary {
+        packsVersion = packs.version
+        val reg = regular ?: parseAsset(WordPacks.REGULAR_ASSET, WordPacks.REGULAR).also { regular = it }
+        val parts = arrayListOf(reg)
+        for (p in WordPacks.builtIn) {
+            if (!packs.isEnabled(p.key)) continue
+            val d = packCache[p.id] ?: runCatching { parseAsset(p.asset, p.id) }.onFailure { Log.w(TAG, "no ${p.key} pack", it) }.getOrNull()
+            if (d != null) {
+                packCache[p.id] = d
+                parts.add(d)
+            }
+        }
+        var merged = Dictionary.merge(parts)
+        val own = packs.enabledImportedWords().filter { merged.indexOfLower(it.lowercase()) < 0 }.distinctBy { it.lowercase() }
+        if (own.isNotEmpty()) {
+            merged = Dictionary.merge(listOf(merged, Dictionary.parse(own.asSequence().map { "$it\t$IMPORTED_TIER" }, WordPacks.IMPORTED)))
+        }
+        return merged
+    }
+
+    private fun parseAsset(asset: String, pack: Int): Dictionary =
+        context.assets.open(asset).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it, pack) }
+
+    /** The word packs changed: the word list is put together again, then the bundle rebuilt. */
+    fun reloadBase() {
+        if (!started.get()) return
+        executor.execute {
+            val t0 = SystemClock.elapsedRealtime()
+            base = loadBase()
+            base?.let { onDictionary(Suggester(it.withoutWords(removedWords.snapshot()))) }
+            buildNow("packs", t0)
         }
     }
 
@@ -76,7 +123,7 @@ class LanguageLoader(
         val snapshot = if (learnWords) personal.snapshot() else PersonalSnapshot.EMPTY
         val system = SystemUserDictionary.read(context)
         val removedVersion = removedWords.version
-        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts, glideModel, nextWord, removedWords.snapshot(), removedVersion)
+        val bundle = LanguageBuilder.build(b, d, snapshot, system, vocab, counts, glideModel, nextWord, removedWords.snapshot(), removedVersion, packsVersion)
         Log.i(TAG, "$why: ${bundle.dictionary.size} words (${bundle.dictionary.size - b.size} personal or system, " +
             "${bundle.systemWords} from the system dictionary), trie ${bundle.glide.trie.nodeCount} nodes in " +
             "${SystemClock.elapsedRealtime() - t0} ms")
@@ -84,7 +131,10 @@ class LanguageLoader(
     }
 
     companion object {
-        const val DICTIONARY_ASSET = "dict/en_words.txt"
+        /** The regular words; the packs are listed in [WordPacks]. */
+        const val DICTIONARY_ASSET = WordPacks.REGULAR_ASSET
+        /** Tier of a word from the user's own lists: offered and glidable, never autocorrected to. */
+        const val IMPORTED_TIER = 40
         private const val TAG = "DevBoard"
     }
 }

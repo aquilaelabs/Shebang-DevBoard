@@ -15,7 +15,7 @@
 ### Added
 
 - Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (78c89c1)
-- Settings > Learning and privacy > Built-in dictionary: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (21762e3)
+- Settings > Dictionaries > Built-in words: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (21762e3)
 - Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (6764977)
 - One-handed mode: the keys shrink to the left or right side, with buttons beside them to switch sides or go back to full width (Settings > Appearance, or a terminal bar item) (3103ff7)
 - Undo, Redo, Select all, Cut, Copy and Paste on the terminal bar, done by the app itself so a terminal never gets a stray Ctrl+Z (3103ff7)

@@ -482,9 +482,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             mode = if (appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
             applyBar()
         }
-        // Words deleted in settings (same process) take effect the next time the keyboard opens.
+        // Words deleted in settings (same process) take effect the next time the keyboard opens; so do word packs
+        // turned on or off, and word lists imported.
         bundle?.let {
-            if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
+            if (languageLoader.packsVersion != languageLoader.packs.version) languageLoader.reloadBase()
+            else if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
         }
         modifiers.clearAll()
         strip?.bar?.updateModifiers(modifiers)

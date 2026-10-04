@@ -32,10 +32,11 @@ class PersonalLearningTest {
     fun aNewWordBecomesKnownOnItsSecondUse() {
         val p = PersonalWords(null)
         val v0 = p.vocabularyVersion
-        p.learn("kubectl", null, false, inDictionary)
+        // A made-up name: "kubectl" is in the development pack now.
+        p.learn("zorbctl", null, false, inDictionary)
         assertFalse(p.list().single().known)
         assertEquals(v0, p.vocabularyVersion)
-        p.learn("kubectl", "run", false, inDictionary)
+        p.learn("zorbctl", "run", false, inDictionary)
         assertTrue(p.list().single().known)
         assertEquals(v0 + 1, p.vocabularyVersion)
     }

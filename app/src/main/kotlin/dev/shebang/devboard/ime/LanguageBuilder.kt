@@ -21,6 +21,8 @@ class LanguageBundle(
     val systemWords: Int,
     /** [dev.shebang.devboard.dict.RemovedWords.version] this build reflects. */
     val removedVersion: Int = 0,
+    /** [dev.shebang.devboard.dict.WordPackStore.version] this build reflects. */
+    val packsVersion: Int = 0,
 )
 
 /**
@@ -43,6 +45,7 @@ object LanguageBuilder {
         nextWord: dev.shebang.devboard.dict.NextWordModel? = null,
         removed: Set<String> = emptySet(),
         removedVersion: Int = 0,
+        packsVersion: Int = 0,
     ): LanguageBundle {
         // Words the user removed from the built-in list go, and learned words do not bring them back (Android's
         // personal dictionary still can: that one is the user's own list).
@@ -68,7 +71,7 @@ object LanguageBuilder {
         }
         return LanguageBundle(
             dictionary, lm, GlideLanguage.build(dictionary, lm, glideModel, nextWord), Suggester(dictionary, counts, FloatArray(dictionary.size) { kotlin.math.exp(-lm.unigramCost(it).toDouble()).toFloat() }, lm),
-            vocabularyVersion, countsVersion, systemWords.size, removedVersion,
+            vocabularyVersion, countsVersion, systemWords.size, removedVersion, packsVersion,
         )
     }
 }

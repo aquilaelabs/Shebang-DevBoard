@@ -13,6 +13,8 @@ class Dictionary(
     val lower: Array<String>,
     /** Tier per word (10, 20, 35, 40, 50, 60). */
     val tiers: IntArray,
+    /** The pack each word comes from ([WordPacks]): the regular words, a built-in pack, or a list the user imported. */
+    val packs: ByteArray = ByteArray(words.size),
 ) {
     val size: Int get() = words.size
 
@@ -111,6 +113,7 @@ class Dictionary(
         val w = arrayOfNulls<String>(n)
         val l = arrayOfNulls<String>(n)
         val t = IntArray(n)
+        val p = ByteArray(n)
         var i = 0
         var j = 0
         for (k in 0 until n) {
@@ -123,6 +126,7 @@ class Dictionary(
                 w[k] = words[i]
                 l[k] = lower[i]
                 t[k] = tiers[i]
+                p[k] = packs[i]
                 i++
             } else {
                 w[k] = add[j].first
@@ -132,7 +136,7 @@ class Dictionary(
             }
         }
         @Suppress("UNCHECKED_CAST")
-        return Dictionary(w as Array<String>, l as Array<String>, t)
+        return Dictionary(w as Array<String>, l as Array<String>, t, p)
     }
 
     /** This dictionary without [remove] (exact spellings), in the same order. */
@@ -140,7 +144,10 @@ class Dictionary(
         if (remove.isEmpty()) return this
         val keep = (0 until size).filter { words[it] !in remove }
         if (keep.size == size) return this
-        return Dictionary(Array(keep.size) { words[keep[it]] }, Array(keep.size) { lower[keep[it]] }, IntArray(keep.size) { tiers[keep[it]] })
+        return Dictionary(
+            Array(keep.size) { words[keep[it]] }, Array(keep.size) { lower[keep[it]] }, IntArray(keep.size) { tiers[keep[it]] },
+            ByteArray(keep.size) { packs[keep[it]] },
+        )
     }
 
     /** Relative frequency weight for a tier; the ratio between tiers is what matters for ranking. */
@@ -158,8 +165,55 @@ class Dictionary(
             else -> 0.01
         }
 
-        /** Parses the `word<TAB>tier` asset format. Lines must already be sorted case-insensitively. */
-        fun parse(lines: Sequence<String>): Dictionary {
+        /**
+         * Several word lists as one, in search order: the regular words first, then each pack (a spelling
+         * already there is not added again). Each part must be in search order, as [parse] leaves it.
+         */
+        fun merge(parts: List<Dictionary>): Dictionary {
+            val nonEmpty = parts.filter { it.size > 0 }
+            if (nonEmpty.size == 1) return nonEmpty[0]
+            if (nonEmpty.isEmpty()) return Dictionary(emptyArray(), emptyArray(), IntArray(0))
+            val total = nonEmpty.sumOf { it.size }
+            val w = ArrayList<String>(total)
+            val l = ArrayList<String>(total)
+            val t = IntArray(total)
+            val p = ByteArray(total)
+            val at = IntArray(nonEmpty.size)
+            val seen = HashSet<String>(total * 2)
+            var n = 0
+            while (true) {
+                // The next entry in search order among the parts' heads; ties go to the earlier part.
+                var best = -1
+                for (k in nonEmpty.indices) {
+                    if (at[k] >= nonEmpty[k].size) continue
+                    if (best < 0 || compareEntries(nonEmpty[k], at[k], nonEmpty[best], at[best]) < 0) best = k
+                }
+                if (best < 0) break
+                val d = nonEmpty[best]
+                val i = at[best]++
+                if (!seen.add(d.words[i])) continue
+                w.add(d.words[i])
+                l.add(d.lower[i])
+                t[n] = d.tiers[i]
+                p[n] = d.packs[i]
+                n++
+            }
+            return Dictionary(w.toTypedArray(), l.toTypedArray(), t.copyOf(n), p.copyOf(n))
+        }
+
+        /** Search order: by lowercase form, then the commonest tier, then the all-lowercase spelling, then the spelling. */
+        private fun compareEntries(a: Dictionary, i: Int, b: Dictionary, j: Int): Int {
+            val c = a.lower[i].compareTo(b.lower[j])
+            if (c != 0) return c
+            if (a.tiers[i] != b.tiers[j]) return a.tiers[i].compareTo(b.tiers[j])
+            val la = if (a.words[i] == a.lower[i]) 0 else 1
+            val lb = if (b.words[j] == b.lower[j]) 0 else 1
+            if (la != lb) return la.compareTo(lb)
+            return a.words[i].compareTo(b.words[j])
+        }
+
+        /** Parses the `word<TAB>tier` asset format, every word from [pack]. Lines must already be sorted case-insensitively. */
+        fun parse(lines: Sequence<String>, pack: Int = WordPacks.REGULAR): Dictionary {
             val words = ArrayList<String>(70_000)
             val tiers = ArrayList<Int>(70_000)
             for (line in lines) {
@@ -183,14 +237,15 @@ class Dictionary(
                     break
                 }
             }
+            val packArray = ByteArray(words.size) { pack.toByte() }
             if (sorted) {
-                return Dictionary(words.toTypedArray(), lowered, tiers.toIntArray())
+                return Dictionary(words.toTypedArray(), lowered, tiers.toIntArray(), packArray)
             }
             val order = words.indices.sortedWith(order0)
             val w = Array(order.size) { words[order[it]] }
             val l = Array(order.size) { lowered[order[it]] }
             val t = IntArray(order.size) { tiers[order[it]] }
-            return Dictionary(w, l, t)
+            return Dictionary(w, l, t, packArray)
         }
     }
 }

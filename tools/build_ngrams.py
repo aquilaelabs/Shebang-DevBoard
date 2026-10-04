@@ -11,7 +11,7 @@ Inputs
     against --tatoeba-weight (integers, default 1 and 2: the shipped model)
   - --exclude: jsonl files with a "sentence" field (the FUTO swipe dataset's test and dev splits): those
     sentences are never counted, so benchmarks on them are not tested on text the model learned from
-  - app/src/main/assets/dict/en_words.txt (the SCOWL word list); only its words are modelled.
+  - app/src/main/assets/dict/en_words.txt and pack_*.txt (the word lists); only their words are modelled.
 
 Outputs
   - app/src/main/assets/dict/en_ngrams.bin     the model, format below
@@ -49,6 +49,7 @@ Format (big-endian, as java.io.DataInputStream reads it):
 import argparse
 import bz2
 import collections
+import glob
 import json
 import os
 import random
@@ -151,12 +152,14 @@ def main():
                     pass
     print(f"excluding {len(excluded)} sentences")
 
+    # The regular words and every pack, so a pack word has its counts whenever its pack is on.
     vocab_words = set()
-    with open(args.words, encoding="utf-8") as fh:
-        for line in fh:
-            w = line.split("\t")[0].lower()
-            if w:
-                vocab_words.add(w)
+    for path in [args.words] + sorted(glob.glob(os.path.join(os.path.dirname(args.words), "pack_*.txt"))):
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                w = line.split("\t")[0].lower()
+                if w:
+                    vocab_words.add(w)
 
     # Pass 1: words and pairs.
     uni = collections.Counter()

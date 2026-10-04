@@ -26,6 +26,7 @@ object DiagnosticsExport {
     /** What is left out, written into the file so whoever reads it knows. */
     val LEFT_OUT = listOf(
         "learned words and word pairs (counts only)",
+        "imported word lists and their names (counts only)",
         "email addresses (count only)",
         "clipboard history",
         "terminal bar keys and snippets",
@@ -48,6 +49,7 @@ object DiagnosticsExport {
         crashes: List<CrashLog.Crash> = emptyList(),
         spaceHabit: Triple<Float, Float, Boolean>? = null,
         glideOutcomes: JsonObject? = null,
+        wordPacks: JsonObject? = null,
     ): JsonObject = buildJsonObject {
         put("format", JsonPrimitive("shebang-devboard-diagnostics"))
         put("version", JsonPrimitive(1))
@@ -67,6 +69,7 @@ object DiagnosticsExport {
             put("pairs", JsonPrimitive(learned.pairs))
             put("emailAddresses", JsonPrimitive(learned.emails))
         })
+        wordPacks?.let { put("wordPacks", it) }
         put("tapAdaptation", taps)
         put("glideAdaptation", glides)
         glideOutcomes?.let { put("glideOutcomes", it) }
@@ -138,8 +141,18 @@ object DiagnosticsExport {
             CrashLog.read(File(dir, CrashLog.FILE)),
             dev.shebang.devboard.glide.SpaceHabit.get(dir).summary(),
             dev.shebang.devboard.glide.GlideOutcomes.get(dir).summary(),
+            wordPacksJson(dev.shebang.devboard.dict.WordPackStore.get(dir)),
         )
         out.write(pretty.encodeToString(JsonObject.serializer(), doc).toByteArray())
+    }
+
+    /** Which built-in packs are on, and how many lists the user imported and words they hold: never the words or names. */
+    fun wordPacksJson(store: dev.shebang.devboard.dict.WordPackStore): JsonObject = buildJsonObject {
+        for (p in dev.shebang.devboard.dict.WordPacks.builtIn) put(p.key, JsonPrimitive(store.isEnabled(p.key)))
+        val lists = store.lists()
+        put("importedLists", JsonPrimitive(lists.size))
+        put("importedListsOn", JsonPrimitive(lists.count { it.enabled }))
+        put("importedWords", JsonPrimitive(lists.filter { it.enabled }.sumOf { it.words }))
     }
 
     private val json = Json { ignoreUnknownKeys = true }

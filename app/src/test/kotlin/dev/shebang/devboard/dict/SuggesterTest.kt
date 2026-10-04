@@ -99,7 +99,7 @@ class SuggesterTest {
 
     @Test
     fun bundledDictionaryLoadsAndIsSorted() {
-        val d = Dictionary.parse(java.io.File("src/main/assets/dict/en_words.txt").readLines().asSequence())
+        val d = BuiltInWords.all()
         assertTrue(d.size > 50_000)
         assertTrue(d.contains("keyboard"))
         assertTrue(d.contains("the"))

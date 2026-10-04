@@ -17,6 +17,7 @@ All of it is in the app's private storage, which other apps cannot read. It is l
 - Words you use, and which word followed which, so suggestions and glide typing fit you. Nothing is learned in password, number, email, web address, terminal or no-suggestion fields, or in apps that ask keyboards not to learn. Turn it off with Settings > Learning and privacy > Learn words I type.
 - Where your taps and glides land on each key, kept only as numbers per letter. Turn these off with Adapt autocorrect to my taps and Adapt glide to my swiping.
 - How the above stood at the start of each of the last 14 days, so a bad day can be undone.
+- Word lists you import in Settings > Dictionaries, only if you import one: copied into the app's storage so the keyboard can offer their words. Delete one there and it is gone.
 - Email addresses you type into email fields, at most 50, so the keyboard can offer them again in email fields. Turn it off with Settings > Learning and privacy > Remember email addresses.
 - Clipboard history: up to 20 recent copies, text or pictures, each kept for 24 hours unless you pin it. Copies an app marks as sensitive (a password manager's, for example) are never kept.
 - Your settings, your terminal bars, and whether each app was last used in text or code mode.

@@ -4,7 +4,8 @@ How the word list, the word statistics and the two neural models are rebuilt. Wh
 how each was measured, is in [decisions.md](decisions.md); the sources and licences are in
 [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 
-Regenerate the word list from a SCOWL release, then the n-gram model from Tatoeba's English sentence export
+Regenerate the word lists (the regular words and the three packs; see "Dictionaries in packs" in
+decisions.md) from a SCOWL release, then the n-gram model from Tatoeba's English sentence export
 (<https://downloads.tatoeba.org/exports/per_language/eng/eng_sentences.tsv.bz2>) and Common Voice's English
 sentence collection (the `server/data/en/*.txt` files of <https://github.com/common-voice/common-voice>, in
 one folder). `--exclude` keeps the FUTO test and dev sentences out of the counts, so the real-swipe benchmark

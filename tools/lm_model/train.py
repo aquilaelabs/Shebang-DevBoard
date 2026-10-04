@@ -11,6 +11,7 @@ Held out: the first 2000 of app/src/test/resources/glide/heldout_sentences.tsv (
 never had), and the first 2000 distinct sentences of FUTO's test split (never in the corpus either).
 """
 import argparse
+import glob
 import json
 import math
 import os
@@ -114,7 +115,11 @@ def main():
         vocab = vocab[: args.vocab]
         tokens = np.where(tokens >= args.vocab, 2, tokens)
     ids = {w: i for i, w in enumerate(vocab)}
-    dictionary = {l.split("\t")[0].lower() for l in open(WORDS, encoding="utf-8")}
+    # The regular words and every pack.
+    dictionary = set()
+    for path in [WORDS] + sorted(glob.glob(os.path.join(os.path.dirname(WORDS), "pack_*.txt"))):
+        with open(path, encoding="utf-8") as fh:
+            dictionary |= {line.split("\t")[0].lower() for line in fh}
     sets = heldout_sets(args.futo)
 
     # One stream, cut into [batch] parallel rows, read [bptt] tokens at a time with the state carried on.

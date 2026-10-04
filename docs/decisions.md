@@ -55,7 +55,7 @@ data. Newest first at the top, then the original design notes.
   What it cannot see counts as kept: a fix after leaving the field or past the hold, and a wrong word never
   noticed, so the real error rate is a little higher than it shows; a deletion may be a change of mind.
 
-- **The built-in dictionary can be edited** (the owner's design): Settings > Learning and privacy > Built-in dictionary
+- **The built-in dictionary can be edited** (the owner's design): Settings > Dictionaries > Built-in words
   lists the bundled words (search by prefix) with a delete button each; Removed lists the deleted ones with
   Restore and Restore all. Removed words (`RemovedWords`, exact spellings in `removed_words.json`) are left
   out when the language is built, so they are not suggested, glided or corrected to, and a learned word
@@ -81,6 +81,36 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **Dictionaries in packs** (the owner's design, 4 Oct, after B12: "usb" and other computer terms were
+  missing or rare, and typed in lowercase they were corrected away: cpu -> cup, git -> got, aws -> was).
+  The word list is now the regular words (`en_words.txt`, 62,394: SCOWL's words, contractions,
+  abbreviations and everyday capitalised words up to level 40, such as days, months and nationalities) and
+  three packs: brands and names (9,586: SCOWL's rarer capitalised words and proper names, plus
+  `tools/packs/names.txt`), development and terminal (`tools/packs/dev.txt`, 315) and computer terms
+  (`tools/packs/computer.txt`, 146), the last two written for this project. A word a pack lists leaves the
+  regular words only when it is not a common one there (tier 35 or better), so turning a pack off never
+  takes "terminal" or "kernel" away. Settings > Dictionaries turns each pack on or off (all on by default) and
+  imports the user's own lists (one word per line; CSV first columns and frequency lists work), kept in the
+  app's private files.
+  - **Priority:** a word's frequency is multiplied by its pack's weight before glide and suggestions rank it:
+    regular 1, names and imported lists 0.7, development 0.55, computer terms 0.45 (`WordPacks`). A gentle
+    order, not a wall: a pack word still wins when the swipe or the letters clearly say it.
+  - **Autocorrect:** still only corrects to common regular words. A development or computer word, or one from
+    the user's lists, typed exactly as spelled is kept, and takes its capitals ("cpu" -> "CPU"); without its
+    pack it is corrected as before ("cup").
+  - **Measured** with all packs on, on the same data as before the split (old list's words only for FUTO):
+    FUTO real swipes top-1 94.4% -> 94.4%, top-3 97.3% -> 97.3%; TSI real taps: typos fixed 75.9% -> 75.9%,
+    made another word 4.3% -> 4.3%; simulated slips fixed 91.3% -> 91.3%, right words changed 0.0%; next word
+    first 24.2% -> 24.2%. On 270 common computer terms: typed then space as meant 239 -> 270 (pid -> pie was
+    the last; PID is now in the development pack), simulated glide top-1 48% -> 59%. Short abbreviations
+    still lose to an everyday word a key away when the swipe is ambiguous (git -> got, ssd -> sad); that is
+    the order asked for, and a word used a few times is learned and rises.
+  - Everyday tech words SCOWL files with its rarest (login, username, inbox, screenshot, podcast, wireless,
+    emoji) are regular words at tier 35 now (`tools/extra_words.txt` lowers a tier as well as adding words).
+  - The built-in word browser lists the packs' words too, labelled; removing a word works the same in any
+    of them. Imported lists are not sent anywhere; Export diagnostics has only how many there are and how
+    many words they hold.
+
 - **Punctuation takes the place of the space after a word** (B11, the owner's report: a space before
   punctuation after a glided or autocorrected word). The space that ended a word (the space key,
   autocorrect on space, a strip pick, a predicted word, a phrase glide lifted in the space bar) is

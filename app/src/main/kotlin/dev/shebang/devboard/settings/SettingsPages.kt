@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -45,6 +46,7 @@ enum class SettingsPageId(val title: String) {
     APPEARANCE("Appearance"),
     TYPING("Typing and glide"),
     CORRECTIONS("Corrections and suggestions"),
+    DICTIONARIES("Dictionaries"),
     SOUND("Sound and vibration"),
     BAR("Terminal bar"),
     VOICE("Voice typing"),
@@ -92,6 +94,12 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
         }
     }
     val themeName = Palettes.choices.firstOrNull { it.first == settings.palette }?.second ?: settings.palette
+    val packStore = remember { dev.shebang.devboard.dict.WordPackStore.get(context.filesDir) }
+    val dictionariesSummary = remember(status) {
+        val on = dev.shebang.devboard.dict.WordPacks.builtIn.count { packStore.isEnabled(it.key) }
+        val lists = packStore.lists().count { it.enabled }
+        "Regular words and $on of ${dev.shebang.devboard.dict.WordPacks.builtIn.size} packs" + if (lists > 0) " · ${plural(lists, "list")} of yours" else ""
+    }
     fun summary(page: SettingsPageId): String = when (page) {
         SettingsPageId.APPEARANCE -> buildString {
             append(themeName).append(" theme · ").append(kotlin.math.round(settings.heightScale * 100).toInt()).append("% height")
@@ -105,6 +113,7 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
         }
         SettingsPageId.BAR -> (if (settings.barJson == null) "Default bar" else "Your own bar") + " · strip: " + stripLabel(settings.stripMode)
         SettingsPageId.VOICE -> if (voice) "Shebang Voice is installed" else "Add-on not installed"
+        SettingsPageId.DICTIONARIES -> dictionariesSummary
         SettingsPageId.LEARNING -> (if (settings.learnWords) "Learns your words" else "Not learning words") + ", on this phone only"
         SettingsPageId.ABOUT -> "Version $version · licence, credits, privacy, diagnostics"
     }
@@ -115,6 +124,7 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
         SettingsPageId.SOUND -> SettingsIcons.sound
         SettingsPageId.BAR -> SettingsIcons.terminal
         SettingsPageId.VOICE -> dev.shebang.devboard.view.KeyIcons.mic
+        SettingsPageId.DICTIONARIES -> SettingsIcons.book
         SettingsPageId.LEARNING -> SettingsIcons.lock
         SettingsPageId.ABOUT -> SettingsIcons.info
     }
@@ -122,7 +132,10 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
     SettingsPage(title = "Settings", onBack = onBack) {
         item { HomeHeader(version, status, actions.onSetup) }
         val groups = listOf(
-            "Keyboard" to listOf(SettingsPageId.APPEARANCE, SettingsPageId.TYPING, SettingsPageId.CORRECTIONS, SettingsPageId.SOUND, SettingsPageId.BAR, SettingsPageId.VOICE),
+            "Keyboard" to listOf(
+                SettingsPageId.APPEARANCE, SettingsPageId.TYPING, SettingsPageId.CORRECTIONS, SettingsPageId.DICTIONARIES,
+                SettingsPageId.SOUND, SettingsPageId.BAR, SettingsPageId.VOICE,
+            ),
             "Your data" to listOf(SettingsPageId.LEARNING),
             null to listOf(SettingsPageId.ABOUT),
         )
@@ -173,6 +186,117 @@ private fun HomeHeader(version: String, status: ImeStatus, onSetup: () -> Unit) 
         }
     }
 }
+
+private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
+
+/**
+ * The word lists the keyboard uses: the regular words (always on), the built-in packs, each with a switch, the
+ * lists the user imported (on or off, or deleted), and importing another from a text file.
+ */
+@Composable
+private fun DictionariesGroups(actions: SettingsActions) {
+    val context = LocalContext.current
+    val store = remember { dev.shebang.devboard.dict.WordPackStore.get(context.filesDir) }
+    val scope = rememberCoroutineScope()
+    // Bumped after every change, so the rows read the store again.
+    var changes by remember { mutableStateOf(0) }
+    var counts by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    var deleting by remember { mutableStateOf<dev.shebang.devboard.dict.WordPackStore.ImportedList?>(null) }
+    LaunchedEffect(Unit) {
+        counts = withContext(Dispatchers.IO) {
+            (listOf(dev.shebang.devboard.dict.WordPacks.REGULAR_ASSET) + dev.shebang.devboard.dict.WordPacks.builtIn.map { it.asset }).associateWith { asset ->
+                runCatching { context.assets.open(asset).bufferedReader().useLines { lines -> lines.count { it.isNotBlank() } } }.getOrDefault(0)
+            }
+        }
+    }
+    fun change(action: () -> Unit) {
+        scope.launch {
+            withContext(Dispatchers.IO) { action() }
+            changes++
+        }
+    }
+    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                val name = runCatching {
+                    context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                        if (c.moveToFirst()) c.getString(0) else null
+                    }
+                }.getOrNull()?.substringBeforeLast('.') ?: "Word list"
+                runCatching { context.contentResolver.openInputStream(uri)?.use { store.import(name, it) } }.getOrNull()
+                    ?: dev.shebang.devboard.dict.WordPackStore.ImportResult(null, 0, "The file could not be read.")
+            }
+            changes++
+            val list = result.list
+            val message = if (list == null) result.error ?: "No words found." else buildString {
+                append("Added ").append("%,d".format(list.words)).append(if (list.words == 1) " word" else " words").append(" from ").append(list.name)
+                if (result.skipped > 0) append(" (").append("%,d".format(result.skipped)).append(" lines left out)")
+            }
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+    val lists = remember(changes) { store.lists() }
+    Column(verticalArrangement = Arrangement.spacedBy(GroupGap)) {
+        PageNote(
+            "Glide and suggestions prefer regular words, then brands, names and your own lists, then development words, " +
+                "then computer terms. Autocorrect only ever corrects to everyday words, and a word typed exactly as a " +
+                "pack spells it is left as typed. Changes apply the next time the keyboard opens.",
+        )
+        SettingsGroup("Built in") {
+            // Always on: a label, not a switch that cannot move (a disabled switch reads as off).
+            androidx.compose.material3.ListItem(
+                headlineContent = { Text("Regular words") },
+                supportingContent = { Text("${countLabel(counts[dev.shebang.devboard.dict.WordPacks.REGULAR_ASSET])}everyday English") },
+                trailingContent = { Text("Always on", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
+                colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+            )
+            for (p in dev.shebang.devboard.dict.WordPacks.builtIn) {
+                RowDivider()
+                val on = remember(changes) { store.isEnabled(p.key) }
+                SwitchRow(p.title, "${countLabel(counts[p.asset])}${p.summary}", on) { v -> change { store.setEnabled(p.key, v) } }
+            }
+        }
+        SettingsGroup("Your word lists") {
+            for (l in lists) {
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text(l.name) },
+                    supportingContent = { Text("%,d".format(l.words) + if (l.words == 1) " word" else " words") },
+                    trailingContent = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.IconButton(onClick = { deleting = l }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Delete ${l.name}")
+                            }
+                            androidx.compose.material3.Switch(checked = l.enabled, onCheckedChange = { v -> change { store.setListEnabled(l.id, v) } })
+                        }
+                    },
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                )
+                RowDivider()
+            }
+            NavRow(
+                "Import a word list",
+                "A text file with one word per line, such as names, project terms or another language's words. A CSV works " +
+                    "too (its first column). Kept on this phone.",
+                opensPage = false,
+            ) { importer.launch(arrayOf("text/*", "application/csv", "application/octet-stream")) }
+        }
+        SettingsGroup("Edit") {
+            NavRow("Built-in words", "Browse every built-in word, remove ones you never want offered, and restore them any time", onClick = actions.onDictionary)
+        }
+    }
+    deleting?.let { l ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { deleting = null },
+            title = { Text("Delete ${l.name}?") },
+            text = { Text("Its words are no longer offered or glided. The file you imported it from is not touched.") },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { deleting = null; change { store.delete(l.id) } }) { Text("Delete") } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+private fun countLabel(n: Int?): String = if (n == null || n == 0) "" else "%,d words · ".format(n)
 
 private fun stripLabel(m: StripMode) = when (m) {
     StripMode.AUTO -> "Auto"
@@ -341,13 +465,14 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
                 item {
                     SettingsGroup("Words") {
                         NavRow("Personal words", "Add words, review or delete what was learned and the addresses remembered, or reset adaptation", onClick = actions.onPersonalWords)
-                        RowDivider()
-                        NavRow("Built-in dictionary", "Every word the keyboard ships with: delete ones you never want offered, and restore them any time", onClick = actions.onDictionary)
                     }
                 }
             }
             SettingsPageId.ABOUT -> {
                 item { AboutGroups(settings, actions) }
+            }
+            SettingsPageId.DICTIONARIES -> {
+                item { DictionariesGroups(actions) }
             }
         }
     }
