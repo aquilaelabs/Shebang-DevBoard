@@ -11,14 +11,9 @@
 
 ### Changed
 
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
 - Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (3103ff7)
 - The setup screen shows your progress through the three steps, and finished steps fold away (3103ff7)
-
-## 0.5.2: 2026-10-03
-
-### Changed
-
-- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
 
 ## 0.5.1: 2026-10-03
 
