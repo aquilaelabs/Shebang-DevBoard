@@ -1,19 +1,19 @@
 # Changelog
 
-## Unreleased
+## 0.5.3: 2026-10-04
 
 ### Added
 
-- Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (193d0be)
+- Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (6c59160)
 
 ### Changed
 
-- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (03a62b7)
+- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (0949c13)
 
 ### Fixed
 
-- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (03a62b7)
-- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (a38e598)
+- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (0949c13)
+- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (193d0be)
 
 ## 0.5.2: 2026-10-03
 
