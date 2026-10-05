@@ -4,9 +4,11 @@
 
 ### Changed
 
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
+- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (dc18e4b)
+- The setup screen shows your progress through the three steps, and finished steps fold away (dc18e4b)
+- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (0949c13)
 - Better at technical writing: the word model now knows development and computer terms in context, so they glide and are predicted far more often (gliding them in technical sentences: 70% to 90% right), with everyday typing unchanged (a8fa66b)
-
-## 0.5.3: 2026-10-04
 
 ### Added
 
@@ -18,13 +20,6 @@
 - A settings gear on the terminal bar (3103ff7)
 - Settings > Learning and privacy > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (371be02)
 - Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (6c59160)
-
-### Changed
-
-- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
-- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (dc18e4b)
-- The setup screen shows your progress through the three steps, and finished steps fold away (dc18e4b)
-- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (0949c13)
 
 ### Fixed
 
