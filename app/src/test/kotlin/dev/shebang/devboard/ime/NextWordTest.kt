@@ -13,12 +13,17 @@ import java.util.concurrent.Executor
 class NextWordTest {
     private val ic = FakeInputConnection()
     private var shown: List<String> = emptyList()
+    /** What the strip was last told: "word" (a word in progress), "predicting", or "none". */
+    private var stripState = "none"
+    private var wordsStarted = 0
 
     private val controller = TextInputController(
         { ic },
         object : TextInputController.Ui {
             override fun showCandidates(words: List<String>) { shown = words }
-            override fun setComposing(composing: Boolean) = Unit
+            override fun setComposing(composing: Boolean) { stripState = if (composing) "word" else "none" }
+            override fun setPredicting() { stripState = "predicting" }
+            override fun wordStarted() { wordsStarted++ }
         },
         Executor { it.run() },
         Handler(Looper.getMainLooper()),
@@ -30,6 +35,22 @@ class NextWordTest {
 
     private fun type(s: String) {
         for (c in s) if (c == ' ') controller.space() else controller.typeText(c.toString())
+    }
+
+    @Test
+    fun nextWordsAreNotAWordInProgressSoChipsKeepTheirRow() {
+        // B15: the paste chip stayed until next-word suggestions arrived after a space, because they told the
+        // strip a word was being typed. They say "predicting" now; only typing a letter starts a word.
+        type("thank")
+        assertEquals("word", stripState)
+        assertEquals(5, wordsStarted)
+        controller.space()
+        assertTrue("after 'thank ': $shown", "you" in shown)
+        assertEquals("predicting", stripState)
+        assertEquals(5, wordsStarted)
+        type("y")
+        assertEquals("word", stripState)
+        assertEquals(6, wordsStarted)
     }
 
     @Test

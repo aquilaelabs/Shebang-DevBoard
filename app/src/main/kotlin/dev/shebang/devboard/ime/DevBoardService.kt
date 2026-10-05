@@ -817,6 +817,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideId = glideSession.start(glideModelFor(g), context, times[0], settings.phraseGlide, offsets)
         for (i in 0 until count) glideSession.point(points[2 * i], points[2 * i + 1], times[i])
         background.execute { adaptation.recordGlide() }
+        retireClipOffer()
         strip?.setComposing(true)
         strip?.suggestions?.showPreview("")
     }
@@ -1226,6 +1227,20 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun setComposing(composing: Boolean) {
         strip?.setComposing(composing)
+    }
+
+    override fun setPredicting() {
+        strip?.setComposing(true, predicting = true)
+    }
+
+    override fun wordStarted() = retireClipOffer()
+
+    /** Typing or gliding a word: the paste chip has had its chance and does not come back for this clip. */
+    private fun retireClipOffer() {
+        val offer = clipOffer ?: return
+        clipChip.markHandled(offer.stamp)
+        clipOffer = null
+        strip?.setClip(null)
     }
 
     companion object {
