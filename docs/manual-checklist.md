@@ -112,3 +112,6 @@ Usability items (0.5.2):
 - [ ] With the rebuilt word model (technical documentation counted): glide "sudo", "git" and "kubectl" in
       a sentence, and check the strip predicts a word after "sudo apt". *(not done: the emulator was in
       another session and the phone not lent, 5 Oct; unit tests and benchmarks pass)*
+- [ ] Autocorrect's wider search with taps (two slips from three letters, three from six): type "yiy" then
+      space and "tbjs" then space on the keyboard; expect "you " and "this ". *(not yet tried on a device:
+      the emulator was in another session, 5 Oct; TSI benchmark passes)*

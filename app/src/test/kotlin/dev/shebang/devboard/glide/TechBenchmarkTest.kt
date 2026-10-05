@@ -55,13 +55,15 @@ class TechBenchmarkTest {
         for (sentence in sentences.take(800)) {
             var prev: String? = null
             var prev2: String? = null
-            for (w in sentence) {
+            for ((wi, w) in sentence.withIndex()) {
                 val idx = dictionary.indexOfLower(w)
                 if (idx >= 0) {
                     val pack = isPackWord(w)
-                    // The strip's three predictions before the word.
+                    // The strip's three predictions before the word: the n-grams and the next-word network, which
+                    // reads the sentence so far (as PredictionBenchmarkTest and the keyboard give it).
                     val rep = lm.contextOf(idx)
-                    val guesses = WordPredictions.predict(dictionary, lm, GlideBenchmarkTest.nextWord, null, if (prev == null) NgramModel.UNKNOWN else ctx(prev2), ctx(prev), 3)
+                    val soFar = sentence.subList(maxOf(0, wi - dev.shebang.devboard.ime.GlideText.MAX_SENTENCE_WORDS), wi)
+                    val guesses = WordPredictions.predict(dictionary, lm, GlideBenchmarkTest.nextWord, soFar, if (prev == null) NgramModel.UNKNOWN else ctx(prev2), ctx(prev), 3)
                         .map { lm.contextOf(it) }
                     for (s in listOfNotNull(predictAll, if (pack) predictPack else null)) {
                         s.n++

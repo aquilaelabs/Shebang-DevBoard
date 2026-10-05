@@ -81,6 +81,30 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **Retraining the next-word network: not shipped** (5 Oct, the owner's pick). The network
+  (`en_next_word.bin`) was trained before the packs, so it reads their words as unknown and drags technical
+  predictions below what the n-grams give alone (27.4% in the strip's three against 28.8%). Two retrains on
+  the n-grams' corpus plus the technical documentation (`prep.py --tech`, same recipe: 128/384, 8 epochs,
+  about 33 min on the node's card): A with the usual 32,000-word vocabulary, which dropped 658 rare everyday
+  words for technical ones, and B with 33,000. In the keyboard's mix, next word in the three:
+
+  | | shipped | A | B |
+  |---|---|---|---|
+  | everyday, Tatoeba held-out (13,030 words) | 39.3% | 38.5% | 38.9% |
+  | everyday, FUTO sentences (19,959) | 32.7% | 31.6% | 32.5% |
+  | technical, every word (9,424) | 27.4% | 29.1% | 28.6% |
+  | technical, pack words only (302) | 5.0% | 4.3% | 3.0% |
+  | FUTO real swipes, glide top-1 | 94.4% | 94.3% | 94.3% |
+
+  A buys 1.7 points on technical text for about 1 on everyday; B is within noise of the shipped network
+  everywhere and 1.2 better on technical text, but predicts the pack words themselves no better (the
+  documentation is 5% of the corpus, too little for the network to learn them). Under the owner's rule
+  (ship accuracy changes only when they are clearly better on held-out data), the shipped network stays.
+  Kept: `prep.py --tech`, and `TechBenchmarkTest` now gives the network the sentence, as the keyboard does;
+  its earlier technical prediction numbers (18.7% -> 28.8%) were the n-grams alone. Network-alone scores
+  moved a lot between the two runs (Tatoeba in three 34.7% against 36.9%), so a retrain is also a dice roll;
+  several seeds, or a larger technical share, are the next things to try (roadmap).
+
 - **Autocorrect looks for more slips when it knows the taps** (5 Oct, the owner's pick from the list of
   next improvements). On TSI's 1,255 real typos, 82 could never be fixed because the word meant was not among
   the six candidates autocorrect weighs: candidates were gathered at one slip for words of four letters or
@@ -116,9 +140,10 @@ data. Newest first at the top, then the original design notes.
   | technical text: next word in the three | 18.7% | 18.8% | 25.8% | 27.2% | 28.8% | 30.4% |
   | 270 computer terms glided (simulated) | 59.2% | 61.4% | 68.1% | 69.3% | 71.5% (72.5% light) | 72.8% |
 
-  Weight 2 began to cost everyday accuracy (slips 91.0%, taps 75.8%) for little more, so 1. The next-word
-  network (`en_next_word.bin`) was not retrained: the n-gram model alone lifted technical next-word hits from
-  18.7% to 28.8%; retraining it with the packs' words is left for when that is not enough.
+  Weight 2 began to cost everyday accuracy (slips 91.0%, taps 75.8%) for little more, so 1. The table's
+  prediction rows are the n-gram model alone; as the keyboard mixes it with the next-word network, technical
+  next-word hits in the strip's three went from 21.4% to 27.4% (`TechBenchmarkTest`, the network given the
+  sentence). The network itself was not retrained here; see "Retraining the next-word network" (5 Oct).
 
 - **Measured on a real phone** (the owner's Pixel 11 Pro XL, 1344x2992 at 480 dpi, signed 0.5.3, 5 Oct):
   the language loads in 83 ms (word lists, 72,441 words with every pack) plus 343 ms (n-grams and the glide

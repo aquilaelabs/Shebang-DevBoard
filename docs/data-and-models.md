@@ -38,6 +38,8 @@ sentences go in the Common Voice folder), then exported with 8-bit word tables:
 ```sh
 python3 tools/lm_model/wikinews.py enwikinews-latest-pages-articles.xml.bz2 /path/to/cv-en/zz_wikinews.txt
 python-ml tools/lm_model/prep.py /path/to/eng_sentences.tsv /path/to/cv-en corpus.npz --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
+# (--tech tech.txt [--vocab 33000] adds the technical documentation; the shipped network was trained without
+#  it: see "Retraining the next-word network" in decisions.md)
 bb gpu run -- python-ml tools/lm_model/train.py corpus.npz lm.pt --futo /path/to/futo/test.jsonl --emb 128 --hidden 384 --epochs 8 --batch 128 --bptt 32
 python-ml tools/lm_model/glide_context.py lm.pt cands-dev.jsonl cands-test.jsonl
 python-ml tools/lm_model/export.py lm.pt app/src/main/assets/dict/en_next_word.bin --vectors app/src/test/resources/dict/next_word_vectors.txt
