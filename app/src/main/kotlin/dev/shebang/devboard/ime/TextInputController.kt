@@ -375,6 +375,22 @@ class TextInputController(
 
     /** When the keyboard last changed the field: selection reports soon after are its own, not the user's. */
     private var lastOwnEdit = Long.MIN_VALUE / 2
+    /**
+     * What the last glide wrote, while the cursor may still stand right after it. Letters following such a
+     * cursor were not typed there by the user (the keyboard puts a space between a glide and a word after it):
+     * the app completed the word around the cursor, as a browser's address bar fills in "example.com/" after a
+     * glided "exam". That word is no target; the next glide goes after the glide, and the app drops its
+     * completion when the text no longer continues it.
+     */
+    private var lastOwnTail: String? = null
+
+    /** Whether the cursor stands right after the last glide's text, with the app's own letters following. */
+    private fun appCompletedAfterGlide(ic: InputConnection): Boolean {
+        val tail = lastOwnTail ?: return false
+        if (tail.isEmpty() || ic.getTextBeforeCursor(tail.length, 0)?.toString() != tail) return false
+        val next = ic.getTextAfterCursor(1, 0)?.firstOrNull() ?: return false
+        return isLetterInWord(next)
+    }
 
     val isComposing: Boolean get() = word.isNotEmpty()
 
@@ -413,6 +429,7 @@ class TextInputController(
         flushHeld()
         lastActionWasSpace = false
         spaceAfterPunctuation = false
+        lastOwnTail = null
         ui.showCandidates(emptyList())
         ui.setComposing(false)
     }
@@ -485,8 +502,9 @@ class TextInputController(
         var a = 0
         while (a < after.length && isLetterInWord(after[a])) a++
         // Only a cursor inside a word targets it: at a word's edge (where a tap between words lands) the user
-        // may be adding a word, so nothing is targeted.
-        if (b == 0 || a == 0) return
+        // may be adding a word, so nothing is targeted. Nor is a word the app completed after the last glide
+        // ([appCompletedAfterGlide]): the next glide adds a word instead of replacing it.
+        if (b == 0 || a == 0 || appCompletedAfterGlide(ic)) return
         val text = before.substring(before.length - b) + after.substring(0, a)
         if (!text.first().isLetter()) return
         val underlined = selStart >= 0 && ic.setComposingRegion(selStart - b, selStart + a)
@@ -594,6 +612,11 @@ class TextInputController(
         lastAutocorrect = null
         val spaceBefore = lastActionWasSpace
         lastActionWasSpace = false
+        // A letter typed where the app completed the last glide continues that word (the browser then keeps or
+        // adjusts its completion), so it is not a new word after the glide.
+        val continuesCompletion = appCompletedAfterGlide(ic)
+        // The letter joins what the keyboard wrote before the completion, so the next glide still sees it.
+        lastOwnTail = if (continuesCompletion && isWordChar(text)) lastOwnTail + text else null
         val owedSpace = spaceAfterPunctuation
         spaceAfterPunctuation = false
         val glideBefore = lastGlide
@@ -603,7 +626,7 @@ class TextInputController(
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
-            if (!field.isEmail && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
+            if (!field.isEmail && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() && !continuesCompletion &&
                 ic.getSelectedText(0).isNullOrEmpty() &&
                 ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
             ) {
@@ -830,6 +853,7 @@ class TextInputController(
         ownEdit()
         lastActionWasSpace = false
         spaceAfterPunctuation = false
+        lastOwnTail = null
         val ac = lastAutocorrect
         lastAutocorrect = null
         if (ac != null && !isComposing && ic.getTextBeforeCursor(ac.corrected.length + ac.after.length, 0)?.toString() == ac.corrected + ac.after) {
@@ -1682,7 +1706,8 @@ class TextInputController(
         while (b < before.length && isLetterInWord(before[before.length - 1 - b])) b++
         var a = 0
         while (a < after.length && isLetterInWord(after[a])) a++
-        val text = if (b > 0 && a > 0) before.substring(before.length - b) + after.substring(0, a) else ""
+        // A word the app completed after the last glide is not one the user pointed into.
+        val text = if (b > 0 && a > 0 && !appCompletedAfterGlide(ic)) before.substring(before.length - b) + after.substring(0, a) else ""
         val t = target
         if (t != null && !t.selection && t.before == b && t.after == a && t.text == text) return
         dropTarget()
@@ -1758,6 +1783,7 @@ class TextInputController(
             fresh.first().text = caseFor(t, fresh.first().text)
             val text = fresh.joinToString(" ") { it.text }
             if (replaceTarget(t, text)) {
+                lastOwnTail = text
                 val first = fresh.first()
                 if (!first.text.equals(t.text, ignoreCase = true)) learner.correction(t.glided?.stroke, first.word.word, dictionary)
                 t.glided?.let { recent.remove(it) }
@@ -1771,13 +1797,15 @@ class TextInputController(
             }
         }
         val fresh = newWords(result, dictionary, capitalize, previousOf(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: ""))
-        // Gliding in front of a word keeps them apart; a dip into the space bar adds one anyway.
-        val after = if (trailingSpace || needsTrailingSpace(ic)) " " else ""
+        // Gliding in front of a word keeps them apart; a dip into the space bar adds one anyway. Letters the app
+        // completed after the last glide are about to go, so no space is kept for them.
+        val after = if (trailingSpace || (needsTrailingSpace(ic) && !appCompletedAfterGlide(ic))) " " else ""
         val ownText = fresh.joinToString(" ") { it.text } + after
         val sb = StringBuilder()
         if (needsLeadingSpace(ic)) sb.append(' ')
         sb.append(ownText)
         ic.commitText(sb, 1)
+        lastOwnTail = ownText
         // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
         lastActionWasSpace = trailingSpace
         remember(fresh)

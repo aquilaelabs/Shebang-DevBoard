@@ -93,6 +93,15 @@ class GlideCommitTest {
         for (c in s) if (c == ' ') controller.space() else controller.typeText(c.toString())
     }
 
+    /** An empty field of [inputType], the controller's state reset for it. */
+    private fun fresh(inputType: Int) {
+        ic.finishComposingText()
+        ic.text.setLength(0)
+        ic.cursor = 0
+        ic.setSelection(0, 0)
+        controller.startInput(FieldInfo.from(inputType, 0))
+    }
+
     /** The user moves on to another field: glided words still held back are learned. */
     private fun leaveField() = controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
 
@@ -581,6 +590,41 @@ class GlideCommitTest {
         userMovesCursor(9)
         type(",")
         assertEquals("hello. a ,b ", ic.toString())
+    }
+
+    @Test
+    fun aWordTheAppCompletedAroundTheCursorIsNotReplacedByTheNextGlide() {
+        // A browser's address bar: the glide lands, the field reports the cursor after it, then history fills in
+        // the rest of a URL after the cursor without moving it (Firefox: glide "exam", read "example.com/").
+        val uri = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+        fresh(uri)
+        glide("exam")
+        now += 100
+        controller.onSelectionChanged(0, 0, 4, 4, -1, -1)
+        ic.text.insert(4, "ple.com/")
+        now += 2_000
+        controller.onSelectionChanged(4, 4, 4, 4, -1, -1)
+        // The next glide adds a word after what was glided (the browser drops its completion itself when the
+        // text no longer continues it), instead of redoing "example".
+        glide("world")
+        assertEquals("exam worldple.com/", ic.toString())
+        // A letter typed into the completion continues the word (no space as after a glide elsewhere), and a
+        // glide after that still goes after the word, with no space kept for the completion.
+        fresh(uri)
+        glide("exam")
+        now += 100
+        controller.onSelectionChanged(0, 0, 4, 4, -1, -1)
+        ic.text.insert(4, "ple.com/")
+        type("p")
+        assertEquals("exampple.com/", ic.toString())
+        glide("world")
+        assertEquals("examp worldple.com/", ic.toString())
+        // Whereas a cursor the user put inside a word still targets it.
+        fresh(InputType.TYPE_CLASS_TEXT)
+        type("example ")
+        userMovesCursor(3)
+        glide("world")
+        assertEquals("world ", ic.toString())
     }
 
     @Test
