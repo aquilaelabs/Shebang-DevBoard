@@ -19,7 +19,7 @@ class WordPackStoreTest {
             # my words
             Kubectl
             kubectl
-            ﻿Zorbly
+            ${'\uFEFF'}Zorbly
             "quoted"
             word,123
             freq${'\t'}42
