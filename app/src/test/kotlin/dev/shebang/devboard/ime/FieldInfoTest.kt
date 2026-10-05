@@ -68,9 +68,24 @@ class FieldInfoTest {
         assertFalse(go.enterIsNewline)
         assertFalse(go.enterIsKeyEvent)
 
-        val multi = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_SEND)
-        assertTrue(multi.multiline)
-        assertTrue(multi.enterIsNewline)
+        // A multi-line field that asks for an action without IME_FLAG_NO_ENTER_ACTION gets it (the Play Store's
+        // search box, B14); with the flag, as TextView adds to every multi-line EditText, Enter is a new line.
+        val multiSearch = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_SEARCH)
+        assertTrue(multiSearch.multiline)
+        assertFalse(multiSearch.enterIsNewline)
+        assertFalse(multiSearch.enterIsKeyEvent)
+        assertEquals(EditorInfo.IME_ACTION_SEARCH, multiSearch.editorAction)
+
+        val messageBox = FieldInfo.from(
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_ENTER_ACTION,
+        )
+        assertTrue(messageBox.enterIsNewline)
+
+        val multiPlain = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED)
+        assertTrue(multiPlain.enterIsNewline)
+        val multiNone = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE, EditorInfo.IME_ACTION_NONE)
+        assertTrue(multiNone.enterIsNewline)
 
         val noAction = FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_ENTER_ACTION)
         assertTrue(noAction.enterIsNewline)

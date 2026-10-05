@@ -93,7 +93,12 @@ data class FieldInfo(
             }
             val action = imeOptions and EditorInfo.IME_MASK_ACTION
             val noEnterAction = (imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
-            val enterIsNewline = !isTerminal && (multiline || noEnterAction)
+            // Android's rule, as LatinIME and Gboard follow it: a new line when the app says Enter has no action
+            // (TextView adds IME_FLAG_NO_ENTER_ACTION to every multi-line field by itself), or when a multi-line
+            // field names no action. A multi-line field that asks for Search, Send or Go without that flag gets
+            // its action: Compose search boxes such as the Play Store's are multi-line.
+            val noAction = action == EditorInfo.IME_ACTION_NONE || action == EditorInfo.IME_ACTION_UNSPECIFIED
+            val enterIsNewline = !isTerminal && (noEnterAction || (multiline && noAction))
             return FieldInfo(
                 variant = variant,
                 isTerminal = isTerminal,

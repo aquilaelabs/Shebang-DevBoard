@@ -669,9 +669,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Shift + letter on the main keyboard** types the capital as text; Ctrl/Alt/Meta + a main key becomes a
   `KeyEvent` using the character's US keycode (adding Shift meta for shifted symbols such as `_`).
 - **TYPE_NULL fields**: letters and symbols are committed as text, Backspace and Enter as `KeyEvent`s.
-- **Enter**: newline when the field is multiline or sets `IME_FLAG_NO_ENTER_ACTION`; otherwise
-  `performEditorAction` for Go/Search/Send/Next/Done/Previous; a plain Enter `KeyEvent` when the action is
-  none/unspecified or the field is a terminal.
+- **Enter**: newline when the field sets `IME_FLAG_NO_ENTER_ACTION`, or is multiline and names no action;
+  otherwise `performEditorAction` for Go/Search/Send/Next/Done/Previous; a plain Enter `KeyEvent` when the
+  action is none/unspecified or the field is a terminal. This is Android's rule as LatinIME and Gboard follow
+  it (5 Oct, B14): the first version gave every multiline field a newline, which made Enter add a second line
+  in the Play Store's search box, a Compose field that is multiline and asks for Search. TextView adds
+  `IME_FLAG_NO_ENTER_ACTION` to every multiline EditText itself, so message boxes still get their newline.
 - **Permissions**: the merged manifest declares `VIBRATE` and nothing else. AndroidX Core's automatic
   `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed with `tools:node="remove"`; no code here or in the
   Compose/DataStore dependencies registers a runtime receiver through `ContextCompat`. If a future dependency
