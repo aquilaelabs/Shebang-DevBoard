@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Better at technical writing: the word model now knows development and computer terms in context, so they glide and are predicted far more often (gliding them in technical sentences: 70% to 90% right), with everyday typing unchanged (a8fa66b)
+
 ## 0.5.3: 2026-10-04
 
 ### Added
