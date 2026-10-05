@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Settings > About > Credits names every library the app ships, including the ones its libraries bring in, and says that five strokes from the FUTO swipe dataset are kept for tests (bf63adb)
+
 ## 0.5.4: 2026-10-05
 
 ### Fixed
