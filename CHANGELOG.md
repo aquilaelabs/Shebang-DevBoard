@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.3: 2026-10-05
 
 ### Fixed
 
@@ -9,7 +9,7 @@
 - Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (0949c13)
 - Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (193d0be)
 - The settings gear on the terminal bar opens settings even when the app was left open in the background (334507f)
-- Autocorrect fixes more typos: with where you tapped known, it looks two slips away in short words and three in long ones (on real typing data, typos fixed 76% to 81%, wrong corrections down) (b6d5064)
+- Autocorrect fixes more typos: with where you tapped known, it looks two slips away in short words and three in long ones (on real typing data, typos fixed 76% to 81%, wrong corrections down) (924f8c9)
 
 ### Changed
 
