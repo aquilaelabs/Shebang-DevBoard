@@ -81,6 +81,31 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **The word model counts the packs' words** (the owner's question, 5 Oct: weights or a rebuilt model?). The
+  word model was counted before the packs existed, so about 450 development and computer words had no counts
+  and no context; the pack weights were standing in for missing data. It is now rebuilt with every pack in its
+  vocabulary and 186,269 sentences of permissively licensed technical documentation (Python, the Rust book,
+  Kotlin, Docker, Kubernetes, the FreeBSD Handbook; no Google-authored text) counted at weight 1 against
+  Tatoeba's 2 and Common Voice's 1, about 6% of the words. 2% of the technical sentences are held out
+  (heldout_tech.tsv, regenerated, not committed) for `TechBenchmarkTest`. With the counts in, the pack weights
+  are a light tie-breaker that keeps the owner's order: names and imported lists 0.9, development 0.85,
+  computer terms 0.8 (flat weights measured the same). Measured against the shipped model, same data:
+
+  | | shipped | weight 0 (rebuilt, no docs) | 0.25 | 0.5 | **1 (shipped now)** | 2 |
+  |---|---|---|---|---|---|---|
+  | FUTO swipes top-1 | 94.4% | 94.4% | 94.3% | 94.4% | 94.4% | 94.4% |
+  | TSI typos fixed / made another word | 75.9 / 4.3% | 75.9 / 4.3% | 75.9 / 4.4% | 75.9 / 4.5% | 75.9 / 4.1% | 75.8 / 4.1% |
+  | simulated slips fixed | 91.3% | 91.3% | 91.3% | 91.2% | 91.1% | 91.0% |
+  | next word in the three (Tatoeba) | 39.3% | 39.3% | 39.2% | 39.3% | 39.3% | 39.3% |
+  | technical text: pack words glided top-1 | 69.9% | 73.5% | 85.1% | 85.8% | 88.7% (89.7% light weights) | 89.1% |
+  | technical text: every word glided top-1 | 91.7% | 91.8% | 93.1% | 93.7% | 94.5% | 94.9% |
+  | technical text: next word in the three | 18.7% | 18.8% | 25.8% | 27.2% | 28.8% | 30.4% |
+  | 270 computer terms glided (simulated) | 59.2% | 61.4% | 68.1% | 69.3% | 71.5% (72.5% light) | 72.8% |
+
+  Weight 2 began to cost everyday accuracy (slips 91.0%, taps 75.8%) for little more, so 1. The next-word
+  network (`en_next_word.bin`) was not retrained: the n-gram model alone lifted technical next-word hits from
+  18.7% to 28.8%; retraining it with the packs' words is left for when that is not enough.
+
 - **Measured on a real phone** (the owner's Pixel 11 Pro XL, 1344x2992 at 480 dpi, signed 0.5.3, 5 Oct):
   the language loads in 83 ms (word lists, 72,441 words with every pack) plus 343 ms (n-grams and the glide
   trie) on the first start after install, against about 5 s on the emulator (R7, closed). Typing a sentence
@@ -100,8 +125,9 @@ data. Newest first at the top, then the original design notes.
   imports the user's own lists (one word per line; CSV first columns and frequency lists work), kept in the
   app's private files.
   - **Priority:** a word's frequency is multiplied by its pack's weight before glide and suggestions rank it:
-    regular 1, names and imported lists 0.7, development 0.55, computer terms 0.45 (`WordPacks`). A gentle
-    order, not a wall: a pack word still wins when the swipe or the letters clearly say it.
+    regular 1, names and imported lists 0.7, development 0.55, computer terms 0.45 at first (`WordPacks`); 0.9,
+    0.85 and 0.8 since the word model counts the packs' words (above). A gentle order, not a wall: a pack word
+    still wins when the swipe or the letters clearly say it.
   - **Autocorrect:** still only corrects to common regular words. A development or computer word, or one from
     the user's lists, typed exactly as spelled is kept, and takes its capitals ("cpu" -> "CPU"); without its
     pack it is corrected as before ("cup").

@@ -2,13 +2,17 @@
 """Build the word model used for glide context, suggestions and predictions.
 
 Usage: tools/build_ngrams.py /path/to/eng_sentences.tsv[.bz2] [--cv DIR] [--cv-weight N] [--tatoeba-weight N]
-                             [--exclude FILE.jsonl ...]
+                             [--tech FILE] [--tech-weight W] [--exclude FILE.jsonl ...]
 
 Inputs
   - Tatoeba per-language export (id <TAB> lang <TAB> text), CC BY 2.0 FR, https://tatoeba.org
   - optionally, Common Voice's English sentence collection (--cv: a folder of its server/data/en/*.txt, one
     sentence per line), CC0, https://github.com/common-voice/common-voice; counted with weight --cv-weight
     against --tatoeba-weight (integers, default 1 and 2: the shipped model)
+  - optionally, technical documentation as sentences (--tech: tools/tech_corpus.py's output, "name<TAB>text"
+    per line), counted with weight --tech-weight (a fraction: it gives development and computer words their
+    counts and contexts without outweighing everyday English); every sentence whose CRC-32 % 50 == 7 is held
+    out (heldout_tech.tsv) and never counted
   - --exclude: jsonl files with a "sentence" field (the FUTO swipe dataset's test and dev splits): those
     sentences are never counted, so benchmarks on them are not tested on text the model learned from
   - app/src/main/assets/dict/en_words.txt and pack_*.txt (the word lists); only their words are modelled.
@@ -17,6 +21,8 @@ Outputs
   - app/src/main/assets/dict/en_ngrams.bin     the model, format below
   - app/src/test/resources/glide/heldout_sentences.tsv
         sentences never counted into the model, for the glide benchmark (id <TAB> text)
+  - app/src/test/resources/glide/heldout_tech.tsv
+        technical sentences never counted, for the technical benchmarks (crc <TAB> text), when --tech is given
 
 Tokenising: lowercase, curly apostrophes folded to "'", words are [a-z]+('[a-z]+)*.
 Sentence punctuation (. ! ?) starts a new sentence; other punctuation is ignored; digits and
@@ -56,12 +62,14 @@ import random
 import re
 import struct
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.join(HERE, "..")
 WORDS = os.path.join(ROOT, "app", "src", "main", "assets", "dict", "en_words.txt")
 OUT = os.path.join(ROOT, "app", "src", "main", "assets", "dict", "en_ngrams.bin")
 HELDOUT = os.path.join(ROOT, "app", "src", "test", "resources", "glide", "heldout_sentences.tsv")
+HELDOUT_TECH = os.path.join(ROOT, "app", "src", "test", "resources", "glide", "heldout_tech.tsv")
 
 MIN_COUNT = 2
 TRI_MIN_CONTEXT = 20
@@ -104,8 +112,8 @@ def tokens(text):
             yield t
 
 
-def sequences(tatoeba, heldout, cv_dir, excluded):
-    """Yields (weight_key, tokens of one sentence): "t" for Tatoeba, "c" for Common Voice."""
+def sequences(tatoeba, heldout, cv_dir, excluded, tech=None, heldout_tech=None):
+    """Yields (weight_key, tokens of one sentence): "t" for Tatoeba, "c" for Common Voice, "x" for the technical text."""
     opener = bz2.open if tatoeba.endswith(".bz2") else open
     with opener(tatoeba, "rt", encoding="utf-8") as fh:
         for line in fh:
@@ -127,6 +135,18 @@ def sequences(tatoeba, heldout, cv_dir, excluded):
                     if not text or text in excluded:
                         continue
                     yield "c", list(tokens(text))
+    if tech:
+        with open(tech, encoding="utf-8") as fh:
+            for line in fh:
+                text = line.rstrip("\n").split("\t", 1)[-1].strip()
+                if not text or text in excluded:
+                    continue
+                crc = zlib.crc32(text.encode("utf-8"))
+                if crc % HOLDOUT_MOD == HOLDOUT_REM:
+                    if heldout_tech is not None:
+                        heldout_tech.append((crc, text))
+                    continue
+                yield "x", list(tokens(text))
 
 
 def main():
@@ -135,12 +155,14 @@ def main():
     ap.add_argument("--cv")
     ap.add_argument("--cv-weight", type=int, default=1)
     ap.add_argument("--tatoeba-weight", type=int, default=2)
+    ap.add_argument("--tech")
+    ap.add_argument("--tech-weight", type=float, default=0.0)
     ap.add_argument("--exclude", nargs="*", default=[])
     ap.add_argument("--out", default=OUT)
     ap.add_argument("--words", default=WORDS)
     ap.add_argument("--heldout", default=HELDOUT)
     args = ap.parse_args()
-    weight = {"t": args.tatoeba_weight, "c": args.cv_weight}
+    weight = {"t": args.tatoeba_weight, "c": args.cv_weight, "x": args.tech_weight}
 
     excluded = set()
     for f in args.exclude:
@@ -165,7 +187,8 @@ def main():
     uni = collections.Counter()
     bi = collections.Counter()
     heldout = []
-    for key, toks in sequences(args.tatoeba, heldout, args.cv, excluded):
+    heldout_tech = []
+    for key, toks in sequences(args.tatoeba, heldout, args.cv, excluded, args.tech, heldout_tech):
         wt = weight[key]
         if wt == 0:
             continue
@@ -195,6 +218,14 @@ def main():
                     uni[n] = max(1, int(uni[n] * f))
             print(f"scaled {group} by {f:.4f} to match '{NAME_REFERENCE}' ({ref})")
 
+    def rounded(counter):
+        for key in list(counter):
+            c = round(counter[key])
+            if c > 0:
+                counter[key] = c
+            else:
+                del counter[key]
+
     def scaled(counter):
         for key in list(counter):
             f = 1.0
@@ -208,6 +239,9 @@ def main():
                     del counter[key]
 
     scaled(bi)
+    # A fractional weight leaves fractional counts: the model stores whole ones.
+    rounded(uni)
+    rounded(bi)
 
     words = sorted(uni)  # ids 1..V
     wid = {w: i + 1 for i, w in enumerate(words)}
@@ -231,7 +265,7 @@ def main():
     # Pass 2: followers of the pairs seen often enough to be worth a trigram.
     frequent = {k for k, c in bi.items() if c >= TRI_MIN_CONTEXT}
     tri = collections.Counter()
-    for key, toks in sequences(args.tatoeba, [], args.cv, excluded):
+    for key, toks in sequences(args.tatoeba, [], args.cv, excluded, args.tech, None):
         wt = weight[key]
         if wt == 0:
             continue
@@ -247,6 +281,7 @@ def main():
                 tri[(p2, p1, t)] += wt
             p2, p1 = p1, t
     scaled(tri)
+    rounded(tri)
 
     out = bytearray()
     out += b"SDNG" + struct.pack(">i", 2) + struct.pack(">i", V)
@@ -316,6 +351,27 @@ def main():
         for sid, text in chosen:
             fh.write(f"{sid}\t{text}\n")
     print(f"wrote {len(chosen)} held-out sentences to {args.heldout}")
+
+    # Held-out technical sentences, for measuring the technical words in context: fully in-vocabulary, 3 to 20 words.
+    if args.tech:
+        rng.shuffle(heldout_tech)
+        tech_chosen = []
+        for crc, text in heldout_tech:
+            toks = list(tokens(text))
+            if any(t is None for t in toks) or toks.count("<s>") > 1:
+                continue
+            words_only = [t for t in toks if t != "<s>"]
+            if not (3 <= len(words_only) <= 20) or any(t not in vocab_words for t in words_only):
+                continue
+            tech_chosen.append((crc, " ".join(words_only)))
+            if len(tech_chosen) >= HELDOUT_SAMPLE:
+                break
+        with open(HELDOUT_TECH, "w", encoding="utf-8") as fh:
+            fh.write("# Technical documentation sentences (THIRD_PARTY_NOTICES.md, \"Technical documentation\"), held out of en_ngrams.bin.\n")
+            fh.write("# crc32\\tlowercased words\n")
+            for crc, text in tech_chosen:
+                fh.write(f"{crc}\t{text}\n")
+        print(f"wrote {len(tech_chosen)} held-out technical sentences to {HELDOUT_TECH}")
 
 
 if __name__ == "__main__":

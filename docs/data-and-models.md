@@ -13,7 +13,10 @@ stays fair:
 
 ```sh
 tools/build_wordlist.py /path/to/scowl-2020.12.07
-tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
+tools/tech_corpus.py tech.txt python=cpython/Doc rustbook=book/src kotlin=kotlin-web-site/docs/topics \
+    docker=docs/content k8s=website/content/en/docs freebsd=freebsd-doc/documentation/content/en/books/handbook
+tools/build_ngrams.py /path/to/eng_sentences.tsv.bz2 --cv /path/to/cv-en --tech tech.txt --tech-weight 1 \
+    --exclude /path/to/futo/test.jsonl /path/to/futo/dev.jsonl
 ```
 
 The glide model is trained on the GPU with PyTorch (`python-ml` from the toolchain store's `pytorch`) on

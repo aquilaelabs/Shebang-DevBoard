@@ -107,3 +107,6 @@ Usability items (0.5.2):
       44-key sentence correctly with 0.8% janky frames. *(measured 5 Oct)*
 - [ ] On the Pixel: glide typing and a screenshot of the keyboard (the phone tools could not glide or take
       pictures yet: BuilderBot #56, #57).
+- [ ] With the rebuilt word model (technical documentation counted): glide "sudo", "git" and "kubectl" in
+      a sentence, and check the strip predicts a word after "sudo apt". *(not done: the emulator was in
+      another session and the phone not lent, 5 Oct; unit tests and benchmarks pass)*

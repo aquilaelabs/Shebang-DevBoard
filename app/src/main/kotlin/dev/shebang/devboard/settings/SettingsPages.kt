@@ -239,8 +239,8 @@ private fun DictionariesGroups(actions: SettingsActions) {
     val lists = remember(changes) { store.lists() }
     Column(verticalArrangement = Arrangement.spacedBy(GroupGap)) {
         PageNote(
-            "Glide and suggestions prefer regular words, then brands, names and your own lists, then development words, " +
-                "then computer terms. Autocorrect only ever corrects to everyday words, and a word typed exactly as a " +
+            "Where two words are about as likely, glide and suggestions prefer regular words, then brands, names and your " +
+                "own lists, then development words, then computer terms. Autocorrect only ever corrects to everyday words, and a word typed exactly as a " +
                 "pack spells it is left as typed. Changes apply the next time the keyboard opens.",
         )
         SettingsGroup("Built in") {

@@ -29,7 +29,9 @@ object WordPacks {
 
     /**
      * How much a word of [pack] counts against a regular word as common as it, for glide and suggestions: a
-     * gentle order rather than a wall, so a pack word still wins when the swipe or the letters clearly say it.
+     * light tie-breaker that keeps the owner's order, now that the word model has real counts for the packs'
+     * words (from technical documentation, docs/decisions.md "The word model counts the packs' words"). The
+     * imported lists have no counts, so their words rank by their tier; they share the names' weight.
      */
     fun weight(pack: Int): Double = when (pack) {
         NAMES -> NAMES_WEIGHT
@@ -39,10 +41,10 @@ object WordPacks {
         else -> 1.0
     }
 
-    var NAMES_WEIGHT = 0.7
-    var IMPORTED_WEIGHT = 0.7
-    var DEV_WEIGHT = 0.55
-    var COMPUTER_WEIGHT = 0.45
+    var NAMES_WEIGHT = 0.9
+    var IMPORTED_WEIGHT = 0.9
+    var DEV_WEIGHT = 0.85
+    var COMPUTER_WEIGHT = 0.8
 
     /** Packs whose words, typed exactly but in lowercase, take their own capitals rather than being corrected. */
     fun keepsTypedForm(pack: Int): Boolean = pack == DEV || pack == COMPUTER || pack == IMPORTED
