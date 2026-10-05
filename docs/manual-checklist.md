@@ -105,8 +105,10 @@ Usability items (0.5.2):
       the setup screen back)*
 - [x] On the Pixel 11 Pro XL (signed 0.5.3): installs over earlier builds, loads in about 0.4 s, types a
       44-key sentence correctly with 0.8% janky frames. *(measured 5 Oct)*
-- [ ] On the Pixel: glide typing and a screenshot of the keyboard (the phone tools could not glide or take
-      pictures yet: BuilderBot #56, #57).
+- [x] On the Pixel (signed 0.5.3): the keyboard renders at the owner's height setting and a scripted glide
+      reaches it as one stroke (the strip offered hello / he'll / hell). *(5 Oct; BuilderBot's phone shot,
+      ui and glide work since #56)* Glide accuracy on the phone is the owner's to judge: scripted strokes
+      are not finger-like.
 - [ ] With the rebuilt word model (technical documentation counted): glide "sudo", "git" and "kubectl" in
       a sentence, and check the strip predicts a word after "sudo apt". *(not done: the emulator was in
       another session and the phone not lent, 5 Oct; unit tests and benchmarks pass)*
