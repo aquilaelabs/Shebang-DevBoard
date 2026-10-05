@@ -100,3 +100,6 @@ Usability items (0.5.2):
       emulator)*
 - [ ] On a phone: import a large list (tens of thousands of words) and see how long the keyboard takes to
       be ready afterwards.
+- [x] The bar's gear opens settings with the app's setup screen left open in the background, and from
+      Contacts. *(verified on the signed 0.5.3 release, API 36 emulator; before the fix it only brought
+      the setup screen back)*
