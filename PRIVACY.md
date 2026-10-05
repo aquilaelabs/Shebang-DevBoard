@@ -14,16 +14,17 @@ A few buttons open a web page in your browser: Source code, and the link to get 
 
 All of it is in the app's private storage, which other apps cannot read. It is left out of cloud backups and device-to-device transfers, and it is deleted when you uninstall the app.
 
-- Words you use, and which word followed which, so suggestions and glide typing fit you. Nothing is learned in password, number, email, web address, terminal or no-suggestion fields, or in apps that ask keyboards not to learn. Turn it off with Settings > Learning > Learn words I type.
+- Words you use, and which word followed which, so suggestions and glide typing fit you. Nothing is learned in password, number, email, web address, terminal or no-suggestion fields, or in apps that ask keyboards not to learn. Turn it off with Settings > Learning and privacy > Learn words I type.
 - Where your taps and glides land on each key, kept only as numbers per letter. Turn these off with Adapt autocorrect to my taps and Adapt glide to my swiping.
 - How the above stood at the start of each of the last 14 days, so a bad day can be undone.
-- Email addresses you type into email fields, at most 50, so the keyboard can offer them again in email fields. Turn it off with Settings > Learning > Remember email addresses.
+- Word lists you import in Settings > Dictionaries, only if you import one: copied into the app's storage so the keyboard can offer their words. Delete one there and it is gone.
+- Email addresses you type into email fields, at most 50, so the keyboard can offer them again in email fields. Turn it off with Settings > Learning and privacy > Remember email addresses.
 - Clipboard history: up to 20 recent copies, text or pictures, each kept for 24 hours unless you pin it. Copies an app marks as sensitive (a password manager's, for example) are never kept.
 - Your settings, your terminal bars, and whether each app was last used in text or code mode.
-- Glides you record with Settings > Record glides, only if you use it. Only the words it prompts you to glide are recorded.
+- Glides you record with Settings > Typing and glide > Record glides, only if you use it. Only the words it prompts you to glide are recorded.
 - If the app crashes, where in its code it failed: up to five crash reports, with no text from the error or from anything you typed, and no dates.
 
-You can see and delete what was learned in Settings > Learning > Personal words: delete one word or email address, delete them all, go back to an earlier day, or reset tap and glide adaptation. The clipboard panel has Clear and a remove button on each copy.
+You can see and delete what was learned in Settings > Learning and privacy > Personal words: delete one word or email address, delete them all, go back to an earlier day, or reset tap and glide adaptation. The clipboard panel has Clear and a remove button on each copy.
 
 ## What the keyboard reads but does not keep
 

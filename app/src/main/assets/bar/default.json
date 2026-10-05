@@ -9,6 +9,11 @@
    "label": "📋"
   },
   {
+   "type": "action",
+   "label": "Settings",
+   "action": "settings"
+  },
+  {
    "type": "key",
    "label": "Esc",
    "code": "ESCAPE"
@@ -184,21 +189,34 @@
    "code": "F12"
   },
   {
-   "type": "key",
+   "type": "action",
    "label": "Undo",
-   "code": "Z",
-   "mods": [
-    "ctrl"
-   ]
+   "action": "undo"
   },
   {
-   "type": "key",
+   "type": "action",
    "label": "Redo",
-   "code": "Z",
-   "mods": [
-    "ctrl",
-    "shift"
-   ]
+   "action": "redo"
+  },
+  {
+   "type": "action",
+   "label": "All",
+   "action": "select_all"
+  },
+  {
+   "type": "action",
+   "label": "Cut",
+   "action": "cut"
+  },
+  {
+   "type": "action",
+   "label": "Copy",
+   "action": "copy"
+  },
+  {
+   "type": "action",
+   "label": "Paste",
+   "action": "paste"
   },
   {
    "type": "snippet",

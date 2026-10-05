@@ -25,14 +25,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -85,56 +89,95 @@ fun SetupScreen(onOpenSettings: () -> Unit) {
         }
     }
     var testText by remember { mutableStateOf("") }
+    val done = listOf(status.enabled, status.selected, testText.isNotEmpty()).count { it }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("Shebang DevBoard") }) }) { padding ->
+    // No app bar: the mark and name head the page, under the status bar.
+    Scaffold { padding ->
         Column(
             // Padded for the keyboard: the page scrolls the test field into view instead of the window
             // panning up under the status bar.
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding().padding(16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
+                .padding(horizontal = PageMargin, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(GroupGap),
         ) {
-            Text("A keyboard for developers: text mode with glide typing, a code mode with every symbol, and a terminal bar.", style = MaterialTheme.typography.bodyMedium)
+            AppMark(72.dp)
+            Spacer(Modifier.height(4.dp))
+            Text("Shebang DevBoard", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "A keyboard for developers: glide typing, a code mode with every symbol, and a terminal bar. " +
+                    "Everything stays on this phone.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                LinearProgressIndicator(
+                    progress = { done / 3f },
+                    modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
+                    trackColor = MaterialTheme.colorScheme.surfaceContainer,
+                    drawStopIndicator = {},
+                )
+                Spacer(Modifier.width(12.dp))
+                Text(if (done == 3) "All set" else "$done of 3 done", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(Modifier.height(4.dp))
             StepCard(
-                number = 1, title = "Enable the keyboard", done = status.enabled,
-                description = "Turn on Shebang DevBoard in the system's keyboard list.",
-                buttonLabel = "Open keyboard settings",
+                number = 1, title = "Turn it on", done = status.enabled,
+                description = "Switch on Shebang DevBoard in the system's keyboard list. Android warns that keyboards can see what you type: this one has no network access, so nothing leaves the phone.",
+                buttonLabel = "Open keyboard list",
             ) { context.startActivity(Intent(SysSettings.ACTION_INPUT_METHOD_SETTINGS)) }
             StepCard(
-                number = 2, title = "Select it", done = status.selected,
-                description = "Pick Shebang DevBoard as the current keyboard.",
+                number = 2, title = "Make it your keyboard", done = status.selected,
+                description = "Pick Shebang DevBoard as the keyboard to use.",
                 buttonLabel = "Choose keyboard",
                 enabled = status.enabled,
             ) { (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() }
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    StepHeader(3, "Try it", done = testText.isNotEmpty())
-                    Text("Tap the field and type. Tap #! for code mode; glide across letters to write a word.", style = MaterialTheme.typography.bodyMedium)
-                    OutlinedTextField(
-                        value = testText, onValueChange = { testText = it },
-                        modifier = Modifier.fillMaxWidth(), label = { Text("Test field") }, minLines = 2,
-                    )
-                }
+            StepSurface {
+                StepHeader(3, "Try it", done = testText.isNotEmpty())
+                Text(
+                    "Type here, glide across the letters to write a word, and tap #! for every symbol.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                OutlinedTextField(
+                    value = testText, onValueChange = { testText = it },
+                    modifier = Modifier.fillMaxWidth(), placeholder = { Text("Test field") }, minLines = 3,
+                    shape = RoundedCornerShape(6.dp),
+                )
             }
-            Spacer(Modifier.height(8.dp))
-            Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) { Text("Open DevBoard settings") }
+            Spacer(Modifier.height(6.dp))
+            val ready = status.enabled && status.selected
+            if (ready) {
+                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text("Open settings") }
+            } else {
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text("Open settings") }
+            }
         }
+    }
+}
+
+/** A step's card: the theme's key colour, 8 dp corners, the design's padding. */
+@Composable
+private fun StepSurface(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(8.dp), color = MaterialTheme.colorScheme.surfaceContainer, contentColor = MaterialTheme.colorScheme.onSurface, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
     }
 }
 
 @Composable
 private fun StepHeader(number: Int, title: String, done: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        val bg = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-        val fg = if (done) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+        val bg = if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+        val fg = if (done) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
         Box(
             modifier = Modifier.size(32.dp).background(bg, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) Icon(Icons.Default.Check, contentDescription = "Done", tint = fg)
-            else Text("$number", color = fg, style = MaterialTheme.typography.labelLarge)
+            if (done) Icon(Icons.Default.Check, contentDescription = "Done", tint = fg, modifier = Modifier.size(20.dp))
+            else Text("$number", color = fg, style = MaterialTheme.typography.titleSmall)
         }
-        Text(title, style = MaterialTheme.typography.titleMedium)
-        if (done) Text("Done", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelMedium)
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+        if (done) Text("Done", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
     }
 }
 
@@ -143,11 +186,12 @@ private fun StepCard(
     number: Int, title: String, done: Boolean, description: String, buttonLabel: String,
     enabled: Boolean = true, onClick: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            StepHeader(number, title, done)
-            Text(description, style = MaterialTheme.typography.bodyMedium)
-            if (!done) Button(onClick = onClick, enabled = enabled) { Text(buttonLabel) }
+    StepSurface {
+        StepHeader(number, title, done)
+        // Once done, the step shrinks to its header.
+        if (!done) {
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Button(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(6.dp)) { Text(buttonLabel) }
         }
     }
 }

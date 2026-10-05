@@ -76,7 +76,7 @@ import java.util.concurrent.Executors
 
 class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui,
     GlideSession.Listener, TextInputController.Learner, dev.shebang.devboard.view.EmojiPanelView.Listener,
-    dev.shebang.devboard.view.ClipboardPanelView.Listener {
+    dev.shebang.devboard.view.ClipboardPanelView.Listener, dev.shebang.devboard.view.OneHandedPanelView.Listener {
 
     private enum class Mode { TEXT, CODE }
 
@@ -108,6 +108,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var root: ImeRootView? = null
     private var strip: TopStripView? = null
     private var keyboard: KeyboardView? = null
+    /** The keys and, in one-handed mode, the side panel beside them; hidden while a panel replaces the keys. */
+    private var keysRow: LinearLayout? = null
+    private var oneHandPanel: dev.shebang.devboard.view.OneHandedPanelView? = null
     private var popup: KeyPopup? = null
     /** The emoji panel, shown in place of the keys while open. */
     private var emojiPanel: dev.shebang.devboard.view.EmojiPanelView? = null
@@ -219,6 +222,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val heightChanged = s.heightScale != settings.heightScale || s.numberRow != settings.numberRow
         val themeChanged = s.palette != settings.palette || theme == null
         val barChanged = s.barJson != settings.barJson || s.appBars != settings.appBars || barConfig == null
+        val oneHandedChanged = s.oneHanded != settings.oneHanded || s.oneHandedLeft != settings.oneHandedLeft
         settings = s
         feedback.settings = s
         text.settings = s
@@ -230,6 +234,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.holdDeletesWords = s.holdDeletesWords
         keyboard?.glideTrailEnabled = s.glideTrail
         keyboard?.phraseGlideEnabled = s.phraseGlide
+        if (oneHandedChanged) applyOneHanded()
         if (heightChanged) rebuildGeometry()
         if (languageLoader.learnWords != s.learnWords) {
             languageLoader.learnWords = s.learnWords
@@ -317,6 +322,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.theme = t
         emojiPanel?.setTheme(t)
         clipPanel?.setTheme(t)
+        oneHandPanel?.setTheme(t)
         popup?.setTheme(t)
         strip?.setTheme(t)
         root?.setBackgroundColor(t.background)
@@ -339,7 +345,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             afterEdit()
         }
         column.addView(s, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
-        column.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val side = dev.shebang.devboard.view.OneHandedPanelView(this)
+        side.listener = this
+        row.addView(k)
+        row.addView(side)
+        column.addView(row, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+        keysRow = row
+        oneHandPanel = side
         val e = dev.shebang.devboard.view.EmojiPanelView(this)
         e.listener = this
         e.visibility = View.GONE
@@ -377,6 +390,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         k.holdDeletesWords = settings.holdDeletesWords
         k.glideTrailEnabled = settings.glideTrail
         k.phraseGlideEnabled = settings.phraseGlide
+        applyOneHanded()
         rebuildGeometry()
         return container
     }
@@ -418,7 +432,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val maxHeight = dm.heightPixels * (if (landscape) 0.6f else 0.5f)
         val height = (rows * baseRow).coerceAtMost(maxHeight).toInt()
         // The IME window can be narrower than the display (landscape cutout insets), so follow the view.
-        val width = if (k.width > 0) k.width else dm.widthPixels
+        val width = if (k.width > 0) k.width else if (settings.oneHanded) (dm.widthPixels * ONE_HANDED_WIDTH).toInt() else dm.widthPixels
         val g = KeyboardGeometry(
             layout = layout,
             variant = field.variant,
@@ -468,9 +482,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             mode = if (appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
             applyBar()
         }
-        // Words deleted in settings (same process) take effect the next time the keyboard opens.
+        // Words deleted in settings (same process) take effect the next time the keyboard opens; so do word packs
+        // turned on or off, and word lists imported.
         bundle?.let {
-            if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
+            if (languageLoader.packsVersion != languageLoader.packs.version) languageLoader.reloadBase()
+            else if (it.vocabularyVersion != personal.vocabularyVersion || it.removedVersion != languageLoader.removedWords.version) languageLoader.rebuild()
         }
         modifiers.clearAll()
         strip?.bar?.updateModifiers(modifiers)
@@ -948,6 +964,98 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
     }
 
+    override fun onBarAction(item: BarItem) {
+        when (item.action) {
+            BarItem.ACTION_SETTINGS -> openSettings()
+            BarItem.ACTION_ONE_HANDED -> updateSettings { it.copy(oneHanded = !it.oneHanded) }
+            else -> editAction(item.action ?: return)
+        }
+    }
+
+    /**
+     * Undo, redo, select all, cut, copy or paste, done by the app through its own context-menu actions, so a
+     * terminal never receives a Ctrl key it would act on. An app that does not take them (most terminals)
+     * gets nothing, except paste, which then types the clipboard's text.
+     */
+    private fun editAction(action: String) {
+        val id = when (action) {
+            BarItem.ACTION_UNDO -> android.R.id.undo
+            BarItem.ACTION_REDO -> android.R.id.redo
+            BarItem.ACTION_SELECT_ALL -> android.R.id.selectAll
+            BarItem.ACTION_CUT -> android.R.id.cut
+            BarItem.ACTION_COPY -> android.R.id.copy
+            BarItem.ACTION_PASTE -> android.R.id.paste
+            else -> return
+        }
+        val c = ic ?: return
+        text.finishComposing()
+        val done = c.performContextMenuAction(id)
+        if (!done && id == android.R.id.paste) {
+            val clip = (getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager)?.primaryClip
+            val pasted = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)
+            if (!pasted.isNullOrEmpty()) c.commitText(pasted, 1)
+        }
+        afterEdit()
+    }
+
+    /**
+     * The keyboard's settings, in the app's task (the keyboard has no activity of its own to start from). With
+     * NEW_TASK alone Android only brings that task forward when it already exists (the setup screen left open),
+     * without starting settings; CLEAR_TOP starts them on top of it, or goes back to them if they are open.
+     */
+    private fun openSettings() {
+        text.finishComposing()
+        val intent = android.content.Intent(this, dev.shebang.devboard.settings.SettingsActivity::class.java)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        runCatching { startActivity(intent) }.onFailure { Log.w(TAG, "could not open settings", it) }
+        requestHideSelf(0)
+    }
+
+    /** Changes a setting from the keyboard itself; the change comes back through [applySettings]. */
+    private fun updateSettings(transform: (Settings) -> Settings) {
+        scope.launch { SettingsRepository.get(this@DevBoardService).update(transform) }
+    }
+
+    // ---- One-handed mode -----------------------------------------------------------------------------
+
+    /**
+     * Lays the keys out for [Settings.oneHanded]: [ONE_HANDED_WIDTH] of the width, docked on the chosen side,
+     * the side panel in the rest; or the full width. The keys' new width comes back through
+     * [onKeyboardWidthChanged], which rebuilds the geometry for it.
+     */
+    private fun applyOneHanded() {
+        val row = keysRow ?: return
+        val k = keyboard ?: return
+        val side = oneHandPanel ?: return
+        val on = settings.oneHanded
+        val left = settings.oneHandedLeft
+        row.removeAllViews()
+        if (!on) {
+            row.addView(k, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT))
+            return
+        }
+        side.setKeysOnLeft(left)
+        val keysParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, ONE_HANDED_WIDTH)
+        val sideParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f - ONE_HANDED_WIDTH)
+        if (left) {
+            row.addView(k, keysParams)
+            row.addView(side, sideParams)
+        } else {
+            row.addView(side, sideParams)
+            row.addView(k, keysParams)
+        }
+    }
+
+    override fun onSwitchSide() {
+        feedback.keyPress()
+        updateSettings { it.copy(oneHandedLeft = !it.oneHandedLeft) }
+    }
+
+    override fun onFullWidth() {
+        feedback.keyPress()
+        updateSettings { it.copy(oneHanded = false) }
+    }
+
     /** The emoji panel in place of the keys, the keyboard's height; the list is read once, off the main thread. */
     private fun openEmoji() {
         val k = keyboard ?: return
@@ -967,7 +1075,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         clipPanel?.visibility = View.GONE
         e.layoutParams = e.layoutParams.apply { this.height = height }
         e.open()
-        k.visibility = View.GONE
+        keysRow?.visibility = View.GONE
         e.visibility = View.VISIBLE
     }
 
@@ -982,7 +1090,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val image = clipChip.imageToKeep()
         if (image != null) background.execute { keepImage(image.first, image.second) }
         refreshClipPanel(clipChip.textToKeep())
-        k.visibility = View.GONE
+        keysRow?.visibility = View.GONE
         cp.visibility = View.VISIBLE
     }
 
@@ -991,7 +1099,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private fun keysHeight(): Int {
         val k = keyboard ?: return panelHeight
-        if (k.visibility == View.VISIBLE && k.height > 0) panelHeight = k.height
+        if (keysRow?.visibility == View.VISIBLE && k.height > 0) panelHeight = k.height
         return if (panelHeight > 0) panelHeight else k.measuredHeight
     }
 
@@ -1026,7 +1134,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private fun closePanels() {
         emojiPanel?.visibility = View.GONE
         clipPanel?.visibility = View.GONE
-        keyboard?.visibility = View.VISIBLE
+        keysRow?.visibility = View.VISIBLE
     }
 
     override fun onClipPaste(item: ClipboardHistory.Item) {
@@ -1128,5 +1236,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         private const val CLIP_AUTHORITY = "dev.shebang.devboard.clips"
         /** Autofill chips asked of the service at most. */
         private const val MAX_AUTOFILL = 6
+        /** In one-handed mode the keys take this share of the width; a thumb spans it from one side. */
+        private const val ONE_HANDED_WIDTH = 0.77f
     }
 }

@@ -97,6 +97,8 @@ class SettingsActivity : ComponentActivity() {
             var recording by remember { mutableStateOf(false) }
             var personalWords by remember { mutableStateOf(false) }
             var dictionary by remember { mutableStateOf(false) }
+            // The settings page open from the home page, if any; kept across rotation.
+            var page by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf<SettingsPageId?>(null) }
             // A document from the About section (asset path and title), while it is open.
             var aboutDoc by remember { mutableStateOf<Pair<String, String>?>(null) }
             DevBoardTheme(settings.palette) {
@@ -135,244 +137,25 @@ class SettingsActivity : ComponentActivity() {
                         onBack = { editingBar = false },
                     )
                 } else {
-                    SettingsScreen(
-                        settings = settings,
+                    val actions = SettingsActions(
                         update = { f -> scope.launch { repo.update(f) } },
                         onEditBar = { editingBar = true },
                         onRecordGlides = { recording = true },
                         onPersonalWords = { personalWords = true },
                         onDictionary = { dictionary = true },
                         onDoc = { asset, title -> aboutDoc = asset to title },
-                        onBack = { finish() },
+                        onSetup = { startActivity(android.content.Intent(this@SettingsActivity, SetupActivity::class.java)) },
                     )
+                    val open = page
+                    if (open != null) {
+                        BackHandler { page = null }
+                        SettingsCategory(open, settings, actions, onBack = { page = null })
+                    } else {
+                        SettingsHome(settings, actions, onOpen = { page = it }, onBack = { finish() })
+                    }
                 }
             }
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SettingsScreen(
-    settings: Settings,
-    update: ((Settings) -> Settings) -> Unit,
-    onEditBar: () -> Unit,
-    onRecordGlides: () -> Unit,
-    onPersonalWords: () -> Unit,
-    onDictionary: () -> Unit,
-    onDoc: (asset: String, title: String) -> Unit,
-    onBack: () -> Unit,
-) {
-    val context = LocalContext.current
-    fun open(url: String) = runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url))) }
-    val scope = rememberCoroutineScope()
-    val diagnosticsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it) } }.isSuccess
-            }
-            Toast.makeText(context, if (ok) "Diagnostics saved" else "Couldn't save diagnostics", Toast.LENGTH_SHORT).show()
-        }
-    }
-    Scaffold(topBar = {
-        TopAppBar(
-            title = { Text("DevBoard settings") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-        )
-    }) { padding ->
-        LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).imePadding()) {
-            item { SectionHeader("Appearance") }
-            item { ThemePicker(settings.palette) { v -> update { it.copy(palette = v) } } }
-            item {
-                // Rounded, not cut off: 1.1 is stored as 1.0999999 and read as 109%. Stored snapped to the
-                // slider's 10% steps.
-                SliderRow("Keyboard height", "${kotlin.math.round(settings.heightScale * 100).toInt()}%", settings.heightScale, 0.7f..1.4f, steps = 6) { v ->
-                    update { it.copy(heightScale = kotlin.math.round(v * 10) / 10f) }
-                }
-            }
-            item { SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } } }
-            item { SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } } }
-
-            item { SectionHeader("Feedback") }
-            item { SwitchRow("Haptics", "Vibrate on key press", settings.haptics) { v -> update { it.copy(haptics = v) } } }
-            item {
-                ChoiceRow("Haptic strength", listOf(1 to "Light", 2 to "Medium", 3 to "Strong"), settings.hapticStrength, enabled = settings.haptics) { v -> update { it.copy(hapticStrength = v) } }
-            }
-            item { SwitchRow("Key sounds", "System key-click sounds", settings.keySounds) { v -> update { it.copy(keySounds = v) } } }
-
-            item { SectionHeader("Typing") }
-            item { SwitchRow("Hold backspace for whole words", "After a second of holding backspace, it deletes a word at a time", settings.holdDeletesWords) { v -> update { it.copy(holdDeletesWords = v) } } }
-            item { SwitchRow("Glide typing", "Slide across letters to write a word", settings.glide) { v -> update { it.copy(glide = v) } } }
-            item { SwitchRow("Glide trail", "Draw the path while gliding", settings.glideTrail, enabled = settings.glide) { v -> update { it.copy(glideTrail = v) } } }
-            item {
-                SwitchRow("Phrase gliding", "Dip into the space bar mid-glide to start the next word", settings.phraseGlide, enabled = settings.glide) { v ->
-                    update { it.copy(phraseGlide = v) }
-                }
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Record glides") },
-                    supportingContent = { Text("Glide prompted words to measure accuracy on your own fingers. Kept on this phone.") },
-                    modifier = Modifier.clickable(onClick = onRecordGlides),
-                )
-            }
-            item {
-                // Voice typing is a separate app (it holds the microphone permission; the keyboard does not).
-                val context = LocalContext.current
-                val installed = remember {
-                    context.packageManager.queryIntentServices(
-                        android.content.Intent("dev.shebang.devboard.voice.LISTEN").setPackage(VoiceClient.PACKAGE), 0,
-                    ).isNotEmpty()
-                }
-                ListItem(
-                    headlineContent = { Text("Voice typing") },
-                    supportingContent = {
-                        Text(
-                            if (installed) "Shebang Voice is installed: tap the mic at the end of the strip. Speech stays on this phone."
-                            else "Get the Shebang Voice add-on from GitHub (about 60 MB). It turns speech into text on this phone; the keyboard itself never uses the microphone."
-                        )
-                    },
-                    modifier = if (installed) Modifier else Modifier.clickable {
-                        context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(VoiceClient.RELEASES_URL)))
-                    },
-                )
-            }
-            item {
-                SwitchRow("Tidy dictation", "Drop um and uh, stutters and repeats, and act on spoken corrections like \"no wait\" and \"scratch that\"", settings.tidyDictation) { v ->
-                    update { it.copy(tidyDictation = v) }
-                }
-            }
-            item { SectionHeader("Learning") }
-            item { SwitchRow("Learn words I type", "Remember new words and the ones you use most, on this phone only", settings.learnWords) { v -> update { it.copy(learnWords = v) } } }
-            item { SwitchRow("Remember email addresses", "Offer addresses you entered in email fields as you type them again, on this phone only", settings.rememberEmails) { v -> update { it.copy(rememberEmails = v) } } }
-            item { SwitchRow("Adapt autocorrect to my taps", "Learn where your taps land on each key, from the words you type right", settings.adaptTaps) { v -> update { it.copy(adaptTaps = v) } } }
-            item { SwitchRow("Adapt glide to my swiping", "Learn how your glides lean off each key, most from the words you correct", settings.adaptGlide, enabled = settings.glide) { v -> update { it.copy(adaptGlide = v) } } }
-            item {
-                ListItem(
-                    headlineContent = { Text("Personal words") },
-                    supportingContent = { Text("Review or delete what was learned and the email addresses remembered, or reset glide adaptation") },
-                    modifier = Modifier.clickable(onClick = onPersonalWords),
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Built-in dictionary") },
-                    supportingContent = { Text("Every word the keyboard ships with: delete ones you never want offered, and restore them any time") },
-                    modifier = Modifier.clickable(onClick = onDictionary),
-                )
-            }
-
-            item { SectionHeader("Corrections") }
-            item { SwitchRow("Fix the last glided word", "When the next glide makes it unlikely, the word glided just before is corrected; tap it to change it back", settings.fixPreviousGlide) { v -> update { it.copy(fixPreviousGlide = v) } } }
-            item { SwitchRow("Next-word suggestions", "After a space, the strip offers the words likely to come next", settings.nextWord) { v -> update { it.copy(nextWord = v) } } }
-            item { SwitchRow("Autocorrect", "Fix the word when you press space", settings.autocorrect) { v -> update { it.copy(autocorrect = v) } } }
-            item { SwitchRow("Auto-capitalize", "Shift at the start of sentences", settings.autoCaps) { v -> update { it.copy(autoCaps = v) } } }
-            item { SwitchRow("Double-space period", "Two spaces insert \". \"", settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } } }
-            item { SwitchRow("Pair brackets and quotes", "In code mode, ( [ { and quotes come in pairs, and typing the closing one steps over it", settings.pairBrackets) { v -> update { it.copy(pairBrackets = v) } } }
-
-            item { SectionHeader("Terminal bar") }
-            item {
-                ChoiceRow(
-                    "Strip behavior",
-                    listOf(StripMode.AUTO to "Auto", StripMode.ALWAYS_BAR to "Always bar", StripMode.TWO_ROWS to "Two rows"),
-                    settings.stripMode,
-                ) { v -> update { it.copy(stripMode = v) } }
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Edit terminal bar") },
-                    supportingContent = { Text(if (settings.barJson == null) "Default bar" else "Customized") },
-                    modifier = Modifier.clickable(onClick = onEditBar),
-                )
-            }
-            item { SectionHeader("About") }
-            item {
-                val version = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "" }
-                ListItem(
-                    headlineContent = { Text("Shebang DevBoard $version") },
-                    supportingContent = { Text("A keyboard for developers. Everything it learns stays on this phone; it has no network access. MIT licence.") },
-                    modifier = Modifier.clickable { onDoc("about/LICENSE", "Licence") },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Source code") },
-                    supportingContent = { Text(REPO_URL.removePrefix("https://")) },
-                    modifier = Modifier.clickable { open(REPO_URL) },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Credits") },
-                    supportingContent = { Text("The word lists, sentences, swipe and tap data, models and libraries this keyboard is built on, with their licences") },
-                    modifier = Modifier.clickable { onDoc("about/THIRD_PARTY_NOTICES.md", "Credits") },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Privacy policy") },
-                    supportingContent = { Text("Nothing you type or say leaves your phone: the keyboard cannot connect to the internet. What it keeps, and how to delete it") },
-                    modifier = Modifier.clickable { onDoc("about/PRIVACY.md", "Privacy policy") },
-                )
-            }
-            item {
-                ListItem(
-                    headlineContent = { Text("Export diagnostics") },
-                    supportingContent = {
-                        Text(
-                            "Save a file to send to the developer if typing or gliding isn't working well, or the app crashed: your " +
-                                "settings, how your taps and glides lean, how your recent glides ended up, your recorded glides, and where " +
-                                "the app crashed. Learned words, " +
-                                "email addresses, the clipboard, your terminal bar and anything you typed are left out."
-                        )
-                    },
-                    modifier = Modifier.clickable { diagnosticsLauncher.launch("devboard-diagnostics.json") },
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        title, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(start = 16.dp, top = 20.dp, bottom = 4.dp),
-    )
-}
-
-@Composable
-private fun SwitchRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    ListItem(
-        headlineContent = { Text(title) },
-        supportingContent = { Text(subtitle) },
-        trailingContent = { Switch(checked = checked, onCheckedChange = onChange, enabled = enabled) },
-        modifier = Modifier.clickable(enabled = enabled) { onChange(!checked) },
-    )
-}
-
-@Composable
-private fun <T> ChoiceRow(title: String, options: List<Pair<T, String>>, value: T, enabled: Boolean = true, onChange: (T) -> Unit) {
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(title, style = MaterialTheme.typography.bodyLarge)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
-            for ((v, label) in options) {
-                FilterChip(selected = v == value, onClick = { onChange(v) }, label = { Text(label) }, enabled = enabled)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SliderRow(title: String, valueLabel: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int, onChange: (Float) -> Unit) {
-    var local by remember(value) { mutableFloatStateOf(value) }
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
-            Text(valueLabel, style = MaterialTheme.typography.bodyMedium)
-        }
-        Slider(value = local, onValueChange = { local = it }, onValueChangeFinished = { onChange(local) }, valueRange = range, steps = steps)
     }
 }
 
@@ -483,9 +266,14 @@ fun BarEditorScreen(
                 if (step != 0f && listState.scrollBy(step) != 0f) swapIfPassed()
             }
         }
-        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(), state = listState) {
+        LazyColumn(
+            Modifier.fillMaxSize().padding(padding).imePadding(),
+            state = listState,
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
+        ) {
             item {
-                ListItem(
+                CardRow(0, 1) { ListItem(
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                     headlineContent = { Text(if (app == null) "Bar for all apps" else "Bar for ${appName(app)}") },
                     supportingContent = {
                         Text(
@@ -497,18 +285,37 @@ fun BarEditorScreen(
                         )
                     },
                     modifier = Modifier.clickable { appMenuOpen = true },
-                )
+                ) }
                 DropdownMenu(expanded = appMenuOpen, onDismissRequest = { appMenuOpen = false }) {
                     DropdownMenuItem(text = { Text("All apps") }, onClick = { appMenuOpen = false; onPickApp(null) })
                     for (pkg in apps) {
                         DropdownMenuItem(text = { Text(appName(pkg)) }, onClick = { appMenuOpen = false; onPickApp(pkg) })
                     }
                 }
-                HorizontalDivider()
             }
+            item { GroupTitle("Items (${order.size}) · drag the handle to reorder") }
             itemsIndexed(order, key = { _, entry -> entry.first }) { index, (id, item) ->
                 val lifted = dragging == id
-                ListItem(
+                CardRow(
+                    index, order.size,
+                    modifier = Modifier
+                        .zIndex(if (lifted) 1f else 0f)
+                        // The lifted row is drawn under the finger wherever the list has laid it out; the others
+                        // slide to their new places.
+                        .then(
+                            if (lifted) Modifier.graphicsLayer { translationY = rowOf(id)?.let { dragTop - it.offset } ?: 0f }.shadow(6.dp, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            else Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                        )
+                        .semantics {
+                            // Without dragging (TalkBack): move up and down from the item's actions.
+                            customActions = listOfNotNull(
+                                if (index > 0) CustomAccessibilityAction("Move up") { commit(order.move(index, index - 1)); true } else null,
+                                if (index < order.size - 1) CustomAccessibilityAction("Move down") { commit(order.move(index, index + 1)); true } else null,
+                            )
+                        },
+                    lifted = lifted,
+                ) { ListItem(
+                    colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                     leadingContent = {
                         // Drag the handle to move the item.
                         Icon(
@@ -530,12 +337,12 @@ fun BarEditorScreen(
                         )
                     },
                     headlineContent = {
-                        if (item.isPanel) {
+                        if (item.hasGlyph) {
                             // The same single-colour glyph the bar draws, with a name.
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                BarGlyph(if (item.type == BarItem.TYPE_EMOJI) dev.shebang.devboard.view.KeyIcons.emoji else dev.shebang.devboard.view.KeyIcons.clipboard)
+                                Glyph(dev.shebang.devboard.view.TerminalBarView.glyphFor(item), 22.dp)
                                 Spacer(Modifier.width(10.dp))
-                                Text(if (item.type == BarItem.TYPE_EMOJI) "Emoji" else "Clipboard")
+                                Text(dev.shebang.devboard.view.TerminalBarView.glyphName(item))
                             }
                         } else {
                             Text(item.label)
@@ -547,24 +354,7 @@ fun BarEditorScreen(
                             Icon(Icons.Default.Delete, contentDescription = "Remove")
                         }
                     },
-                    tonalElevation = if (lifted) 6.dp else 0.dp,
-                    modifier = Modifier
-                        .zIndex(if (lifted) 1f else 0f)
-                        // The lifted row is drawn under the finger wherever the list has laid it out; the others
-                        // slide to their new places.
-                        .then(
-                            if (lifted) Modifier.graphicsLayer { translationY = rowOf(id)?.let { dragTop - it.offset } ?: 0f }.shadow(6.dp)
-                            else Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
-                        )
-                        .semantics {
-                            // Without dragging (TalkBack): move up and down from the item's actions.
-                            customActions = listOfNotNull(
-                                if (index > 0) CustomAccessibilityAction("Move up") { commit(order.move(index, index - 1)); true } else null,
-                                if (index < order.size - 1) CustomAccessibilityAction("Move down") { commit(order.move(index, index + 1)); true } else null,
-                            )
-                        },
-                )
-                HorizontalDivider()
+                ) }
             }
         }
     }
@@ -574,21 +364,10 @@ fun BarEditorScreen(
     }
 }
 
-/** One of the keyboard's glyphs, in the text colour, 22 dp square. */
-@Composable
-private fun BarGlyph(path: android.graphics.Path) {
-    val color = androidx.compose.material3.LocalContentColor.current
-    val px = with(androidx.compose.ui.platform.LocalDensity.current) { 22.dp.toPx() }
-    androidx.compose.foundation.Canvas(Modifier.size(22.dp)) {
-        val d = dev.shebang.devboard.view.IconDrawable(path, color.toArgb(), px)
-        d.setBounds(0, 0, size.width.toInt(), size.height.toInt())
-        drawIntoCanvas { d.draw(it.nativeCanvas) }
-    }
-}
-
 private fun describe(item: BarItem): String = when {
     item.type == BarItem.TYPE_EMOJI -> "Opens the emoji panel"
     item.type == BarItem.TYPE_CLIPBOARD -> "Opens the clipboard history"
+    item.isAction -> BarItem.ACTIONS[item.action]?.second ?: "Action"
     item.isModifier -> "Sticky modifier: ${item.mod}"
     item.isSnippet -> "Snippet: \"${item.text}\""
     else -> buildString {
@@ -635,6 +414,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
     var repeat by remember { mutableStateOf(false) }
     var mod by remember { mutableStateOf("ctrl") }
     var text by remember { mutableStateOf("") }
+    var action by remember { mutableStateOf(BarItem.ACTION_UNDO) }
 
     val item: BarItem? = runCatching {
         when (type) {
@@ -642,6 +422,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
             BarItem.TYPE_MODIFIER -> BarItem.modifier(label.ifBlank { mod.replaceFirstChar(Char::uppercase) }, mod)
             BarItem.TYPE_EMOJI -> if (label.isBlank()) BarItem.emoji() else BarItem.emoji(label)
             BarItem.TYPE_CLIPBOARD -> if (label.isBlank()) BarItem.clipboard() else BarItem.clipboard(label)
+            BarItem.TYPE_ACTION -> if (label.isBlank()) BarItem.action(action) else BarItem.action(action, label)
             else -> BarItem.snippet(label.ifBlank { text.trim() }, text)
         }.also { it.validate() }
     }.getOrNull()
@@ -659,7 +440,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard")) {
+                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard", BarItem.TYPE_ACTION to "Action")) {
                         FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
                     }
                 }
@@ -688,6 +469,13 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     }
                     BarItem.TYPE_EMOJI -> Text("Opens the emoji panel in place of the keys.")
                     BarItem.TYPE_CLIPBOARD -> Text("Opens your recent copies in place of the keys.")
+                    BarItem.TYPE_ACTION -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        // Three to a row: the edits, then settings and one-handed mode.
+                        for (row in BarItem.ACTIONS.keys.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (a in row) FilterChip(selected = action == a, onClick = { action = a }, label = { Text(BarItem.ACTIONS.getValue(a).first) })
+                        }
+                        Text(BarItem.ACTIONS.getValue(action).second + ".")
+                    }
                     else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Text to insert") })
                 }
                 Spacer(Modifier.width(1.dp))
@@ -811,4 +599,3 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
 }
 
 /** Where the project lives. */
-private const val REPO_URL = "https://github.com/aquilaelabs/Shebang-DevBoard"

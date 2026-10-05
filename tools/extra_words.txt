@@ -1,7 +1,8 @@
-# Words SCOWL (2020) lacks or files beyond the levels the keyboard uses, added by tools/build_wordlist.py
-# --extra. Written for this project (MIT, like the rest of it). One "word<TAB>tier" per line, as spelled;
-# tiers as in en_words.txt: 35 for everyday words (autocorrect may correct to them), 40 for names and
-# technical words (offered and glidable, never autocorrected to).
+# Regular words SCOWL (2020) lacks, or files rarer than people type them, added to en_words.txt by
+# tools/build_wordlist.py --extra: a word here gets this tier when SCOWL has it rarer or not at all. Written
+# for this project (MIT, like the rest of it). One "word<TAB>tier" per line, as spelled; tiers as in
+# en_words.txt: 35 for everyday words (autocorrect may correct to them), 40 for words offered and glidable
+# but never autocorrected to. Names, development words and computer terms are in tools/packs/.
 
 # Everyday
 app	35
@@ -26,92 +27,31 @@ metadata	40
 changelog	40
 codebase	40
 
-# Technical
-config	40
-configs	40
-repo	40
-repos	40
-dev	40
-devs	40
-backend	40
-frontend	40
-refactor	40
-refactoring	40
-localhost	40
-runtime	40
-middleware	40
-namespace	40
-namespaces	40
-endpoint	40
-endpoints	40
-async	40
-boolean	40
-booleans	40
-enum	40
-enums	40
-regex	40
-APIs	40
-URLs	40
-JSON	40
-YAML	40
-CSV	40
-PNG	40
-JPG	40
-SVG	40
-SSH	40
-HTTPS	40
-OAuth	40
-SSD	40
-
-# Names
-Linux	40
-Java	40
-macOS	40
-MacBook	40
-Chromebook	40
-GitLab	40
-Bitbucket	40
-Docker	40
-Kubernetes	40
-Terraform	40
-Golang	40
-Vue	40
-Reddit	40
-Spotify	40
-WhatsApp	40
-TikTok	40
-Uber	40
-Lyft	40
-Airbnb	40
-Snapchat	40
-Pinterest	40
-LinkedIn	40
-Venmo	40
-Tesla	40
-ChatGPT	40
-OpenAI	40
-Anthropic	40
-Gmail	40
-McDonald's	40
-
-# Developer words (the owner typed "toolchains" and the keyboard read "tool" plus a space, 4 Oct)
-toolchain	40
-toolchains	40
-monorepo	40
-monorepos	40
-linter	40
-linters	40
-runtimes	40
-Dockerfile	40
-changelogs	40
-subcommand	40
-subcommands	40
-codegen	40
-hotfix	40
-hotfixes	40
+# Everyday tech words SCOWL files with the rarest words (the owner's report, 4 Oct)
+login	35
+logins	35
+logout	35
+username	35
+usernames	35
+password	35
+passwords	35
+inbox	35
+screenshot	35
+screenshots	35
+podcast	35
+podcasts	35
+wireless	35
+smartphone	35
+smartphones	35
+emoji	35
+emojis	35
+apps	35
+selfie	35
+selfies	35
+hashtag	35
+hashtags	35
+unsubscribe	35
+uploads	35
+downloads	35
+online	35
 dropdowns	40
-websocket	40
-websockets	40
-backends	40
-struct	40
-structs	40

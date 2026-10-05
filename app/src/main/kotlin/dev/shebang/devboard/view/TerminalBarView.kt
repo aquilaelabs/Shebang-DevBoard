@@ -27,6 +27,8 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
         fun onBarSnippet(item: BarItem)
         /** A panel item: the emoji or the clipboard history in place of the keys. */
         fun onBarPanel(item: BarItem) = Unit
+        /** An action item: an edit on the app's text, settings, or one-handed mode. */
+        fun onBarAction(item: BarItem) = Unit
         fun onBarPress()
     }
 
@@ -100,16 +102,23 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
                     if (mod != null) listener?.onBarModifier(item, mod)
                 }
             }
-            item.isPanel -> {
+            item.hasGlyph -> {
                 // A single-colour glyph, like the mic, rather than the label.
-                val emoji = item.type == BarItem.TYPE_EMOJI
                 v.text = ""
-                val icon = IconDrawable(if (emoji) KeyIcons.emoji else KeyIcons.clipboard, theme.stripText, 20 * density)
+                val icon = IconDrawable(glyphFor(item), theme.stripText, 20 * density)
                 v.background = android.graphics.drawable.LayerDrawable(arrayOf(chipBackground(theme.keyFunctional), icon))
-                v.contentDescription = if (emoji) "Emoji" else "Clipboard history"
+                v.contentDescription = glyphName(item)
                 v.setOnClickListener {
                     listener?.onBarPress()
-                    listener?.onBarPanel(item)
+                    if (item.isPanel) listener?.onBarPanel(item) else listener?.onBarAction(item)
+                }
+            }
+            item.isAction -> {
+                v.background = chipBackground(theme.keyFunctional)
+                v.setTextColor(theme.stripText)
+                v.setOnClickListener {
+                    listener?.onBarPress()
+                    listener?.onBarAction(item)
                 }
             }
             item.isSnippet -> {
@@ -192,5 +201,23 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
     override fun onDetachedFromWindow() {
         handler.removeCallbacksAndMessages(null)
         super.onDetachedFromWindow()
+    }
+
+    companion object {
+        /** The glyph an item with [BarItem.hasGlyph] is drawn with, here and in the bar editor. */
+        fun glyphFor(item: BarItem): android.graphics.Path = when {
+            item.type == BarItem.TYPE_EMOJI -> KeyIcons.emoji
+            item.type == BarItem.TYPE_CLIPBOARD -> KeyIcons.clipboard
+            item.action == BarItem.ACTION_ONE_HANDED -> KeyIcons.oneHanded
+            else -> KeyIcons.gear
+        }
+
+        /** What a glyph item is called, for TalkBack and the bar editor. */
+        fun glyphName(item: BarItem): String = when {
+            item.type == BarItem.TYPE_EMOJI -> "Emoji"
+            item.type == BarItem.TYPE_CLIPBOARD -> "Clipboard history"
+            item.action == BarItem.ACTION_ONE_HANDED -> "One-handed mode"
+            else -> "Keyboard settings"
+        }
     }
 }

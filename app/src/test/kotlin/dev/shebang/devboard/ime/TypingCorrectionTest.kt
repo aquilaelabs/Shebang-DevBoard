@@ -115,8 +115,9 @@ class TypingCorrectionTest {
         type("at TEH ")
         assertEquals("we met Thw at TEH ", ic.toString())
         // At the start of a sentence a capital says nothing: still a slip.
+        // (The period takes the place of the space after "TEH".)
         type(". Teh ")
-        assertEquals("we met Thw at TEH . The ", ic.toString())
+        assertEquals("we met Thw at TEH. The ", ic.toString())
     }
 
     @Test
@@ -224,20 +225,115 @@ class TypingCorrectionTest {
     }
 
     @Test
-    fun webAddressesAreTypedExactly() {
+    fun webAddressFieldsWorkAsSearchBoxesWithoutAutocorrect() {
         controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, 0))
         // No autocorrect, and no capital for a lone i.
         type("wiht i ")
         assertEquals("wiht i ", ic.toString())
-        // A strip pick adds no space; a glide adds none before or after.
-        ic.text.setLength(0)
-        ic.cursor = 0
+        // A search: glided words get spaces between them, and a strip pick a space after it.
+        reset()
+        glide("best")
+        glide("coffee")
+        assertEquals("best coffee", ic.toString())
+        reset()
         type("githu")
         controller.pickCandidate("github")
-        assertEquals("github", ic.toString())
+        assertEquals("github ", ic.toString())
+        // An address: the dot takes the space's place, and a glide after it joins on.
         controller.typeText(".")
         glide("net")
         assertEquals("github.net", ic.toString())
+        // Typed letters after the dot join on too.
+        reset()
+        type("githu")
+        controller.pickCandidate("github")
+        type(".io")
+        assertEquals("github.io", ic.toString())
+    }
+
+    @Test
+    fun emailFieldsGetNoSpacesAdded() {
+        controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, 0))
+        type("someon")
+        controller.pickCandidate("someone")
+        assertEquals("someone", ic.toString())
+        glide("net")
+        assertEquals("someonenet", ic.toString())
+    }
+
+    private fun reset() {
+        ic.finishComposingText()
+        ic.text.setLength(0)
+        ic.cursor = 0
+        ic.setSelection(0, 0)
+        controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, 0))
+    }
+
+    // ---- Punctuation after the space that ended a word ------------------------------------------------
+
+    @Test
+    fun punctuationTakesThePlaceOfTheSpaceAfterAWord() {
+        // After autocorrect on space.
+        type("teh .")
+        assertEquals("the.", ic.toString())
+        // The space comes back before the next word.
+        type("next")
+        assertEquals("the. next", ic.toString())
+        // After a plain space, for each sentence mark.
+        for (mark in listOf(",", "!", "?", ";", ":")) {
+            clear()
+            type("hello $mark")
+            assertEquals("hello$mark", ic.toString())
+        }
+        // A closing bracket too.
+        clear()
+        type("(see this )")
+        assertEquals("(see this)", ic.toString())
+    }
+
+    @Test
+    fun punctuationAfterAPickedOrGlidedWordGoesAgainstIt() {
+        type("helo")
+        controller.pickCandidate("hello")
+        type(".")
+        assertEquals("hello.", ic.toString())
+        clear()
+        glide("hello")
+        type(" ,")
+        glide("world")
+        assertEquals("hello, world", ic.toString())
+        // Straight after a glide there is no space to take.
+        clear()
+        glide("hello")
+        type("!")
+        assertEquals("hello!", ic.toString())
+    }
+
+    @Test
+    fun aSpaceNotEndingAWordStays() {
+        // A second space, a space after punctuation, a quote that may open a quotation, code mode.
+        type("one, .")
+        assertEquals("one, .", ic.toString())
+        clear()
+        type("say \"")
+        assertEquals("say \"", ic.toString())
+        clear()
+        controller.codeMode = true
+        type("x .")
+        assertEquals("x .", ic.toString())
+        controller.codeMode = false
+        // Punctuation twice in a row: the second one just follows.
+        clear()
+        type("wait ..")
+        assertEquals("wait..", ic.toString())
+    }
+
+    private fun clear() {
+        ic.finishComposingText()
+        ic.text.setLength(0)
+        ic.cursor = 0
+        ic.setSelection(0, 0)
+        controller.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0))
     }
 
     @Test

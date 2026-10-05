@@ -20,7 +20,7 @@ class GlideDecoderTest {
             geometry.letterKey(c)?.let { it.centerX to it.centerY }
         }
         val dictionary: Dictionary by lazy {
-            Dictionary.parse(File("src/main/assets/dict/en_words.txt").bufferedReader().readLines().asSequence())
+            dev.shebang.devboard.dict.BuiltInWords.all()
         }
     }
 

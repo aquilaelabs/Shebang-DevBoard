@@ -31,15 +31,15 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [ ] Double-tap a word to select it, then glide: it is replaced. *(unit-tested; injected taps arrive too far
       apart to make a double-tap on the emulator)*
 - [x] A word typed twice ("kubectl") is glidable after the keyboard hides and reopens; a word added to
-      Android's personal dictionary is glidable; Settings > Personal words lists learned words.
+      Android's personal dictionary is glidable; Settings > Learning and privacy > Personal words lists learned words.
       *(verified on the emulator, except the Personal words screen)*
-- [x] Settings > Personal words lists learned words; delete removes one; Undo recent learning lists the kept
+- [x] Settings > Learning and privacy > Personal words lists learned words; delete removes one; Undo recent learning lists the kept
       days and going back to the start of today restores the counts of that morning. *(verified on the
       emulator: "world" went from 5 uses back to 4 and "hello" from 3 to 2)*
 - [ ] Reset glide adaptation zeroes the glide and correction counts.
 - [x] Phrase gliding on: "hello", dip below the middle of the space bar, "world" in one stroke writes
       "hello world"; lifting inside the space bar adds a space. *(verified on the emulator)*
-- [x] Settings > Record glides: gliding the prompted word stores it, the count goes up, the next word
+- [x] Settings > Typing and glide > Record glides: gliding the prompted word stores it, the count goes up, the next word
       appears; the exported file replays in `RecordedGlidesTest`. *(verified on the emulator with injected
       strokes; export through the file picker not exercised)*
 - [ ] Record a few hundred glides on the Pixel and run `RecordedGlidesTest`.
@@ -80,3 +80,39 @@ Layout:
       *(verified on the emulator)*
 - [x] A copied picture pasted from the clipboard history into an app that takes pictures. *(verified on the
       owner's phone)*
+
+Usability items (0.5.2):
+- [x] Bar editing in an Android text field (Contacts): Undo empties typed text, Redo brings it back, All then
+      Cut empties the field, Paste puts the clipboard at the cursor. *(verified on the API 36 emulator)*
+- [x] The gear on the bar opens Settings. *(verified)*
+- [x] One-handed mode, from Settings > Appearance: keys docked right with the side panel on the left; the
+      chevron moves them left; the two-headed arrow goes back to full width; gliding "the" on the narrow
+      keys writes it. *(verified)*
+- [x] Personal words > Add a word: "k8s" is refused with the rule shown; "Zorbly" is added as used twice and
+      the strip offers it after typing "zorb". *(verified)*
+- [ ] Undo and Paste in a web page (Firefox or Chrome) and in Termux (Paste types the clipboard there).
+- [x] Redesigned settings and setup, in Night and Day: home page status and summaries, Appearance, Typing
+      and glide, Learning and privacy, Personal words, Terminal bar and the bar editor (drag still reorders).
+      *(verified on the API 36 emulator, debug and the signed 0.5.2 release)*
+- [x] Settings > Dictionaries: the regular words show "Always on" and the three packs have switches;
+      importing a three-word text file from Downloads adds a list, and the strip offers its word after "zorbl";
+      with Computer terms off "cpu" then space gives "cup", with it on "CPU". *(verified on the API 36
+      emulator)*
+- [ ] On a phone: import a large list (tens of thousands of words) and see how long the keyboard takes to
+      be ready afterwards.
+- [x] The bar's gear opens settings with the app's setup screen left open in the background, and from
+      Contacts. *(verified on the signed 0.5.3 release, API 36 emulator; before the fix it only brought
+      the setup screen back)*
+- [x] On the Pixel 11 Pro XL (signed 0.5.3): installs over earlier builds, loads in about 0.4 s, types a
+      44-key sentence correctly with 0.8% janky frames. *(measured 5 Oct)*
+- [x] On the Pixel (signed 0.5.3): the keyboard renders at the owner's height setting and a scripted glide
+      reaches it as one stroke (the strip offered hello / he'll / hell). *(5 Oct; BuilderBot's phone shot,
+      ui and glide work since #56)* Glide accuracy on the phone is the owner's to judge: scripted strokes
+      are not finger-like.
+- [ ] With the rebuilt word model (technical documentation counted): glide "sudo", "git" and "kubectl" in
+      a sentence, and check the strip predicts a word after "sudo apt". *(not done: the emulator was in
+      another session and the phone not lent, 5 Oct; unit tests and benchmarks pass)*
+- [x] Autocorrect with taps on the signed 0.5.3 (API 36 emulator): "thjs" then space gives "this ", and taps
+      landing near the intended keys read as them ("you" straight off). Taps dead centre on the wrong keys
+      ("yiy", "tbjs") are kept as typed, by design: a centred tap is likely meant. The two-slip cases are
+      measured on TSI's real taps (typos fixed 75.9% -> 80.6%). *(5 Oct)*

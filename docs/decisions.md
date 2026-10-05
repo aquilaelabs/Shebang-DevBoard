@@ -3,6 +3,42 @@
 Every choice that was not obvious, with the reason and, for accuracy changes, the measurements on held-out
 data. Newest first at the top, then the original design notes.
 
+- **Settings as a home page of categories** (0.5.2, the owner's ask for a polished layout): one long list of
+  about forty rows became a home page and eight pages. The home page shows the app, whether it is the
+  current keyboard (with Set up when not), and one row per page with a glyph and a summary of how that page
+  stands, so most people read what they need without opening anything. Rows sit on cards of the theme's key
+  colour with the design's small radii and spacing; small choices are segmented buttons. The category
+  glyphs are drawn for this project, in the key glyphs' idiom, since the Material core icon set has no
+  keyboard, speaker or prompt. Setup lost its app bar for the mark and name, gained a progress line, and
+  a finished step shrinks to its header.
+
+- **One-handed mode** (0.5.2): the keys take 77% of the width, docked left or right, and the space beside
+  them holds two large buttons: a chevron that moves the keys to the other side and a two-headed arrow
+  for full width. 77% puts the far edge within a thumb's reach on a 6.7-inch phone while each key stays
+  about as wide as a full keyboard's in landscape split view; the height is unchanged, so the app does not
+  move. The keys are laid out afresh for the narrower width (geometry, glide model, tap model), so glide
+  and autocorrect work as at full width; learned tap offsets are in key widths and carry over. The emoji
+  and clipboard panels still take the full width. It is a setting (Settings > Appearance > One-handed mode)
+  and a bar item, and the side is remembered while the mode is off.
+
+- **Editing from the bar goes through the app** (0.5.2): Undo, Redo, All, Cut, Copy and Paste ask the app
+  to do them (`InputConnection.performContextMenuAction`) instead of sending Ctrl+Z and friends. The old
+  default bar's Undo and Redo were Ctrl+Z keys, which a text field takes as undo but a terminal takes as
+  "suspend the job", and web pages and Compose fields often ignore. An app that does not take an action
+  (most terminals) gets nothing, except Paste, which then types the clipboard's text. They replace the
+  default bar's Undo and Redo; a bar already customised keeps what it has, and the editor's Action chip
+  adds any of them.
+
+- **A settings gear on the bar** (0.5.2): settings were reachable only from the launcher. The gear is the
+  default bar's third item, after emoji and clipboard, drawn as a single-colour glyph like them; it opens
+  settings in their own task and hides the keyboard.
+
+- **Adding a word by hand** (0.5.2): Settings > Learning and privacy > Personal words > Add a word. The word is known
+  at once (counted as used twice, the learning threshold), written as typed, and checked by the same rule
+  as learned words (2 to 32 letters, `'`, `-` and `_` inside), since the glide trie and the suggester work on
+  those. A word removed from the built-in dictionary is restored when added. Like learned words it can be
+  forgotten if it goes unused while thousands of others are learned (the 5,000-word cap); typing it keeps it.
+
 - **The Shebang mark** (the owner chose concept B of three): # and ! interlocked, the #'s bars cut parallel
   to the slanted ! with a 2.5-unit gap, so they break around it. The app icon draws the # in the accent
   green and the ! in white on the Night background; the #! key draws it in the key's text colour, so it
@@ -19,7 +55,7 @@ data. Newest first at the top, then the original design notes.
   What it cannot see counts as kept: a fix after leaving the field or past the hold, and a wrong word never
   noticed, so the real error rate is a little higher than it shows; a deletion may be a change of mind.
 
-- **The built-in dictionary can be edited** (the owner's design): Settings > Learning > Built-in dictionary
+- **The built-in dictionary can be edited** (the owner's design): Settings > Dictionaries > Built-in words
   lists the bundled words (search by prefix) with a delete button each; Removed lists the deleted ones with
   Restore and Restore all. Removed words (`RemovedWords`, exact spellings in `removed_words.json`) are left
   out when the language is built, so they are not suggested, glided or corrected to, and a learned word
@@ -45,8 +81,124 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
-- **Addresses typed exactly** (the owner's report: Firefox's address bar autocorrected and added spaces).
-  In web-address and email fields there is no autocorrect (the strip still offers words), no "I" for a
+- **Retraining the next-word network: not shipped** (5 Oct, the owner's pick). The network
+  (`en_next_word.bin`) was trained before the packs, so it reads their words as unknown and drags technical
+  predictions below what the n-grams give alone (27.4% in the strip's three against 28.8%). Two retrains on
+  the n-grams' corpus plus the technical documentation (`prep.py --tech`, same recipe: 128/384, 8 epochs,
+  about 33 min on the node's card): A with the usual 32,000-word vocabulary, which dropped 658 rare everyday
+  words for technical ones, and B with 33,000. In the keyboard's mix, next word in the three:
+
+  | | shipped | A | B |
+  |---|---|---|---|
+  | everyday, Tatoeba held-out (13,030 words) | 39.3% | 38.5% | 38.9% |
+  | everyday, FUTO sentences (19,959) | 32.7% | 31.6% | 32.5% |
+  | technical, every word (9,424) | 27.4% | 29.1% | 28.6% |
+  | technical, pack words only (302) | 5.0% | 4.3% | 3.0% |
+  | FUTO real swipes, glide top-1 | 94.4% | 94.3% | 94.3% |
+
+  A buys 1.7 points on technical text for about 1 on everyday; B is within noise of the shipped network
+  everywhere and 1.2 better on technical text, but predicts the pack words themselves no better (the
+  documentation is 5% of the corpus, too little for the network to learn them). Under the owner's rule
+  (ship accuracy changes only when they are clearly better on held-out data), the shipped network stays.
+  Kept: `prep.py --tech`, and `TechBenchmarkTest` now gives the network the sentence, as the keyboard does;
+  its earlier technical prediction numbers (18.7% -> 28.8%) were the n-grams alone. Network-alone scores
+  moved a lot between the two runs (Tatoeba in three 34.7% against 36.9%), so a retrain is also a dice roll;
+  several seeds, or a larger technical share, are the next things to try (roadmap).
+
+- **Autocorrect looks for more slips when it knows the taps** (5 Oct, the owner's pick from the list of
+  next improvements). On TSI's 1,255 real typos, 82 could never be fixed because the word meant was not among
+  the six candidates autocorrect weighs: candidates were gathered at one slip for words of four letters or
+  fewer and two slips beyond, whatever the taps said, so "yiy" (you), "tbjs" (this), "aew" (are) and
+  "shoukdwra" (shoulders) had no candidate. With tap positions, candidates are now gathered at two slips from
+  three letters and three slips from six (`Suggester.slipsAllowed`), and autocorrect accepts the same; each
+  slip is priced by where the finger landed, and KEEP_SCORE still protects a word meant as typed. Without taps
+  (a hardware keyboard, the benchmarks' plain slips) nothing changes. Measured on TSI, taps and the words
+  before: typos fixed 75.9% -> 80.6%, made another word 4.3% -> 3.3%, right words changed 0.0% -> 0.0%, words
+  meant as typed that the dictionary lacks kept 65.7% -> about 64.6% (the one cost: a rare name or term
+  typed right is a little likelier to be corrected away; backspace still undoes it). Two slips from two
+  letters gained nothing (the two-letter rule stands); three from seven or eight lost a little. About 3 ms a
+  word on the JVM, on the background thread.
+
+- **The word model counts the packs' words** (the owner's question, 5 Oct: weights or a rebuilt model?). The
+  word model was counted before the packs existed, so about 450 development and computer words had no counts
+  and no context; the pack weights were standing in for missing data. It is now rebuilt with every pack in its
+  vocabulary and 186,269 sentences of permissively licensed technical documentation (Python, the Rust book,
+  Kotlin, Docker, Kubernetes, the FreeBSD Handbook; no Google-authored text) counted at weight 1 against
+  Tatoeba's 2 and Common Voice's 1, about 6% of the words. 2% of the technical sentences are held out
+  (heldout_tech.tsv, regenerated, not committed) for `TechBenchmarkTest`. With the counts in, the pack weights
+  are a light tie-breaker that keeps the owner's order: names and imported lists 0.9, development 0.85,
+  computer terms 0.8 (flat weights measured the same). Measured against the shipped model, same data:
+
+  | | shipped | weight 0 (rebuilt, no docs) | 0.25 | 0.5 | **1 (shipped now)** | 2 |
+  |---|---|---|---|---|---|---|
+  | FUTO swipes top-1 | 94.4% | 94.4% | 94.3% | 94.4% | 94.4% | 94.4% |
+  | TSI typos fixed / made another word | 75.9 / 4.3% | 75.9 / 4.3% | 75.9 / 4.4% | 75.9 / 4.5% | 75.9 / 4.1% | 75.8 / 4.1% |
+  | simulated slips fixed | 91.3% | 91.3% | 91.3% | 91.2% | 91.1% | 91.0% |
+  | next word in the three (Tatoeba) | 39.3% | 39.3% | 39.2% | 39.3% | 39.3% | 39.3% |
+  | technical text: pack words glided top-1 | 69.9% | 73.5% | 85.1% | 85.8% | 88.7% (89.7% light weights) | 89.1% |
+  | technical text: every word glided top-1 | 91.7% | 91.8% | 93.1% | 93.7% | 94.5% | 94.9% |
+  | technical text: next word in the three | 18.7% | 18.8% | 25.8% | 27.2% | 28.8% | 30.4% |
+  | 270 computer terms glided (simulated) | 59.2% | 61.4% | 68.1% | 69.3% | 71.5% (72.5% light) | 72.8% |
+
+  Weight 2 began to cost everyday accuracy (slips 91.0%, taps 75.8%) for little more, so 1. The table's
+  prediction rows are the n-gram model alone; as the keyboard mixes it with the next-word network, technical
+  next-word hits in the strip's three went from 21.4% to 27.4% (`TechBenchmarkTest`, the network given the
+  sentence). The network itself was not retrained here; see "Retraining the next-word network" (5 Oct).
+
+- **Measured on a real phone** (the owner's Pixel 11 Pro XL, 1344x2992 at 480 dpi, signed 0.5.3, 5 Oct):
+  the language loads in 83 ms (word lists, 72,441 words with every pack) plus 343 ms (n-grams and the glide
+  trie) on the first start after install, against about 5 s on the emulator (R7, closed). Typing a sentence
+  of 44 keys: 498 frames, 0.8% janky, median 5 ms, 99th percentile 16 ms, GPU 2 ms at the 99th. Memory
+  with the keyboard open over another app: 111 MB PSS (56 MB Java heap, 11 MB graphics). Glide could not be
+  measured: the phone tools do not yet send one continuous stroke (BuilderBot #56).
+
+- **Dictionaries in packs** (the owner's design, 4 Oct, after B12: "usb" and other computer terms were
+  missing or rare, and typed in lowercase they were corrected away: cpu -> cup, git -> got, aws -> was).
+  The word list is now the regular words (`en_words.txt`, 62,394: SCOWL's words, contractions,
+  abbreviations and everyday capitalised words up to level 40, such as days, months and nationalities) and
+  three packs: brands and names (9,586: SCOWL's rarer capitalised words and proper names, plus
+  `tools/packs/names.txt`), development and terminal (`tools/packs/dev.txt`, 315) and computer terms
+  (`tools/packs/computer.txt`, 146), the last two written for this project. A word a pack lists leaves the
+  regular words only when it is not a common one there (tier 35 or better), so turning a pack off never
+  takes "terminal" or "kernel" away. Settings > Dictionaries turns each pack on or off (all on by default) and
+  imports the user's own lists (one word per line; CSV first columns and frequency lists work), kept in the
+  app's private files.
+  - **Priority:** a word's frequency is multiplied by its pack's weight before glide and suggestions rank it:
+    regular 1, names and imported lists 0.7, development 0.55, computer terms 0.45 at first (`WordPacks`); 0.9,
+    0.85 and 0.8 since the word model counts the packs' words (above). A gentle order, not a wall: a pack word
+    still wins when the swipe or the letters clearly say it.
+  - **Autocorrect:** still only corrects to common regular words. A development or computer word, or one from
+    the user's lists, typed exactly as spelled is kept, and takes its capitals ("cpu" -> "CPU"); without its
+    pack it is corrected as before ("cup").
+  - **Measured** with all packs on, on the same data as before the split (old list's words only for FUTO):
+    FUTO real swipes top-1 94.4% -> 94.4%, top-3 97.3% -> 97.3%; TSI real taps: typos fixed 75.9% -> 75.9%,
+    made another word 4.3% -> 4.3%; simulated slips fixed 91.3% -> 91.3%, right words changed 0.0%; next word
+    first 24.2% -> 24.2%. On 270 common computer terms: typed then space as meant 239 -> 270 (pid -> pie was
+    the last; PID is now in the development pack), simulated glide top-1 48% -> 59%. Short abbreviations
+    still lose to an everyday word a key away when the swipe is ambiguous (git -> got, ssd -> sad); that is
+    the order asked for, and a word used a few times is learned and rises.
+  - Everyday tech words SCOWL files with its rarest (login, username, inbox, screenshot, podcast, wireless,
+    emoji) are regular words at tier 35 now (`tools/extra_words.txt` lowers a tier as well as adding words).
+  - The built-in word browser lists the packs' words too, labelled; removing a word works the same in any
+    of them. Imported lists are not sent anywhere; Export diagnostics has only how many there are and how
+    many words they hold.
+
+- **Punctuation takes the place of the space after a word** (B11, the owner's report: a space before
+  punctuation after a glided or autocorrected word). The space that ended a word (the space key,
+  autocorrect on space, a strip pick, a predicted word, a phrase glide lifted in the space bar) is
+  provisional: `. , ! ? ; : )` typed next goes against the word ("the ." becomes "the.") and the space comes
+  back in front of the next letter typed ("the. next"), as other Android keyboards do. Quotes are left
+  out, since one may open a quotation. Not in code mode or terminals, after a second space or after
+  punctuation, nor once the cursor has been moved. In web-address fields the space does not come back, so
+  "github" picked from the strip, then ".io", is "github.io".
+- **Web-address fields space words again** (the owner, 4 Oct: an address bar is also a search box).
+  Strip picks, glides and predictions space words as in any text field, and the double-space period works;
+  autocorrect and the lone-i capital stay off so typed addresses are not changed, and `/` keeps the comma's
+  place. A glide right after `. / : @ - _ # ? = & ~` joins on without a space, so glided addresses stay whole.
+  Email fields keep every rule below. Chrome's address bar asks keyboards for no suggestions, so suggestions
+  and glide stay off there whatever this says.
+- **Addresses typed exactly** (the owner's report: Firefox's address bar autocorrected and added spaces;
+  the spacing part since changed for web-address fields, above). In web-address and email fields there is no autocorrect (the strip still offers words), no "I" for a
   lone i, no space the keyboard adds by itself (around a glide, after a strip pick, before a letter typed
   after a glide, the double-space period) and no next-word suggestions; space itself types a space. A plain
   one-line field whose hint reads like an address bar ("Search or enter address", "Search or type URL",
@@ -103,8 +255,8 @@ data. Newest first at the top, then the original design notes.
   three that begin with what is typed back to a space, comma or semicolon, most used first (with nothing
   typed, the most used), raising the strip in Auto mode like next-word predictions; so one name at two
   providers shows both until the provider is typed. A pick replaces what was typed. No offers in
-  no-suggestion fields (the standing rule). Settings > Learning > Remember email addresses (on) turns it
-  off; Settings > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
+  no-suggestion fields (the standing rule). Settings > Learning and privacy > Remember email addresses (on) turns it
+  off; Settings > Learning and privacy > Personal words lists them, to forget one or all. Strip words are cut in the middle, and a
   word alone in the middle slot spans the strip, so a long address keeps its name and its domain.
 - **Clipboard chip** (the user's request): text copied in the last three minutes gets a chip in the strip's
   top row (the autofill row, ahead of any autofill chips) while no word is composed: "Paste" and the clip's
@@ -288,7 +440,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **When nothing fits**: after the wider retry, the decoder falls back to the candidates the preview last
   showed rather than drop the gesture; one backspace removes the result.
 - **Whose glides tune the decoder** (the user's decision): the shipped parameters are tuned on the FUTO
-  dataset only. Glides recorded with **Settings > Record glides** (by the author or sent in by users as
+  dataset only. Glides recorded with **Settings > Typing and glide > Record glides** (by the author or sent in by users as
   exported `.jsonl`) are replayed by `RecordedGlidesTest` to measure, never to tune: a trial search on
   1,058 real swipes treated as one person's recordings gained 2.6 points on that person's held-back words
   and lost 1.1 on FUTO's test split. A person's own habits are learned on their phone by the glide
@@ -409,7 +561,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   uncorrected glides after ten sober days moves no key more than 0.042 of a key and leaves the next
   morning's accuracy unchanged (91.3% both). The state at the start of each of the last 14 days is kept, in
   `glide_adaptation.json` and, for learned words, as `personal_words.day-N.json` beside the vocabulary;
-  Settings > Personal words > Undo recent learning restores both to the start of a chosen day. Deleting a
+  Settings > Learning and privacy > Personal words > Undo recent learning restores both to the start of a chosen day. Deleting a
   word rewrites the kept days without it, and deleting everything deletes them, so going back never
   brings a deleted word back.
 - **Android's personal dictionary**: read through `UserDictionary.Words` when the language loads, words of

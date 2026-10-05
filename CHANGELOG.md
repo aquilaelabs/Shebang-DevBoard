@@ -1,23 +1,34 @@
 # Changelog
 
-## 0.5.2: 2026-10-03
-
-### Changed
-
-- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
-
-## 0.5.1: 2026-10-03
-
-### Added
-
-- Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (78c89c1)
-- Settings > Learning > Built-in dictionary: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (21762e3)
-- Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (6764977)
+## 0.5.3: 2026-10-05
 
 ### Fixed
 
 - A tap clearly on a letter near the space bar no longer turns into a space just because the word could end there (typing 'toolchains' used to give 'tool chains'); the keyboard also stops making spaces from letter taps if you keep deleting them (78c89c1)
-- Web addresses and email addresses are typed exactly: no autocorrect and no spaces added for you in address bars and email fields (78c89c1)
+- Web addresses and email addresses are typed exactly: no autocorrect in address bars and email fields, and no spaces added for you in email fields (03a62b7)
+- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (0949c13)
+- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (193d0be)
+- The settings gear on the terminal bar opens settings even when the app was left open in the background (334507f)
+- Autocorrect fixes more typos: with where you tapped known, it looks two slips away in short words and three in long ones (on real typing data, typos fixed 76% to 81%, wrong corrections down) (924f8c9)
+
+### Changed
+
+- A new logo: the Shebang mark, # and ! interlocked, as the app icon and on the #! key (3872dfe)
+- Settings redesigned: a home page that shows how each page stands and whether DevBoard is your current keyboard, then clear pages for appearance, typing, corrections, sound, the terminal bar, voice, and learning and privacy (dc18e4b)
+- The setup screen shows your progress through the three steps, and finished steps fold away (dc18e4b)
+- Address bars space words again, since they double as search boxes: picked suggestions, glides and predictions get spaces; autocorrect stays off and the slash keeps the comma's place (0949c13)
+- Better at technical writing: the word model now knows development and computer terms in context, so they glide and are predicted far more often (gliding them in technical sentences: 70% to 90% right), with everyday typing unchanged (283f0ac)
+
+### Added
+
+- Developer words like toolchain, monorepo, linter, websocket and Dockerfile are in the dictionary (78c89c1)
+- Settings > Dictionaries > Built-in words: browse and search every word the keyboard ships with, delete ones you never want offered, and restore one or all from Removed (a38e598)
+- Export diagnostics includes how your last 500 glides ended up (kept, fixed from the suggestions, glided again, edited or deleted), as counts by word length, to measure glide accuracy in real use (6764977)
+- One-handed mode: the keys shrink to the left or right side, with buttons beside them to switch sides or go back to full width (Settings > Appearance, or a terminal bar item) (3103ff7)
+- Undo, Redo, Select all, Cut, Copy and Paste on the terminal bar, done by the app itself so a terminal never gets a stray Ctrl+Z (3103ff7)
+- A settings gear on the terminal bar (3103ff7)
+- Settings > Learning and privacy > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (371be02)
+- Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (6c59160)
 
 ## 0.5.0: 2026-10-03
 

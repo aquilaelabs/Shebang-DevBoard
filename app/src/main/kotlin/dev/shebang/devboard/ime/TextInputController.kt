@@ -294,6 +294,11 @@ class TextInputController(
     private var suggestGeneration = 0
     private var lastSpaceTime = 0L
     private var lastActionWasSpace = false
+    /**
+     * Punctuation just took the place of the space after a word ([swapWithSpace]): a letter typed next gets
+     * that space back in front of it, so "the" space "." "next" reads "the. next".
+     */
+    private var spaceAfterPunctuation = false
 
     /** The most recent glide, while it is the last thing typed: backspace removes it, the strip swaps its last word. */
     private class GlideCommit(
@@ -407,6 +412,7 @@ class TextInputController(
         settle()
         flushHeld()
         lastActionWasSpace = false
+        spaceAfterPunctuation = false
         ui.showCandidates(emptyList())
         ui.setComposing(false)
     }
@@ -443,6 +449,9 @@ class TextInputController(
         }
         if (clock() - lastOwnEdit < OWN_EDIT_MS) return
         if (newSelStart == oldSelStart && newSelEnd == oldSelEnd) return
+        // The cursor moved away: a space or punctuation typed now does not follow the last word.
+        lastActionWasSpace = false
+        spaceAfterPunctuation = false
         if (lastGlide != null) {
             lastGlide = null
             clearCandidates()
@@ -583,7 +592,10 @@ class TextInputController(
         dropTarget()
         ownEdit()
         lastAutocorrect = null
+        val spaceBefore = lastActionWasSpace
         lastActionWasSpace = false
+        val owedSpace = spaceAfterPunctuation
+        spaceAfterPunctuation = false
         val glideBefore = lastGlide
         settle()
         lastGlide = null
@@ -591,10 +603,14 @@ class TextInputController(
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
-            if (!field.isAddress && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
+            if (!field.isEmail && glideBefore != null && glideBefore.after.isEmpty() && word.isEmpty() &&
                 ic.getSelectedText(0).isNullOrEmpty() &&
                 ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
             ) {
+                ic.commitText(" ", 1)
+            }
+            // The space that punctuation took from the word before goes in front of the next word.
+            if (owedSpace && word.isEmpty() && ic.getTextBeforeCursor(1, 0)?.firstOrNull()?.let { it in SWAPS_WITH_SPACE } == true) {
                 ic.commitText(" ", 1)
             }
             if (word.isEmpty()) {
@@ -628,7 +644,25 @@ class TextInputController(
             return
         }
         if (pairing && text.length == 1 && typePaired(ic, text[0])) return
+        if (spaceBefore && swapWithSpace(ic, text)) return
         ic.commitText(text, 1)
+    }
+
+    /**
+     * Punctuation right after the space that ended a word (the space key, autocorrect, a strip pick, a predicted
+     * word): it goes against the word instead ("the ." becomes "the."), as other keyboards do, and the space comes
+     * back before the next word typed. Not in code mode or terminals, where every character is meant; in a
+     * web-address field the space does not come back ("github" picked, then ".com", is "github.com").
+     */
+    private fun swapWithSpace(ic: InputConnection, text: String): Boolean {
+        if (text.length != 1 || text[0] !in SWAPS_WITH_SPACE || codeMode || !field.allowsComposing) return false
+        if (!endsSentenceWord(ic)) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(1, 0)
+        ic.commitText(text, 1)
+        ic.endBatchEdit()
+        spaceAfterPunctuation = !field.isUrl
+        return true
     }
 
     private val pairing: Boolean get() = codeMode && settings.pairBrackets && !this.field.isTerminal
@@ -675,6 +709,7 @@ class TextInputController(
 
     fun space() {
         val ic = connection() ?: return
+        spaceAfterPunctuation = false
         val t = target
         if (t != null) {
             // A selected word: space moves past it (typing a space would replace it).
@@ -699,7 +734,7 @@ class TextInputController(
         val now = clock()
         if (isComposing) {
             endWord(ic, " ", correct = true, deferOk = true)
-        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isAddress && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
+        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isEmail && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
             ic.commitText(". ", 1)
@@ -720,7 +755,7 @@ class TextInputController(
      */
     private fun showPredictions(ic: InputConnection) {
         // Not in code mode, where the next word is rarely English.
-        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isAddress || isComposing || target != null) return
+        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isEmail || isComposing || target != null) return
         val model = predictionModel ?: return
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
@@ -794,6 +829,7 @@ class TextInputController(
         dropTarget()
         ownEdit()
         lastActionWasSpace = false
+        spaceAfterPunctuation = false
         val ac = lastAutocorrect
         lastAutocorrect = null
         if (ac != null && !isComposing && ic.getTextBeforeCursor(ac.corrected.length + ac.after.length, 0)?.toString() == ac.corrected + ac.after) {
@@ -1011,6 +1047,7 @@ class TextInputController(
         lastAutocorrect = null
         lastGlide = null
         lastActionWasSpace = false
+        spaceAfterPunctuation = false
         deleteWords(1)
     }
 
@@ -1088,6 +1125,7 @@ class TextInputController(
         dropTarget()
         ownEdit()
         lastActionWasSpace = false
+        spaceAfterPunctuation = false
         lastAutocorrect = null
         lastGlide = null
         settle()
@@ -1548,11 +1586,11 @@ class TextInputController(
             reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
             reopenedCorrection = null
             learnTyped(ic, chosen)
-            // An address goes on as typed: no space after the word.
-            ic.commitText(if (field.isAddress) chosen else "$chosen ", 1)
+            // An email address goes on as typed: no space after the word.
+            ic.commitText(if (field.isEmail) chosen else "$chosen ", 1)
             word.setLength(0)
             clearCandidates()
-            lastActionWasSpace = !field.isAddress
+            lastActionWasSpace = !field.isEmail
             lastSpaceTime = clock()
             showPredictions(ic)
         }
@@ -1708,6 +1746,7 @@ class TextInputController(
             }
         }
         lastActionWasSpace = false
+        spaceAfterPunctuation = false
         reviseBefore(ic, result, dictionary)
         // A word being redone is not learned as it was; the rest of the glide before this one is final now.
         target?.glided?.let { abandon(it, GlideOutcomes.REDONE) }
@@ -1739,6 +1778,8 @@ class TextInputController(
         if (needsLeadingSpace(ic)) sb.append(' ')
         sb.append(ownText)
         ic.commitText(sb, 1)
+        // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
+        lastActionWasSpace = trailingSpace
         remember(fresh)
         pending.addAll(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
@@ -1852,15 +1893,17 @@ class TextInputController(
 
     /** No space at the field start, after whitespace or a newline, or after an opening bracket. */
     private fun needsLeadingSpace(ic: InputConnection): Boolean {
-        if (field.isAddress) return false
+        if (field.isEmail) return false
         val before = ic.getTextBeforeCursor(1, 0)
         if (before.isNullOrEmpty()) return false
+        // In a web-address field a glide right after an address's punctuation is part of it ("github." "com").
+        if (field.isUrl && before[0] in URL_JOINERS) return false
         return !GlideText.atWordStart(before, 1)
     }
 
     /** A space after the glide when a word follows the cursor directly. */
     private fun needsTrailingSpace(ic: InputConnection): Boolean {
-        if (field.isAddress) return false
+        if (field.isEmail) return false
         val after = ic.getTextAfterCursor(1, 0)
         return !after.isNullOrEmpty() && after[0].isLetterOrDigit()
     }
@@ -1878,6 +1921,10 @@ class TextInputController(
         private val PAIRS = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'', '`' to '`')
         private const val CLOSERS = ")]}"
         private const val QUOTES = "\"'`"
+        /** Punctuation that takes the place of the space after a word ([swapWithSpace]). Quotes are left out: one may open a quotation. */
+        private const val SWAPS_WITH_SPACE = ".,!?;:)"
+        /** In a web-address field, punctuation a glided word attaches to without a space. */
+        private const val URL_JOINERS = "./:@-_#?=&~"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
         private const val SENTENCE_PUNCTUATION = ".,!?;:)\"'"
         /** Punctuation that joins a word to the one before it when no space follows ([gluedToPrevious]). */

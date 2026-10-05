@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-"""Build app/src/main/assets/dict/en_words.txt from an unpacked SCOWL release.
+"""Build the keyboard's word lists in app/src/main/assets/dict/ from an unpacked SCOWL release.
 
 Usage: tools/build_wordlist.py /path/to/scowl-2020.12.07 [max_level] [--upper-max N] [--proper-names N]
-                                [--abbreviations N] [--extra FILE] [--out FILE]
+                                [--abbreviations N] [--names-from N] [--extra FILE] [--out-dir DIR]
 
-Output: one `word<TAB>tier` per line, sorted by lowercase form, then within it the spelling to write first
+Writes the regular words (en_words.txt) and one file per pack, which the user can turn off and which glide
+and suggestions rank after the regular words (see docs/decisions.md, "Dictionaries in packs"):
+  pack_names.txt     brands and names: SCOWL's capitalised words from --names-from on (places, people) and its
+                     proper-names lists, plus tools/packs/names.txt
+  pack_dev.txt       development, Linux and terminal words: tools/packs/dev.txt
+  pack_computer.txt  computer terms: tools/packs/computer.txt
+A word in a pack list leaves the regular words unless it is a common one there (tier 35 or better), so
+turning a pack off never takes away an everyday word ("terminal", "kernel" if common).
+
+Each file: one `word<TAB>tier` per line, sorted by lowercase form, then within it the spelling to write first
 (commonest tier, then all-lowercase): the order the app searches in, so it can skip sorting at load time.
 The tier is the smallest SCOWL size level that contains the word (10 = most
 common, 60 = rare). Words with apostrophes are dropped except the contraction
@@ -34,10 +43,36 @@ def is_s_contraction(word):
     return word.endswith("'s") and word[:-2].lower() in S_CONTRACTION_STEMS
 
 
+PACKS_DIR = os.path.join(os.path.dirname(__file__), "packs")
+# Explicit pack lists, in the order they claim words: a word listed in two goes to the first.
+PACK_LISTS = [("dev", "dev.txt"), ("computer", "computer.txt"), ("names", "names.txt")]
+
+
+def read_list(path):
+    """word<TAB>tier lines, "#" comments and blank lines skipped."""
+    out = []
+    with open(path, encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            w, tier = line.split("\t")
+            out.append((w, int(tier)))
+    return out
+
+
+def write_list(path, words):
+    with open(path, "w", encoding="utf-8") as fh:
+        # Within one lowercase form, the spelling to write first: the commonest tier, then the all-lowercase
+        # one ("wood" before the name "Wood"), as the app's Dictionary.parse orders it.
+        fh.writelines(f"{w}\t{words[w]}\n" for w in sorted(words, key=lambda w: (w.lower(), words[w], w != w.lower(), w)))
+    print(f"wrote {len(words)} words to {path}")
+
+
 def main():
     ap = argparse.ArgumentParser(usage=__doc__)
     ap.add_argument("root")
-    # The defaults build the shipped list (see docs/decisions.md: "Names, brands and abbreviations").
+    # The defaults build the shipped lists (see docs/decisions.md: "Names, brands and abbreviations").
     ap.add_argument("max_level", nargs="?", type=int, default=50)
     # Capitalised words (places, peoples, names) up to this level.
     ap.add_argument("--upper-max", type=int, default=50)
@@ -45,14 +80,22 @@ def main():
     ap.add_argument("--proper-names", type=int, default=50)
     # Abbreviations written in capitals ("URL", "API") up to this level; 0 for none.
     ap.add_argument("--abbreviations", type=int, default=50)
-    # Our own list of words SCOWL lacks: word<TAB>tier, "#" comments; "" for none.
+    # Capitalised words from this level on go to the names pack; below it (days, months, nationalities,
+    # "Christmas") they are regular words.
+    ap.add_argument("--names-from", type=int, default=50)
+    # Our own list of regular words SCOWL lacks or files too rare: word<TAB>tier, "#" comments; "" for none.
     ap.add_argument("--extra", default=os.path.join(os.path.dirname(__file__), "extra_words.txt"))
-    ap.add_argument("--out")
+    ap.add_argument("--out-dir", default=os.path.join(os.path.dirname(__file__), "..", "app", "src", "main", "assets", "dict"))
     args = ap.parse_args()
     root = args.root
     max_level = args.max_level
     final = os.path.join(root, "final")
-    words = {}
+    core = {}
+    packs = {"names": {}, "dev": {}, "computer": {}}
+
+    def placed(w):
+        return w in core or any(w in p for p in packs.values())
+
     for level in LEVELS:
         if level > max_level:
             break
@@ -81,26 +124,31 @@ def main():
                             continue
                         if not all(c.isalpha() or c == "'" for c in w):
                             continue
-                        if w not in words:
-                            words[w] = level
+                        if placed(w):
+                            continue
+                        names = cat == "proper-names" or (cat == "upper" and level >= args.names_from)
+                        (packs["names"] if names else core)[w] = level
+    # Regular words of our own: added, or made as common as listed.
     if args.extra:
-        with open(args.extra, encoding="utf-8") as fh:
-            for line in fh:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                w, tier = line.split("\t")
-                if w not in words:
-                    words[w] = int(tier)
-    out_dir = os.path.join(os.path.dirname(__file__), "..", "app", "src", "main", "assets", "dict")
-    os.makedirs(out_dir, exist_ok=True)
-    out = args.out or os.path.join(out_dir, "en_words.txt")
-    with open(out, "w", encoding="utf-8") as fh:
-        # Within one lowercase form, the spelling to write first: the commonest tier, then the all-lowercase
-        # one ("wood" before the name "Wood"), as the app's Dictionary.parse orders it.
-        for w in sorted(words, key=lambda w: (w.lower(), words[w], w != w.lower(), w)):
-            fh.write(f"{w}\t{words[w]}\n")
-    print(f"wrote {len(words)} words to {out}")
+        for w, tier in read_list(args.extra):
+            for p in packs.values():
+                p.pop(w, None)
+            core[w] = min(core.get(w, tier), tier)
+    # The pack lists claim their words, except common regular words.
+    claimed = set()
+    for pack, name in PACK_LISTS:
+        for w, tier in read_list(os.path.join(PACKS_DIR, name)):
+            if w in claimed or (w in core and core[w] <= 35):
+                continue
+            claimed.add(w)
+            core.pop(w, None)
+            for p in packs.values():
+                p.pop(w, None)
+            packs[pack][w] = tier
+    os.makedirs(args.out_dir, exist_ok=True)
+    write_list(os.path.join(args.out_dir, "en_words.txt"), core)
+    for pack in ("names", "dev", "computer"):
+        write_list(os.path.join(args.out_dir, f"pack_{pack}.txt"), packs[pack])
 
 
 if __name__ == "__main__":

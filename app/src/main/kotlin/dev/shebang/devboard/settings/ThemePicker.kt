@@ -45,9 +45,7 @@ fun ThemePicker(selected: String, onSelect: (String) -> Unit) {
     val previews = remember(context) {
         Palettes.choices.map { (id, name) -> Triple(id, name, KeyboardTheme.build(context, Settings(palette = id))) }
     }
-    Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        Text("Theme", style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(horizontal = 16.dp))
-        Spacer(Modifier.height(8.dp))
+    Column(Modifier.fillMaxWidth().padding(vertical = 12.dp)) {
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(previews, key = { it.first }) { (id, name, t) ->
                 val isSelected = id == selected

@@ -28,11 +28,15 @@ data class FieldInfo(
     /** Words typed here may be learned: ordinary text fields that did not ask for no learning. */
     val allowsLearning: Boolean get() = allowsComposing && variant == FieldVariant.PLAIN && !noPersonalizedLearning
     val allowsAutoCaps: Boolean get() = !isTerminal && !isPassword && !isNumeric
-    /**
-     * A web address or an email address: typed exactly, so no autocorrect, no spaces the keyboard adds by
-     * itself (around glides, after a strip pick, the double-space period) and no next-word suggestions.
-     */
+    /** A web address or an email address: typed exactly as far as words go, so no autocorrect. */
     val isAddress: Boolean get() = variant == FieldVariant.URL || variant == FieldVariant.EMAIL
+    /**
+     * An email address: besides no autocorrect, no spaces the keyboard adds by itself (around glides, after a
+     * strip pick, the double-space period) and no next-word suggestions. A web-address field gets those like
+     * any text field, since a browser's address bar is also its search box.
+     */
+    val isEmail: Boolean get() = variant == FieldVariant.EMAIL
+    val isUrl: Boolean get() = variant == FieldVariant.URL
     /** Enter should be sent as a KeyEvent (terminals, and fields without an action). */
     val enterIsKeyEvent: Boolean
         get() = isTerminal || (!enterIsNewline && (editorAction == EditorInfo.IME_ACTION_NONE || editorAction == EditorInfo.IME_ACTION_UNSPECIFIED))

@@ -8,7 +8,7 @@ import java.io.File
 class NgramModelTest {
     companion object {
         val dictionary: Dictionary by lazy {
-            Dictionary.parse(File(System.getenv("DEVBOARD_WORDS") ?: "src/main/assets/dict/en_words.txt").readLines().asSequence())
+            BuiltInWords.all()
         }
         val lm: NgramModel by lazy { File(System.getenv("DEVBOARD_NGRAMS") ?: "src/main/assets/dict/en_ngrams.bin").inputStream().use { NgramModel.load(it, dictionary) } }
     }
