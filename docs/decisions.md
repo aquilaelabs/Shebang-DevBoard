@@ -101,22 +101,24 @@ data. Newest first at the top, then the original design notes.
   about 33 min on the node's card): A with the usual 32,000-word vocabulary, which dropped 658 rare everyday
   words for technical ones, and B with 33,000. In the keyboard's mix, next word in the three:
 
-  | | shipped | A | B |
-  |---|---|---|---|
-  | everyday, Tatoeba held-out (13,030 words) | 39.3% | 38.5% | 38.9% |
-  | everyday, FUTO sentences (19,959) | 32.7% | 31.6% | 32.5% |
-  | technical, every word (9,424) | 27.4% | 29.1% | 28.6% |
-  | technical, pack words only (302) | 5.0% | 4.3% | 3.0% |
-  | FUTO real swipes, glide top-1 | 94.4% | 94.3% | 94.3% |
+  | | shipped | A: 32k | B: 33k | D: 33k, docs x3 | E: 36k |
+  |---|---|---|---|---|---|
+  | everyday, Tatoeba held-out (13,030 words) | 39.3% | 38.5% | 38.9% | 38.7% | 38.1% |
+  | everyday, FUTO sentences (19,959) | 32.7% | 31.6% | 32.5% | 32.3% | 32.5% |
+  | technical, every word (9,424) | 27.4% | 29.1% | 28.6% | 30.3% | 29.1% |
+  | technical, pack words only (302) | 5.0% | 4.3% | 3.0% | 3.3% | 2.3% |
+  | FUTO real swipes, glide top-1 | 94.4% | 94.3% | 94.3% | 94.3% | 94.3% |
 
   A buys 1.7 points on technical text for about 1 on everyday; B is within noise of the shipped network
-  everywhere and 1.2 better on technical text, but predicts the pack words themselves no better (the
-  documentation is 5% of the corpus, too little for the network to learn them). Under the owner's rule
-  (ship accuracy changes only when they are clearly better on held-out data), the shipped network stays.
-  Kept: `prep.py --tech`, and `TechBenchmarkTest` now gives the network the sentence, as the keyboard does;
-  its earlier technical prediction numbers (18.7% -> 28.8%) were the n-grams alone. Network-alone scores
-  moved a lot between the two runs (Tatoeba in three 34.7% against 36.9%), so a retrain is also a dice roll;
-  several seeds, or a larger technical share, are the next things to try (roadmap).
+  everywhere and 1.2 better on technical text; D (the documentation counted three times, about 15% of the
+  corpus) is the best on technical text, 2.9 better, for 0.4 to 0.6 on everyday; E (a 36,000-word
+  vocabulary) gains nothing over B. None predicts the pack words themselves better (a small sample, and
+  the opposite direction). Training is deterministic (a second run of B matched it to the digit), so the A
+  to B difference was the vocabulary, not luck. Under the owner's rule (ship accuracy changes only when they
+  are clearly better on held-out data), the shipped network stays; D is the one to pick if technical text
+  is to be favoured on purpose. Kept: `prep.py --tech`, and `TechBenchmarkTest` now gives the network the
+  sentence, as the keyboard does; its earlier technical prediction numbers (18.7% -> 28.8%) were the
+  n-grams alone (the keyboard's own went 21.4% -> 27.4% with the n-gram rebuild).
 
 - **Autocorrect looks for more slips when it knows the taps** (5 Oct, the owner's pick from the list of
   next improvements). On TSI's 1,255 real typos, 82 could never be fixed because the word meant was not among
