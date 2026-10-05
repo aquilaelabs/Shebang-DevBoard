@@ -81,6 +81,19 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **A word the browser completes is not redone by the next glide** (the owner's report, 5 Oct: in Firefox's
+  address bar, glide a word, history fills in a URL, and the next glide replaced the whole thing). Firefox
+  (and Chrome) complete what was typed by writing the rest of a URL after the cursor without moving it:
+  glide "exam", read "exam|ple.com/". The keyboard's rule "a cursor strictly inside a word was put there by
+  the user, so a glide redoes that word" then took "example" as the target, and the next glide replaced it;
+  the browser dropped the rest. Now letters right after a cursor that still stands on the last glide's text
+  count as the app's completion (`appCompletedAfterGlide`: the keyboard itself always puts a space between a
+  glide and a following word, so they cannot be the user's), both when a selection report arrives and when a
+  glide starts; the glide goes in after the glided word with a space, and the browser drops its completion
+  because the text no longer continues it: "exam world". No space is kept after the new word for the
+  completion. Typing letters still continues the completion ("exam" + "p" keeps "example.com/"), since that
+  is the browser's own logic. Reproduced and checked on Firefox 157 on the emulator.
+
 - **Retraining the next-word network: not shipped** (5 Oct, the owner's pick). The network
   (`en_next_word.bin`) was trained before the packs, so it reads their words as unknown and drags technical
   predictions below what the n-grams give alone (27.4% in the strip's three against 28.8%). Two retrains on

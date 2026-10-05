@@ -116,3 +116,7 @@ Usability items (0.5.2):
       landing near the intended keys read as them ("you" straight off). Taps dead centre on the wrong keys
       ("yiy", "tbjs") are kept as typed, by design: a centred tap is likely meant. The two-slip cases are
       measured on TSI's real taps (typos fixed 75.9% -> 80.6%). *(5 Oct)*
+- [x] Firefox's address bar (Firefox 157 on the API 36 emulator, example.com in history): glide "exam" (history
+      completes "example.com/"), glide "world": "exam world". Glide "example" then "world": "example world".
+      Glide "exam", type p (the completion stays "example.com/"), glide "world": "examp world".
+      *(5 Oct; before the fix the second glide left only "world")*

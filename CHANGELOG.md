@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- In a browser's address bar, a glide after a word the browser completed from history adds the new word after what you glided (the completion goes) instead of replacing everything with it (df377d6)
+
 ## 0.5.3: 2026-10-05
 
 ### Fixed
