@@ -81,6 +81,20 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **Autocorrect looks for more slips when it knows the taps** (5 Oct, the owner's pick from the list of
+  next improvements). On TSI's 1,255 real typos, 82 could never be fixed because the word meant was not among
+  the six candidates autocorrect weighs: candidates were gathered at one slip for words of four letters or
+  fewer and two slips beyond, whatever the taps said, so "yiy" (you), "tbjs" (this), "aew" (are) and
+  "shoukdwra" (shoulders) had no candidate. With tap positions, candidates are now gathered at two slips from
+  three letters and three slips from six (`Suggester.slipsAllowed`), and autocorrect accepts the same; each
+  slip is priced by where the finger landed, and KEEP_SCORE still protects a word meant as typed. Without taps
+  (a hardware keyboard, the benchmarks' plain slips) nothing changes. Measured on TSI, taps and the words
+  before: typos fixed 75.9% -> 80.6%, made another word 4.3% -> 3.3%, right words changed 0.0% -> 0.0%, words
+  meant as typed that the dictionary lacks kept 65.7% -> about 64.6% (the one cost: a rare name or term
+  typed right is a little likelier to be corrected away; backspace still undoes it). Two slips from two
+  letters gained nothing (the two-letter rule stands); three from seven or eight lost a little. About 3 ms a
+  word on the JVM, on the background thread.
+
 - **The word model counts the packs' words** (the owner's question, 5 Oct: weights or a rebuilt model?). The
   word model was counted before the packs existed, so about 450 development and computer words had no counts
   and no context; the pack weights were standing in for missing data. It is now rebuilt with every pack in its

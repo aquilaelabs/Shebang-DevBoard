@@ -76,7 +76,10 @@ class Suggester(
         // what was typed is only a name in lowercase ("thar" for "Thar"): it is as likely a slip ("that").
         val lowercaseName = typed == lower && dict.indexOf(lower) >= 0 && !dict.hasLowercaseSpelling(lower)
         if (lower.length >= 2 && (lowercaseName || out.none { it.word.equals(typed, ignoreCase = true) })) {
-            val maxDist = if (lower.length <= 4) 1 else 2
+            // With the taps known, more slips may be looked for: each is then priced by where the finger landed
+            // (a two-slip "yiy" is a cheap "you" when both taps sat beside the keys meant), and KEEP_SCORE still
+            // guards a word meant as typed. Without them, only short distances are safe to offer.
+            val maxDist = if (taps != null) slipsAllowed(lower.length) else if (lower.length <= 4) 1 else 2
             val corrections = ArrayList<Suggestion>()
             val words = dict.lower
             for (i in words.indices) {
@@ -169,7 +172,7 @@ class Suggester(
         // A development word, computer term or word of the user's own lists, typed as it is spelled: meant, so it
         // takes its capitals ("cpu" -> "CPU") rather than becoming an everyday word a slip away ("cup").
         if (recase && !asUnknown && WordPacks.keepsTypedForm(dict.packs[known].toInt())) return dict.words[known]
-        val maxD = if (lower.length >= 6 || (taps != null && lower.length >= TAP_TWO_SLIPS_FROM)) 2 else 1
+        val maxD = if (taps != null) slipsAllowed(lower.length) else if (lower.length >= 6) 2 else 1
         var best: String? = null
         var bestScore = 0.0
         var bestSame = false
@@ -226,8 +229,20 @@ class Suggester(
         var KEEP_SCORE = 2e-8
         /** How much the words before count, against how common a word is overall (0..1). */
         var CONTEXT_WEIGHT = 0.75f
-        /** With tap positions, words from this length may be two slips away (else from six letters). */
-        private const val TAP_TWO_SLIPS_FROM = 4
+        /**
+         * With tap positions, words from this length may be two slips away (else from six letters), and from
+         * [TAP_THREE_SLIPS_FROM] three. Chosen on TSI's taps (TapBenchmarkTest, TAPS_SLIPS): typos fixed 75.9% ->
+         * 80.6%, made another word 4.3% -> 3.3%, words meant as typed kept 65.7% -> 64.6%.
+         */
+        var TAP_TWO_SLIPS_FROM = 3
+        var TAP_THREE_SLIPS_FROM = 6
+
+        /** How many slips a correction may be from a typed word of [length] letters when the taps are known. */
+        fun slipsAllowed(length: Int): Int = when {
+            length >= TAP_THREE_SLIPS_FROM -> 3
+            length >= TAP_TWO_SLIPS_FROM -> 2
+            else -> 1
+        }
 
         /** Copies the user's casing onto a suggestion: "Hel" -> "Hello", "HEL" -> "HELLO", "hel" -> dictionary casing. */
         fun matchCase(typed: String, word: String): String {

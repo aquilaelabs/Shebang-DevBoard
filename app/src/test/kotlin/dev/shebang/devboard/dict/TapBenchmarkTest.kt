@@ -135,6 +135,18 @@ class TapBenchmarkTest {
         val realWord = typos.count { dictionary.contains(it.typed) }
         val notOffered = typos.count { w -> !dictionary.contains(w.typed) && suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES).none { it.word.equals(w.meant, ignoreCase = true) } }
         println("TAPS   of the typos: ${realWord} are themselves words, ${notOffered} more lack the word meant among the candidates")
+        // TAPS_MISSING=1: each typo whose word is not among the candidates, with the taps' own reading of it.
+        if (System.getenv("TAPS_MISSING") != null) {
+            for (w in typos) {
+                if (dictionary.contains(w.typed)) continue
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val cands = suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, contextOf(w))
+                if (cands.none { it.word.equals(w.meant, ignoreCase = true) }) {
+                    val d = EditDistance.bounded(w.typed.lowercase(), w.meant.lowercase(), 3)
+                    println("TAPS MISSING ${w.typed} (meant ${w.meant}, distance ${if (d < 0) ">3" else d}, length ${w.typed.length}->${w.meant.length}): ${cands.map { it.word }}")
+                }
+            }
+        }
         System.getenv("RECASE_WEIGHT")?.toDoubleOrNull()?.let { Suggester.RECASE_WEIGHT = it }
         val weights = if (System.getenv("AUTOCORRECT_SWEEP") != null) listOf(0f, 0.5f, 0.75f, 1f) else listOf(Suggester.CONTEXT_WEIGHT)
         for ((useTaps, useContext, weight) in listOf(Triple(false, false, 0f), Triple(true, false, 0f)) + weights.map { Triple(true, true, it) }) {
@@ -171,6 +183,34 @@ class TapBenchmarkTest {
             println("TAPS $label typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}, left ${pct(left, typos.size)}; right words changed ${pct(changed, right.size)}, given capitals $recased")
         }
         Suggester.CONTEXT_WEIGHT = 0.75f
+        // TAPS_SLIPS="4:6,3:6,4:7": from which typed length two and three slips are looked for, with taps and context.
+        System.getenv("TAPS_SLIPS")?.split(',')?.forEach { pair ->
+            val (two, three) = pair.split(':').map { it.trim().toInt() }
+            Suggester.TAP_TWO_SLIPS_FROM = two
+            Suggester.TAP_THREE_SLIPS_FROM = three
+            val t0 = System.nanoTime()
+            var fixed = 0
+            var wrong = 0
+            var changed = 0
+            var kept = 0
+            for (w in typos + right) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                val ctx = contextOf(w)
+                val fix = suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, ctx), taps, ctx)
+                if (w.typed != w.meant) {
+                    if (fix == null) Unit else if (fix.equals(w.meant, ignoreCase = true)) fixed++ else wrong++
+                } else if (fix != null && !fix.equals(w.typed, ignoreCase = true)) changed++
+            }
+            // Words meant as typed that the dictionary would lack (the keepingWordsMeantAsTyped measure): how many stay.
+            for (w in right) {
+                val taps = SlipCost.Taps { i, a, b -> model.cost(w.xs[i], w.ys[i], a, b) }
+                if (suggester.autocorrectFrom(w.typed, suggester.suggest(w.typed, Suggester.AUTOCORRECT_CANDIDATES, taps, contextOf(w)), taps, contextOf(w), asUnknown = true) == null) kept++
+            }
+            val pct = GlideBenchmarkTest::pct
+            println("TAPS SLIPS two from $two, three from $three: typos fixed ${pct(fixed, typos.size)}, made another word ${pct(wrong, typos.size)}; right words changed ${pct(changed, right.size)}; words meant as typed kept ${pct(kept, right.size)}; ${"%.0f".format((System.nanoTime() - t0) / 1e6 / (typos.size + right.size))} ms per word")
+        }
+        Suggester.TAP_TWO_SLIPS_FROM = 3
+        Suggester.TAP_THREE_SLIPS_FROM = 6
     }
 
     /**
