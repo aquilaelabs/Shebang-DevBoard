@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Autocorrect fixes more typos: with where you tapped known, it looks two slips away in short words and three in long ones (on real typing data, typos fixed 76% to 81%, wrong corrections down) (b6d5064)
+
 ## 0.5.3: 2026-10-04
 
 ### Changed
