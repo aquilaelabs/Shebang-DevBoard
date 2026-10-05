@@ -42,14 +42,18 @@ An Android keyboard (IME) for developers, written in Kotlin.
 
 ## Screenshots
 
+All taken from the 0.5.4 release build on Android 16.
+
 | | | |
 |---|---|---|
-| <img src="docs/screenshots/suggestions.png" width="270" alt="Suggestions after a space"> | <img src="docs/screenshots/glide.png" width="270" alt="Gliding with the trail and a live preview"> | <img src="docs/screenshots/code-mode.png" width="270" alt="Code mode"> |
-| Next-word suggestions from the whole sentence | Glide typing: the trail, and the word read before you lift | Code mode: every symbol on one page |
-| <img src="docs/screenshots/emoji.png" width="270" alt="Emoji panel"> | <img src="docs/screenshots/clipboard.png" width="270" alt="Clipboard history"> | <img src="docs/screenshots/settings.png" width="180" alt="Settings"> |
-| The emoji panel, from the terminal bar | Clipboard history with pins and pictures | Settings: every page at a glance (Night theme) |
-| <img src="docs/screenshots/setup.png" width="180" alt="Setup"> | <img src="docs/screenshots/one-handed.png" width="180" alt="One-handed mode"> | <img src="docs/screenshots/appearance.png" width="180" alt="Appearance settings"> |
-| Setup in three steps, with a field to try it | One-handed mode, docked left | Appearance: themes, height, one-handed mode |
+| <img src="docs/screenshots/glide.png" width="270" alt="Gliding with the trail and a live preview"> | <img src="docs/screenshots/suggestions.png" width="270" alt="Next-word suggestions after a space"> | <img src="docs/screenshots/code-mode.png" width="270" alt="Code mode"> |
+| Glide typing: the trail, and the word read before you lift | Next-word suggestions from the whole sentence | Code mode: every symbol on one page, under the terminal bar |
+| <img src="docs/screenshots/clipboard.png" width="270" alt="Clipboard history"> | <img src="docs/screenshots/paste-chip.png" width="270" alt="Paste chip for a recent copy"> | <img src="docs/screenshots/emoji.png" width="270" alt="Emoji panel"> |
+| Clipboard history with pins | A chip offers what you just copied | The emoji panel, from the terminal bar |
+| <img src="docs/screenshots/one-handed.png" width="270" alt="One-handed mode"> | <img src="docs/screenshots/day-theme.png" width="270" alt="The Day theme"> | <img src="docs/screenshots/setup.png" width="180" alt="Setup"> |
+| One-handed mode, docked left | The Day theme, one of twelve | Setup in three steps, with a field to try it |
+| <img src="docs/screenshots/settings.png" width="180" alt="Settings"> | <img src="docs/screenshots/dictionaries.png" width="180" alt="Dictionaries"> | <img src="docs/screenshots/appearance.png" width="180" alt="Appearance settings"> |
+| Settings: every page at a glance | Dictionaries: packs to turn on or off, and your own lists | Appearance: themes, height, one-handed mode |
 
 ## Build and install
 
