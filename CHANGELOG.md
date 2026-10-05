@@ -4,9 +4,12 @@
 
 ### Fixed
 
+- A tap clearly on a letter near the space bar no longer turns into a space just because the word could end there (typing 'toolchains' used to give 'tool chains'); the keyboard also stops making spaces from letter taps if you keep deleting them (78c89c1)
+- Web addresses and email addresses are typed exactly: no autocorrect in address bars and email fields, and no spaces added for you in email fields (03a62b7)
+- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (0949c13)
+- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (193d0be)
+- The settings gear on the terminal bar opens settings even when the app was left open in the background (334507f)
 - Autocorrect fixes more typos: with where you tapped known, it looks two slips away in short words and three in long ones (on real typing data, typos fixed 76% to 81%, wrong corrections down) (b6d5064)
-
-## 0.5.3: 2026-10-04
 
 ### Changed
 
@@ -26,14 +29,6 @@
 - A settings gear on the terminal bar (3103ff7)
 - Settings > Learning and privacy > Personal words > Add a word: teach the keyboard a name or term by hand; it is offered and glided at once (371be02)
 - Settings > Dictionaries: turn packs of brands and names, development words and computer terms on or off, and import your own word lists. Glide and suggestions prefer regular words, then names and your lists, then development words, then computer terms (6c59160)
-
-### Fixed
-
-- A tap clearly on a letter near the space bar no longer turns into a space just because the word could end there (typing 'toolchains' used to give 'tool chains'); the keyboard also stops making spaces from letter taps if you keep deleting them (78c89c1)
-- Web addresses and email addresses are typed exactly: no autocorrect in address bars and email fields, and no spaces added for you in email fields (03a62b7)
-- Punctuation after a word you ended with space, a picked suggestion or autocorrect goes against the word instead of after a space ('the .' is now 'the.'), and the space comes back before your next word (0949c13)
-- Hundreds of computer and developer terms (USB, HDMI, BIOS, VPN, git, sudo, grep, touchpad, hotspot) can be typed and glided; typed in lowercase they keep their capitals ('cpu' becomes CPU) instead of being corrected to everyday words (193d0be)
-- The settings gear on the terminal bar opens settings even when the app was left open in the background (334507f)
 
 ## 0.5.0: 2026-10-03
 
