@@ -140,7 +140,7 @@ class WordPackStore(private val dir: File?) {
             val out = LinkedHashSet<String>()
             var skipped = 0
             for (raw in lines) {
-                var line = raw.removePrefix("﻿").trim()
+                var line = raw.removePrefix("\uFEFF").trim()
                 if (line.isEmpty() || line.startsWith("#")) continue
                 val cut = line.indexOfFirst { it == '\t' || it == ',' }
                 if (cut >= 0) line = line.substring(0, cut).trim()
