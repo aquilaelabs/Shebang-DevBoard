@@ -998,11 +998,15 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         afterEdit()
     }
 
-    /** The keyboard's settings, in their own task (the keyboard has no activity of its own to start from). */
+    /**
+     * The keyboard's settings, in the app's task (the keyboard has no activity of its own to start from). With
+     * NEW_TASK alone Android only brings that task forward when it already exists (the setup screen left open),
+     * without starting settings; CLEAR_TOP starts them on top of it, or goes back to them if they are open.
+     */
     private fun openSettings() {
         text.finishComposing()
         val intent = android.content.Intent(this, dev.shebang.devboard.settings.SettingsActivity::class.java)
-            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+            .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP)
         runCatching { startActivity(intent) }.onFailure { Log.w(TAG, "could not open settings", it) }
         requestHideSelf(0)
     }
