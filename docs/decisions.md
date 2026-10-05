@@ -81,6 +81,13 @@ data. Newest first at the top, then the original design notes.
      backspace. When more than a fifth of the recent ones (fading by 0.97 each, at least three) are taken
      back, the help turns off for that user; Reset glide and tap adaptation turns it on again. Most people
      would keep about 97% (TSI). The tallies are in Export diagnostics.
+- **Measured on a real phone** (the owner's Pixel 11 Pro XL, 1344x2992 at 480 dpi, signed 0.5.3, 5 Oct):
+  the language loads in 83 ms (word lists, 72,441 words with every pack) plus 343 ms (n-grams and the glide
+  trie) on the first start after install, against about 5 s on the emulator (R7, closed). Typing a sentence
+  of 44 keys: 498 frames, 0.8% janky, median 5 ms, 99th percentile 16 ms, GPU 2 ms at the 99th. Memory
+  with the keyboard open over another app: 111 MB PSS (56 MB Java heap, 11 MB graphics). Glide could not be
+  measured: the phone tools do not yet send one continuous stroke (BuilderBot #56).
+
 - **Dictionaries in packs** (the owner's design, 4 Oct, after B12: "usb" and other computer terms were
   missing or rare, and typed in lowercase they were corrected away: cpu -> cup, git -> got, aws -> was).
   The word list is now the regular words (`en_words.txt`, 62,394: SCOWL's words, contractions,

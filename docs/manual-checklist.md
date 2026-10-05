@@ -103,3 +103,7 @@ Usability items (0.5.2):
 - [x] The bar's gear opens settings with the app's setup screen left open in the background, and from
       Contacts. *(verified on the signed 0.5.3 release, API 36 emulator; before the fix it only brought
       the setup screen back)*
+- [x] On the Pixel 11 Pro XL (signed 0.5.3): installs over earlier builds, loads in about 0.4 s, types a
+      44-key sentence correctly with 0.8% janky frames. *(measured 5 Oct)*
+- [ ] On the Pixel: glide typing and a screenshot of the keyboard (the phone tools could not glide or take
+      pictures yet: BuilderBot #56, #57).
