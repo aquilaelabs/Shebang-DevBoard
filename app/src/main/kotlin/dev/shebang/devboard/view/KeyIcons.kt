@@ -15,6 +15,15 @@ object KeyIcons {
     private const val BACKSPACE = "M5 12 L13.1 3.9 L14.5 5.3 L7.8 12 L14.5 18.7 L13.1 20.1 Z M17 6 H19 V18 H17 Z"
     /** Down from the top right, then left, ending in an open chevron. */
     private const val RETURN = "M19 4.5 H21 V15 H8.8 L11.9 18.1 L10.5 19.5 L5 14 L10.5 8.5 L11.9 9.9 L8.8 13 H19 Z"
+    /**
+     * A magnifier for a search field's Enter: a ring and a handle at the caret's stroke weight. Even-odd would cut
+     * the handle where it meets the ring, so the ring's inside runs the other way and the fill is non-zero.
+     */
+    private const val SEARCH = "M4 10.5 A6.5 6.5 0 1 1 17 10.5 A6.5 6.5 0 1 1 4 10.5 Z " +
+        "M6 10.5 A4.5 4.5 0 1 0 15 10.5 A4.5 4.5 0 1 0 6 10.5 Z " +
+        "M15.45 14.03 L20.40 18.98 L18.98 20.40 L14.03 15.45 Z"
+    /** Go, Send or Done: a straight arrow to the right, ending in the return arrow's open chevron. */
+    private const val SUBMIT = "M3.5 11 H16.2 L13.1 7.9 L14.5 6.5 L20 12 L14.5 17.5 L13.1 16.1 L16.2 13 H3.5 Z"
     /** A caret pointing up. */
     private const val SHIFT = "M12 4.6 L20.1 12.7 L18.7 14.1 L12 7.4 L5.3 14.1 L3.9 12.7 Z"
     /** The caret with a bar under it: shift is on. */
@@ -64,6 +73,15 @@ object KeyIcons {
     val dockRight: Path = PathParser.createPathFromPathData(DOCK_RIGHT)
     val fullWidth: Path = PathParser.createPathFromPathData(FULL_WIDTH)
     val enter: Path = PathParser.createPathFromPathData(RETURN)
+    val search: Path = PathParser.createPathFromPathData(SEARCH)
+    val submit: Path = PathParser.createPathFromPathData(SUBMIT)
+
+    /** The Enter key's glyph for what the field will do with it. */
+    fun enterFor(kind: dev.shebang.devboard.ime.EnterKind): Path = when (kind) {
+        dev.shebang.devboard.ime.EnterKind.RETURN -> enter
+        dev.shebang.devboard.ime.EnterKind.SEARCH -> search
+        dev.shebang.devboard.ime.EnterKind.SUBMIT -> submit
+    }
     val shift: Path = PathParser.createPathFromPathData(SHIFT)
     val shiftOn: Path = PathParser.createPathFromPathData(SHIFT_ON)
     val shiftLocked: Path = PathParser.createPathFromPathData(SHIFT_LOCKED)

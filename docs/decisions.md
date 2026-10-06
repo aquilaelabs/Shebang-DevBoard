@@ -281,9 +281,11 @@ data. Newest first at the top, then the original design notes.
   up, when a field opens or the clip changes, and nothing of it is kept or learned. Freshness goes by when
   the keyboard saw the clip change, else by the clip's own timestamp (its clock differs between releases,
   so either is accepted). Terminals get no chip.
-- **Enter key**: always the enter icon, whatever the field asks for (search, go, send, done); it still
-  performs that action. Labels such as "Search" were drawn on the key until the user found them too big and
-  preferred the icon not to change.
+- **Enter key**: a glyph for what Enter does, never a word: the return arrow for a new line, a plain Enter,
+  Next and Previous and terminals; a magnifier for Search; a straight arrow with the return arrow's chevron
+  for Go, Send and Done. Screen readers hear the action ("Search", "Send"). Labels such as "Search" were drawn
+  on the key until the user found them too big, then the key always showed the return arrow; on 6 Oct the
+  user asked for a glyph per action, with no text.
 - **Autofill chips** (R11): the strip asks the autofill service for inline suggestions, styled with the
   bar-chip colour and strip text colours, and shows them in the bar's row (or the suggestions' in Auto mode)
   while no word is composed, so the keyboard's height never changes. They show in password fields too: they

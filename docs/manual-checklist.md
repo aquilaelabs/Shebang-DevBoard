@@ -52,7 +52,9 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [x] Email field: an address typed there and left is offered in an empty email field and fills it in.
       *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
-- [ ] Multiline: Enter inserts a newline; a Search field keeps the enter icon and performs the search.
+- [ ] Multiline: Enter inserts a newline and shows the return arrow; a Search field shows the magnifier and
+  performs the search (also a multi-line one, such as the Play Store's); Go, Send and Done fields show the
+  straight arrow.
 - [x] Type "wiht cat ", backspace back to the corrected "with": it stays, and the strip offers "wiht",
       "with", "whit" (no check mark: space leaves the word); tapping "wiht" puts it back. *(verified on the
       emulator)*

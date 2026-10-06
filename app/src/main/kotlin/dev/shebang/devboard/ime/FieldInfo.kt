@@ -37,6 +37,28 @@ data class FieldInfo(
      */
     val isEmail: Boolean get() = variant == FieldVariant.EMAIL
     val isUrl: Boolean get() = variant == FieldVariant.URL
+    /**
+     * The glyph on the Enter key: [EnterKind.SEARCH] for a search, [EnterKind.SUBMIT] for Go, Send and Done,
+     * otherwise the return arrow (a new line, a plain Enter, Next and Previous, terminals).
+     */
+    val enterKind: EnterKind
+        get() = when {
+            isTerminal || enterIsNewline || enterIsKeyEvent -> EnterKind.RETURN
+            editorAction == EditorInfo.IME_ACTION_SEARCH -> EnterKind.SEARCH
+            editorAction == EditorInfo.IME_ACTION_GO || editorAction == EditorInfo.IME_ACTION_SEND ||
+                editorAction == EditorInfo.IME_ACTION_DONE -> EnterKind.SUBMIT
+            else -> EnterKind.RETURN
+        }
+
+    /** What a screen reader says for the Enter key: what it will do here. */
+    val enterSpoken: String
+        get() = if (enterKind == EnterKind.RETURN) "Enter" else when (editorAction) {
+            EditorInfo.IME_ACTION_SEARCH -> "Search"
+            EditorInfo.IME_ACTION_GO -> "Go"
+            EditorInfo.IME_ACTION_SEND -> "Send"
+            else -> "Done"
+        }
+
     /** Enter should be sent as a KeyEvent (terminals, and fields without an action). */
     val enterIsKeyEvent: Boolean
         get() = isTerminal || (!enterIsNewline && (editorAction == EditorInfo.IME_ACTION_NONE || editorAction == EditorInfo.IME_ACTION_UNSPECIFIED))
@@ -113,3 +135,6 @@ data class FieldInfo(
         }
     }
 }
+
+/** Which glyph the Enter key wears: the return arrow, a magnifier for a search, or an arrow for Go, Send and Done. */
+enum class EnterKind { RETURN, SEARCH, SUBMIT }

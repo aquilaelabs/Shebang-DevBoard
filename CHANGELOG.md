@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- The enter key shows what it will do: the return arrow for a new line, a magnifier in search boxes, and an arrow where it goes, sends or finishes; screen readers say the action (8dbc2cb)
+
 ### Fixed
 
 - Settings > About > Credits names every library the app ships, including the ones its libraries bring in, and says that five strokes from the FUTO swipe dataset are kept for tests (bf63adb)

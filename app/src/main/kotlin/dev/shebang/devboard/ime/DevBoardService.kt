@@ -377,6 +377,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         root = container
         strip = s
         keyboard = k
+        k.enterKind = field.enterKind
+        k.enterSpoken = field.enterSpoken
         popup = p
         applyTheme()
         barConfig?.let { s.bar.setConfig(it) }
@@ -474,6 +476,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (!restarting) closePanels()
         field = FieldInfo.from(info)
         text.startInput(field)
+        keyboard?.enterKind = field.enterKind
+        keyboard?.enterSpoken = field.enterSpoken
         val app = info?.packageName.orEmpty()
         if (app != currentApp) {
             // Another app: its own mode (the one last used there) and its own bar.
