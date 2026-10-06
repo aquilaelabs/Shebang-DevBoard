@@ -13,7 +13,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -366,7 +365,7 @@ class FieldCompatibilityTest {
     /** Taps the keys for [s], one at a time, letting each tap's work settle as a person's pace would. */
     private fun type(s: String, settle: Boolean = true, gap: Long = 80) {
         for (c in s) {
-            val k = key(c) ?: fail("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}") as Nothing
+            val k = key(c) ?: throw AssertionError("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}")
             instrumentation.runOnMainSync { service().tapForTest(k) }
             instrumentation.waitForIdleSync()
             SystemClock.sleep(gap)
