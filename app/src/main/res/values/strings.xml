@@ -264,8 +264,8 @@
     <string name="dict_delete_list_title">Delete %1$s?</string>
     <string name="dict_delete_list_text">Its words are no longer offered or glided. The file you imported it from is not touched.</string>
     <plurals name="dict_count_prefix">
-        <item quantity="one">%1$s word · </item>
-        <item quantity="other">%1$s words · </item>
+        <item quantity="one">"%1$s word · "</item>
+        <item quantity="other">"%1$s words · "</item>
     </plurals>
     <string name="strip_auto">Auto</string>
     <string name="strip_always_bar">Always bar</string>

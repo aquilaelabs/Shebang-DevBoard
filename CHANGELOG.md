@@ -18,6 +18,7 @@
 - Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)
 - The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
 - In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (0c79a33)
+- Dictionaries settings: the word counts keep their space before each pack's description again (1a8d59f)
 
 ## 0.5.5: 2026-10-06
 
