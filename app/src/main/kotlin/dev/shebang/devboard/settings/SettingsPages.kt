@@ -483,11 +483,13 @@ private fun AboutGroups(settings: Settings, actions: SettingsActions) {
     val context = LocalContext.current
     val version = remember { appVersion(context) }
     val scope = rememberCoroutineScope()
+    // Off each time the page opens: including the recent fields is chosen for one export, not kept.
+    var includeFields by remember { mutableStateOf(false) }
     val diagnosticsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             val ok = withContext(Dispatchers.IO) {
-                runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it) } }.isSuccess
+                runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it, includeFields) } }.isSuccess
             }
             Toast.makeText(context, if (ok) "Diagnostics saved" else "Couldn't save diagnostics", Toast.LENGTH_SHORT).show()
         }
@@ -505,6 +507,13 @@ private fun AboutGroups(settings: Settings, actions: SettingsActions) {
             NavRow("Privacy policy", "Nothing you type or say leaves your phone. What the keyboard keeps, and how to delete it") { actions.onDoc("about/PRIVACY.md", "Privacy policy") }
         }
         SettingsGroup("Help") {
+            SwitchRow(
+                "Include recent fields",
+                "Add the last ${dev.shebang.devboard.ime.RecentFields.MAX} fields the keyboard opened in: which app, and what kind of field " +
+                    "it said it was (search box, email, password...). Never their text. Helps when typing goes wrong in one app.",
+                includeFields,
+            ) { includeFields = it }
+            RowDivider()
             NavRow(
                 "Export diagnostics",
                 "Save a file to send to the developer if typing or gliding isn't working well: settings, how your taps and glides lean, " +

@@ -46,8 +46,13 @@ It contains only:
 - how your last 500 glides ended up, as counts by word length: kept, fixed from the suggestions, glided again, edited or deleted (never the words)
 - glides you recorded with Record glides (the prompted words and the shape of each glide)
 - where the app crashed, if it did (the parts of its code that failed, without error messages)
+- only if you turn on Include recent fields for that export: the last 10 fields the keyboard opened in, each
+  with the app's package name, the kind of field the app said it was (its input type and options, such as a
+  search box, an email field or a password field) and how the keyboard treated it. Never what was in them or
+  typed into them. The keyboard keeps these in memory only, so they are gone when it restarts, and the switch
+  is off again each time you open the page.
 
-It does not contain anything you typed, your learned words, email addresses, your clipboard, your terminal bar keys or snippets, the names of apps you use, dates, or any account, serial number or other identifier for you or your phone.
+It does not contain anything you typed, your learned words, email addresses, your clipboard, your terminal bar keys or snippets, the names of apps you use (except those of the recent fields, if you chose to include them), dates, or any account, serial number or other identifier for you or your phone.
 
 ## Shebang Voice
 

@@ -52,6 +52,11 @@ Fields (the setup screen has a multiline test field; a browser form has the rest
 - [x] Email field: an address typed there and left is offered in an empty email field and fills it in.
       *(verified on the emulator in Contacts)*
 - [ ] Number/phone: numeric pad; `#!` still reaches code mode.
+- [ ] Diagnostics: with Include recent fields on, the exported file lists the last fields' apps and kinds (newest first)
+  and nothing typed; with it off, no recentFields section.
+- [ ] Browser terminal (tmux or a shell in Firefox or Chrome): "teh" stays "teh"; "git add ." keeps its space;
+  backspacing into a word and typing on does not repeat it; backspace after a glide removes the whole glide;
+  Ctrl+B, Esc and Tab on the bar reach the terminal.
 - [ ] Joined words: "ataco" offers "a taco" on the strip; "thankyou" then space gives "thank you"; backspace
   right after puts back "thankyou".
 - [ ] Multiline: Enter inserts a newline and shows the return arrow; a Search field shows the magnifier and

@@ -54,6 +54,10 @@ class FieldTestActivity : ComponentActivity() {
         val kind = intent.getStringExtra(EXTRA_FIELD) ?: MULTILINE
         fieldView = when (kind) {
             MULTILINE -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED)
+            SENTENCES -> edit(
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
+                EditorInfo.IME_ACTION_UNSPECIFIED,
+            )
             SEARCH -> edit(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
             URL -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, EditorInfo.IME_ACTION_GO)
             EMAIL -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, EditorInfo.IME_ACTION_DONE)
@@ -64,6 +68,7 @@ class FieldTestActivity : ComponentActivity() {
             WEB_SEARCH -> web("<form onsubmit=\"Android.action('submit'); return false;\">" +
                 "<input id=f type=search autocapitalize=off autofocus oninput=\"Android.text(this.value)\" style=\"$WEB_STYLE\"></form>")
             WEB_TEXTAREA -> web("<textarea id=f autocapitalize=off autofocus oninput=\"Android.text(this.value)\" style=\"$WEB_STYLE\"></textarea>")
+            WEB_TERMINAL -> webPage("file:///android_asset/fieldtest/terminal.html")
             TERMINAL -> TerminalView(this)
             else -> error("unknown field $kind")
         }
@@ -94,6 +99,8 @@ class FieldTestActivity : ComponentActivity() {
             .put("actions", org.json.JSONArray(actions.toList()))
             .put("keys", keys.toString())
             .put("composingStart", composingStart())
+            .put("selStart", editText?.selectionStart ?: -1)
+            .put("selEnd", editText?.selectionEnd ?: -1)
         val f = stateFile(this)
         f.parentFile?.mkdirs()
         val tmp = java.io.File(f.path + ".tmp")
@@ -112,7 +119,7 @@ class FieldTestActivity : ComponentActivity() {
             is ComposeView -> composeFocus.requestFocus()
             is WebView -> {
                 v.requestFocus()
-                v.evaluateJavascript("document.getElementById('f').focus()", null)
+                v.evaluateJavascript("(window.focusField || function () { document.getElementById('f').focus() })()", null)
                 imm.showSoftInput(v, 0)
             }
             else -> {
@@ -143,7 +150,7 @@ class FieldTestActivity : ComponentActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: android.text.Editable?) = save()
         })
-        // The composing span changes without the text changing (a word committed as typed); keep it current.
+        // The composing span and the selection change without the text changing; keep them current.
         viewTreeObserver.addOnPreDrawListener { save(); true }
         editText = this
     }
@@ -167,14 +174,20 @@ class FieldTestActivity : ComponentActivity() {
         }
     }
 
+    private fun web(body: String) = webView().apply {
+        loadDataWithBaseURL("https://localhost/", "<html><body style=\"margin:0;background:#222\">$body</body></html>", "text/html", "utf-8", null)
+    }
+
+    /** A page from the debug build's assets (the xterm.js terminal). */
+    private fun webPage(url: String) = webView().apply { loadUrl(url) }
+
     @SuppressLint("SetJavaScriptEnabled")
-    private fun web(body: String) = WebView(this).apply {
+    private fun webView() = WebView(this).apply {
         settings.javaScriptEnabled = true
         addJavascriptInterface(object {
             @JavascriptInterface fun text(value: String) { webText = value; runOnUiThread { save() } }
             @JavascriptInterface fun action(name: String) { actions += name; runOnUiThread { save() } }
         }, "Android")
-        loadDataWithBaseURL("https://localhost/", "<html><body style=\"margin:0;background:#222\">$body</body></html>", "text/html", "utf-8", null)
     }
 
     /** A terminal-like view: TYPE_NULL, so the keyboard sends key events, which are recorded as characters. */
@@ -219,6 +232,8 @@ class FieldTestActivity : ComponentActivity() {
         /** Where the activity writes what its field holds; the test reads it. Same app, so same files. */
         fun stateFile(context: Context) = java.io.File(context.filesDir, "fieldtest/state.json")
         const val MULTILINE = "multiline"
+        /** A message box: multi-line, asking for a capital at the start of each sentence. */
+        const val SENTENCES = "sentences"
         const val SEARCH = "search"
         const val URL = "url"
         const val EMAIL = "email"
@@ -228,6 +243,8 @@ class FieldTestActivity : ComponentActivity() {
         const val COMPOSE_PLAIN = "compose_plain"
         const val WEB_SEARCH = "web_search"
         const val WEB_TEXTAREA = "web_textarea"
+        /** xterm.js in a WebView: a browser terminal, whose field's text is everything the shell would get. */
+        const val WEB_TERMINAL = "web_terminal"
         const val TERMINAL = "terminal"
         private const val WEB_STYLE = "width:100%;height:100vh;font-size:22px;box-sizing:border-box"
 

@@ -754,3 +754,57 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   strip only: "ataco" after "i want" offers "a taco" first and keeps "ataco" on space. All 3,000 held-out
   sentences were scored once, at the first settings tried (cost 1.0), before the halves were fixed; no choice
   was made from it.
+- **Recent fields in diagnostics** (R35, 6 Oct): `RecentFields` keeps the last 10 fields the keyboard opened in,
+  in memory only: each one's package name, input type and IME options (raw and decoded into names), and how
+  `FieldInfo` read it (variant, multi-line, Enter as newline, key event or action, the Enter glyph, composing,
+  learning). Never the text, the hint or the label. Export diagnostics adds them only when Include recent fields
+  is on for that export; the switch is not saved, so it is off each time the About page opens. With it on, the
+  file's `leftOut` says app names are included for those fields. Why: B14 had to be diagnosed by guessing the
+  Play Store's EditorInfo; a user's export now shows it. Package names are the one identifying thing the export
+  can hold, hence opt-in per export, in memory only, and named in the policy.
+- **Backspace and space swipes stay in their row** (B16, 6 Oct): a glide whose first touch landed on backspace
+  (beside the m) and headed up-left into the letters became the swipe that deletes whole words, highlighting
+  and deleting about one word per key width travelled. Now a touch that began on backspace or the space bar
+  and strays more than 0.6 of a row up or down is taken as a glide that started off its first letter: the swipe
+  ends, anything it highlighted is put back, and letting go does nothing (the glide itself is not typed; the
+  touch did not start on a letter). A level swipe still deletes words and still moves the cursor. The space-bar
+  slide selects only with shift the user turned on, not the automatic capital at a sentence start: that
+  selected the character before the cursor on a one-step slide (a longer slide dropped the automatic shift and
+  the next plain step collapsed it, so it was never the cause of the lost text). Device tests in
+  FieldCompatibilityTest drive the keyboard view with real touch events for all three. Without the fix the
+  backspace test turned "one two three four five six" into "one two", and the space test left one character
+  selected.
+- **Web fields that ask for no autocorrect are typed exactly** (B17, 6 Oct): the owner's tmux in a browser
+  "screws up a lot". Reproduced in Firefox 157 with an xterm.js 5.5 page logging what the terminal passes to
+  the shell: backspacing into a word sent it again ("cat", space, two backspaces, "r" gave "cacar"), a full stop
+  after a space ate the space ("git add ." would be "git add."), and autocorrect ran. xterm.js types through a
+  hidden textarea marked autocorrect=off and mirrors every edit to the shell, where nothing can be taken back.
+  Firefox reports it as text, WEB_EDIT_TEXT, with TYPE_TEXT_FLAG_AUTO_CORRECT off (0x400a1; Chrome's WebView
+  0x200a1); a plain textarea (0x4c0a1) and a text input (0x480a1) have the flag. `FieldInfo.exact` is a
+  WEB_EDIT_TEXT field without that flag. Android's own convention there is no autocorrect; the rest follows
+  from how xterm.js reads its textarea (its source: a finished composition is sent whole; a key press is acted
+  on at once; any other change is noticed by a zero-delay timer, reported as one backspace however much went,
+  and dropped if the next composition has begun). In an exact field the keyboard:
+  - does not autocorrect, split joined words, fix contractions or capitalise "i";
+  - never rewrites what is written: no reopening a word on backspace or on typing at its end, no target on a
+    tapped word, no punctuation swap, no double-space full stop, no fixing the previous glide, no bracket pairs;
+  - ends a typed word as one edit: the word and what follows committed together, or the word finished in
+    place. Firefox passes a one-character commit on to the page as a key press as well, so a one-letter word
+    committed on its own arrived twice;
+  - sends characters typed outside a word (space, punctuation, digits, symbols) and Enter as key presses
+    (`CharKeyCodes`), which the terminal acts on at once. As text they wait for the timer, and a quick Enter
+    beat it: of 15 lines typed at the test's speed, 2 lost their last characters. Enter as text also reaches
+    Chrome as an empty edit plus the key, which xterm.js answered with a stray backspace;
+  - writes a glide, a paste, a snippet and dictation as a finished composition (`commitWhole`): committed
+    outright, Chrome leaves the cursor at the start of xterm.js's textarea, so the next backspace deleted nothing
+    and the next word landed in front;
+  - deletes one character at a time, each its own edit (backspace after a glide, word deletes, a strip pick
+    replacing a glided word). The backspace swipe shows no highlight there, since it could not be seen;
+  - shows no next-word suggestions, which would take the terminal bar's row after every space.
+  Suggestions for the word being typed and glide stay. Deletions stay on the text path, so the keyboard's
+  reading of the field stays right; at a person's pace they arrive, but xterm.js can drop one when the next word
+  starts before its timer fires (seen once at 80 ms a key on a busy emulator), whatever the keyboard.
+  Checked in Firefox with real taps: eight typing cases and the bar's Ctrl+B, Esc, Tab and Ctrl+C arrive as
+  meant. FieldCompatibilityTest runs xterm.js (bundled in the debug build's assets only) in a WebView for the
+  Chromium side: four tests, the first two failing without the rule ("the." and "cat car"). Not compared with
+  Gboard: on the AVD it shows only a floating toolbar.

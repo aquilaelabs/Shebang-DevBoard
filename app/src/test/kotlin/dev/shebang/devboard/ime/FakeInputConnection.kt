@@ -32,7 +32,11 @@ class FakeInputConnection(initial: String = "") : InputConnection {
     override fun getCursorCapsMode(reqModes: Int): Int = 0
     override fun getExtractedText(request: ExtractedTextRequest?, flags: Int): ExtractedText? = null
 
+    /** How many times text was deleted around the cursor: a page that mirrors edits sees each as one backspace. */
+    var deletions = 0
+
     override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+        deletions++
         val start = maxOf(0, cursor - beforeLength)
         val end = minOf(text.length, cursor + afterLength)
         text.delete(start, end)

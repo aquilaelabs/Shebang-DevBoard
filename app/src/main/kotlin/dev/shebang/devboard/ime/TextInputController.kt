@@ -15,6 +15,8 @@ import dev.shebang.devboard.glide.GlideContext
 import dev.shebang.devboard.glide.GlideResult
 import dev.shebang.devboard.glide.GlideWord
 import dev.shebang.devboard.glide.TapModel
+import dev.shebang.devboard.input.CharKeyCodes
+import dev.shebang.devboard.input.KeyEventPlan
 import dev.shebang.devboard.input.KeySender
 import dev.shebang.devboard.layout.FieldVariant
 import dev.shebang.devboard.settings.Settings
@@ -205,7 +207,7 @@ class TextInputController(
         clearCandidates()
         ownEdit()
         val written = if (needsLeadingSpace(ic)) " $t" else t
-        ic.commitText(written, 1)
+        commitWhole(ic, written)
         lastDictation = written
         lastActionWasSpace = false
     }
@@ -219,7 +221,7 @@ class TextInputController(
         val last = lastDictation ?: return
         if (ic.getTextBeforeCursor(last.length, 0)?.toString() != last) return
         ownEdit()
-        ic.deleteSurroundingText(last.length, 0)
+        deleteBefore(ic, last.length)
         lastDictation = null
     }
 
@@ -494,7 +496,7 @@ class TextInputController(
     // ---- The targeted word ---------------------------------------------------------------------------
 
     private fun findTarget(selStart: Int, selEnd: Int) {
-        if (!field.allowsComposing || isComposing) return
+        if (!field.allowsComposing || field.exact || isComposing) return
         val ic = connection() ?: return
         if (selEnd > selStart) {
             val sel = ic.getSelectedText(0)?.toString() ?: return
@@ -637,7 +639,7 @@ class TextInputController(
                 ic.getSelectedText(0).isNullOrEmpty() &&
                 ic.getTextBeforeCursor(glideBefore.text.length, 0)?.toString() == glideBefore.text
             ) {
-                ic.commitText(" ", 1)
+                typeOutsideWord(ic, " ")
             }
             // The space that punctuation took from the word before goes in front of the next word.
             if (owedSpace && word.isEmpty() && ic.getTextBeforeCursor(1, 0)?.firstOrNull()?.let { it in SWAPS_WITH_SPACE } == true) {
@@ -676,7 +678,42 @@ class TextInputController(
         }
         if (pairing && text.length == 1 && typePaired(ic, text[0])) return
         if (spaceBefore && swapWithSpace(ic, text)) return
-        ic.commitText(text, 1)
+        typeOutsideWord(ic, text)
+    }
+
+    /**
+     * A character typed outside a word. In an [FieldInfo.exact] field it goes as the key press for it, where the
+     * US layout has one: a web terminal acts on a key press at once, but picks typed text up on a timer that a
+     * quick Enter outruns, losing the character (B17).
+     */
+    /**
+     * Writes [text] in one piece. In an [FieldInfo.exact] field it goes in as a finished composition, the way a
+     * typed word does: text committed outright leaves the cursor at the start of a web terminal's input in Chrome,
+     * so the next backspace deletes nothing and the next word lands in front of it (B17).
+     */
+    private fun commitWhole(ic: InputConnection, text: CharSequence) {
+        if (!field.exact) {
+            ic.commitText(text, 1)
+            return
+        }
+        ic.setComposingText(text, 1)
+        ic.finishComposingText()
+    }
+
+    /** Text the service puts in as one piece (a paste, a snippet, code mode's space), written as the field needs. */
+    fun insert(text: CharSequence) {
+        val ic = connection() ?: return
+        if (text.length == 1) typeOutsideWord(ic, text.toString()) else commitWhole(ic, text)
+    }
+
+    private fun typeOutsideWord(ic: InputConnection, text: String) {
+        val stroke = if (field.exact && text.length == 1) CharKeyCodes.forChar(text[0]) else null
+        if (stroke == null) {
+            commitWhole(ic, text)
+            return
+        }
+        val meta = if (stroke.shift || text[0].isUpperCase()) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
+        KeySender.send(ic, KeyEventPlan(stroke.keyCode, meta))
     }
 
     /**
@@ -686,7 +723,7 @@ class TextInputController(
      * web-address field the space does not come back ("github" picked, then ".com", is "github.com").
      */
     private fun swapWithSpace(ic: InputConnection, text: String): Boolean {
-        if (text.length != 1 || text[0] !in SWAPS_WITH_SPACE || codeMode || !field.allowsComposing) return false
+        if (text.length != 1 || text[0] !in SWAPS_WITH_SPACE || codeMode || !field.allowsComposing || field.exact) return false
         if (!endsSentenceWord(ic)) return false
         ic.beginBatchEdit()
         ic.deleteSurroundingText(1, 0)
@@ -696,7 +733,7 @@ class TextInputController(
         return true
     }
 
-    private val pairing: Boolean get() = codeMode && settings.pairBrackets && !this.field.isTerminal
+    private val pairing: Boolean get() = codeMode && settings.pairBrackets && !this.field.isTerminal && !this.field.exact
 
     /**
      * Code mode's pairs: an opening bracket brings its closing one with the cursor between; a closing
@@ -765,7 +802,7 @@ class TextInputController(
         val now = clock()
         if (isComposing) {
             endWord(ic, " ", correct = true, deferOk = true)
-        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isEmail && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
+        } else if (settings.doubleSpacePeriod && field.allowsComposing && !field.isEmail && !field.exact && lastActionWasSpace && now - lastSpaceTime < DOUBLE_SPACE_MS && endsSentenceWord(ic)) {
             ic.beginBatchEdit()
             ic.deleteSurroundingText(1, 0)
             ic.commitText(". ", 1)
@@ -773,7 +810,7 @@ class TextInputController(
             lastActionWasSpace = false
             return
         } else {
-            ic.commitText(" ", 1)
+            typeOutsideWord(ic, " ")
         }
         lastActionWasSpace = true
         lastSpaceTime = now
@@ -786,7 +823,8 @@ class TextInputController(
      */
     private fun showPredictions(ic: InputConnection) {
         // Not in code mode, where the next word is rarely English.
-        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isEmail || isComposing || target != null) return
+        // Nor where a page asked for exact typing (a web terminal): the words would take the terminal bar's row.
+        if (!settings.nextWord || codeMode || !field.allowsComposing || field.isEmail || field.exact || isComposing || target != null) return
         val model = predictionModel ?: return
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
         val w1 = GlideText.contextWord(before)
@@ -855,6 +893,42 @@ class TextInputController(
         return c.isLetterOrDigit() || c == ')' || c == ']' || c == '"' || c == '\''
     }
 
+    /**
+     * Deletes the [n] characters before the cursor. In an [FieldInfo.exact] field they go one at a time, each its
+     * own edit, as backspace presses would: a page that mirrors edits (a web terminal) passes a deletion on as one
+     * backspace however long it was.
+     */
+    private fun deleteBefore(ic: InputConnection, n: Int) {
+        if (n <= 0) return
+        if (!field.exact) {
+            ic.deleteSurroundingText(n, 0)
+            return
+        }
+        val before = ic.getTextBeforeCursor(n, 0)?.toString().orEmpty()
+        var i = before.length
+        var left = n
+        while (left > 0) {
+            // A surrogate pair (an emoji) goes whole.
+            val step = if (i >= 2 && left >= 2 && Character.isSurrogatePair(before[i - 2], before[i - 1])) 2 else 1
+            ic.deleteSurroundingText(step, 0)
+            i -= step
+            left -= step
+        }
+    }
+
+    /** Replaces the [n] characters before the cursor with [text]: one edit, or step by step in an exact field. */
+    private fun replaceBefore(ic: InputConnection, n: Int, text: String) {
+        if (field.exact) {
+            deleteBefore(ic, n)
+            commitWhole(ic, text)
+            return
+        }
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(n, 0)
+        ic.commitText(text, 1)
+        ic.endBatchEdit()
+    }
+
     fun backspace() {
         val ic = connection() ?: return
         dropTarget()
@@ -879,7 +953,7 @@ class TextInputController(
         // Backspace right after a glide removes everything that glide wrote, unlearned: when it still stands
         // right before the cursor (a quick tap elsewhere can outrun the cursor report).
         if (glide != null && ic.getTextBeforeCursor(glide.text.length, 0)?.toString() == glide.text) {
-            ic.deleteSurroundingText(glide.text.length, 0)
+            deleteBefore(ic, glide.text.length)
             repeat(minOf(glide.words, pending.size)) {
                 val w = pending.removeAt(pending.size - 1)
                 recent.remove(w)
@@ -1002,7 +1076,7 @@ class TextInputController(
      * it ("x86"), or it does not start with a letter.
      */
     private fun recomposeWordBeforeCursor(ic: InputConnection): String? {
-        if (!field.allowsComposing || isComposing) return null
+        if (!field.allowsComposing || field.exact || isComposing) return null
         if (!ic.getSelectedText(0).isNullOrEmpty()) return null
         val after = ic.getTextAfterCursor(1, 0)
         if (!after.isNullOrEmpty() && (after[0].isLetterOrDigit() || isLetterInWord(after[0]))) return null
@@ -1039,6 +1113,9 @@ class TextInputController(
      * selected to show what will go; 0 selects nothing. The first call reads the text before the cursor once.
      */
     fun previewDeleteWords(n: Int) {
+        // No highlight where the page mirrors edits: the selection would not show there, and deleting it would
+        // reach the page as one deletion. The words go one character at a time when the swipe ends.
+        if (field.exact) return
         val ic = connection() ?: return
         if (deleteAnchor < 0) {
             dropTarget()
@@ -1108,7 +1185,7 @@ class TextInputController(
         if (isComposing) endWord(ic, "", correct = false, deferOk = false)
         val before = ic.getTextBeforeCursor(DELETE_CHARS, 0)?.toString() ?: return
         val offs = wordOffsets(before)
-        ic.deleteSurroundingText(offs[n.coerceIn(0, offs.size - 1)], 0)
+        deleteBefore(ic, offs[n.coerceIn(0, offs.size - 1)])
         forgetDeletedGlide(n)
     }
 
@@ -1164,7 +1241,9 @@ class TextInputController(
         if (isComposing) endWord(ic, "", correct = true, deferOk = false)
         clearCandidates()
         when {
-            field.enterIsNewline -> ic.commitText("\n", 1)
+            // In an exact web field Enter is the key press: as text, Chrome delivers it as an empty edit and then
+            // the key, and a web terminal answers the empty edit with a stray backspace.
+            field.enterIsNewline -> if (field.exact) KeySender.sendPlain(ic, KeyEvent.KEYCODE_ENTER) else ic.commitText("\n", 1)
             field.enterIsKeyEvent -> KeySender.sendPlain(ic, KeyEvent.KEYCODE_ENTER)
             else -> ic.performEditorAction(field.editorAction)
         }
@@ -1206,7 +1285,7 @@ class TextInputController(
         // A word backspace reopened and left as it was stays as it was, and is not learned twice.
         val untouched = reopenedUnchanged
         reopened = null
-        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && !field.isAddress &&
+        val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && !field.noAutocorrect &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
             !capitalisedOnPurpose(ic, typed)
         var commit = typed
@@ -1221,16 +1300,24 @@ class TextInputController(
                 defer = false
             }
         }
-        if (!field.isAddress) commit = pronounCase(commit)
+        if (!field.noAutocorrect) commit = pronounCase(commit)
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
-        ic.beginBatchEdit()
-        ic.commitText(commit, 1)
-        if (after.isNotEmpty()) ic.commitText(after, 1)
-        ic.endBatchEdit()
+        if (field.exact && commit == typed) {
+            // One edit, so a page that mirrors edits (a web terminal) sees the word end once: the word and what
+            // follows it committed together, or the word finished where it stands. Never a one-character commit of
+            // the word itself: Firefox passes that on to the page as a key press as well, and the terminal gets
+            // the letter twice (B17).
+            if (after.isNotEmpty()) ic.commitText(typed + after, 1) else ic.finishComposingText()
+        } else {
+            ic.beginBatchEdit()
+            ic.commitText(commit, 1)
+            if (after.isNotEmpty()) ic.commitText(after, 1)
+            ic.endBatchEdit()
+        }
         word.setLength(0)
         clearCandidates()
-        if (commit != (if (field.isAddress) typed else pronounCase(typed))) {
+        if (commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
             lastAutocorrect = Autocorrected(typed, commit, after)
             rememberCorrection(ic, typed, commit, after.length, other)
         }
@@ -1495,7 +1582,7 @@ class TextInputController(
         val context = ic?.let { currentContext(it) }
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
-        val correctable = settings.autocorrect && field.allowsComposing && !field.isAddress && !reopenedUnchanged &&
+        val correctable = settings.autocorrect && field.allowsComposing && !field.noAutocorrect && !reopenedUnchanged &&
             typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
             (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
@@ -1562,10 +1649,7 @@ class TextInputController(
         if (join != null && join.glide === lastGlide && (chosen == join.camel || chosen == join.snake)) {
             // The run of glided words becomes one name.
             if (ic.getTextBeforeCursor(join.runText.length, 0)?.toString() == join.runText) {
-                ic.beginBatchEdit()
-                ic.deleteSurroundingText(join.runText.length, 0)
-                ic.commitText(chosen, 1)
-                ic.endBatchEdit()
+                replaceBefore(ic, join.runText.length, chosen)
                 pending.clear()
                 if (field.allowsLearning) learner.learnWord(chosen, null, false)
             }
@@ -1581,10 +1665,7 @@ class TextInputController(
         if (glide != null) {
             val tail = glide.lastWord + glide.after
             val replacement = chosen + glide.after
-            ic.beginBatchEdit()
-            ic.deleteSurroundingText(tail.length, 0)
-            ic.commitText(replacement, 1)
-            ic.endBatchEdit()
+            replaceBefore(ic, tail.length, replacement)
             glide.text = glide.text.dropLast(tail.length) + replacement
             glide.lastWord = chosen
             // A word picked by hand is a correction; it is learned as picked, and its stroke not trusted.
@@ -1668,7 +1749,7 @@ class TextInputController(
      * strip, and it stands exactly as it went in right before the cursor.
      */
     private fun revisableBefore(ic: InputConnection): Revisable? {
-        if (!settings.fixPreviousGlide || !field.allowsComposing || target != null || isComposing) return null
+        if (!settings.fixPreviousGlide || !field.allowsComposing || field.exact || target != null || isComposing) return null
         val g = lastGlide ?: return null
         val last = pending.lastOrNull() ?: return null
         if (last.word.locked || last.text != g.lastWord) return null
@@ -1812,7 +1893,7 @@ class TextInputController(
         val sb = StringBuilder()
         if (needsLeadingSpace(ic)) sb.append(' ')
         sb.append(ownText)
-        ic.commitText(sb, 1)
+        commitWhole(ic, sb)
         lastOwnTail = ownText
         // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
         lastActionWasSpace = trailingSpace

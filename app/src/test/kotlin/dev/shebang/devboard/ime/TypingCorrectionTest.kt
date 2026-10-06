@@ -189,6 +189,69 @@ class TypingCorrectionTest {
         assertEquals("wiht wiht ", ic.toString())
     }
 
+    // ---- A web field that asked for no autocorrect: a browser terminal (B17) ----------------------------
+
+    /** What Firefox reports for xterm.js's input: text, web edit text, no autocorrect flag. */
+    private val webExact = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE
+
+    @Test
+    fun aWebFieldThatAskedForNoAutocorrectIsTypedExactly() {
+        controller.startInput(FieldInfo.from(webExact, 0))
+        type("teh ")
+        assertEquals("teh ", ic.toString())
+        // Punctuation after the space is its own key press, after the space ("git add ." is not "git add."):
+        // nothing already written changes. (The fake field keeps key presses apart from its text.)
+        type(".")
+        assertEquals("teh ", ic.toString())
+        assertEquals("a key down and up for the full stop", 2, ic.keyEvents.size)
+        // Joined words are not split, and i stays i.
+        type("thankyou i ")
+        assertEquals("teh thankyou i ", ic.toString())
+        // A second space is a key press too, not a full stop.
+        type(" ")
+        assertEquals("teh thankyou i ", ic.toString())
+        assertEquals(4, ic.keyEvents.size)
+        // Enter is the key press.
+        controller.enter()
+        assertEquals("teh thankyou i ", ic.toString())
+        assertEquals(6, ic.keyEvents.size)
+    }
+
+    @Test
+    fun backspacingIntoAWordThereDoesNotReopenIt() {
+        controller.startInput(FieldInfo.from(webExact, 0))
+        type("cat ")
+        controller.backspace()
+        controller.backspace()
+        assertEquals("ca", ic.toString())
+        assertEquals("nothing is composing", -1, ic.composingStart)
+        // The next letter is a word of its own to the field: only it is sent, not "car" over "ca".
+        type("r")
+        assertEquals("car", ic.toString())
+        assertEquals(2, ic.composingStart)
+    }
+
+    @Test
+    fun backspaceAfterAGlideThereDeletesOneCharacterAtATime() {
+        controller.startInput(FieldInfo.from(webExact, 0))
+        glide("hello")
+        assertEquals("hello", ic.toString().trim())
+        val written = ic.toString().length
+        ic.deletions = 0
+        controller.backspace()
+        assertEquals("", ic.toString())
+        assertEquals("each character its own deletion", written, ic.deletions)
+    }
+
+    @Test
+    fun aWebFieldThatWantsAutocorrectGetsIt() {
+        controller.startInput(FieldInfo.from(webExact or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT, 0))
+        type("teh ")
+        assertEquals("the ", ic.toString())
+        type(".")
+        assertEquals("the.", ic.toString())
+    }
+
     @Test
     fun twoWordsRunTogetherAreSplitOnSpaceAndBackspaceTakesTheSplitBack() {
         type("thankyou ")

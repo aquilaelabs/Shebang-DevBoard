@@ -129,6 +129,123 @@ class FieldCompatibilityTest {
         assertText("the.")
     }
 
+    // ---- A browser terminal: xterm.js (B17) -----------------------------------------------------------
+
+    /** What a shell's line editor holds after [received]: each DEL takes a character off; lines end at Enter. */
+    private fun shellLines(received: String): List<String> {
+        val lines = ArrayList<String>()
+        val line = StringBuilder()
+        for (c in received) when (c) {
+            '\u007f' -> if (line.isNotEmpty()) line.setLength(line.length - 1)
+            '\r' -> { lines += line.toString(); line.setLength(0) }
+            else -> line.append(c)
+        }
+        return lines
+    }
+
+    private fun assertShellGot(vararg lines: String) {
+        waitFor(4_000) { shellLines(currentText()) == lines.toList() }
+        assertEquals("the terminal received ${currentText().map { if (it.code < 32 || it.code == 127) "\\x%02x".format(it.code) else it.toString() }.joinToString("")}",
+            lines.toList(), shellLines(currentText()))
+    }
+
+    @Test
+    fun aBrowserTerminalGetsExactlyWhatIsTyped() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        val f = service().fieldForTest
+        assertTrue("xterm.js's input is typed exactly (or raw): $f", f.exact || !f.allowsComposing)
+        // No autocorrect, and punctuation stays after its space ("git add ." is not "git add.").
+        type("teh .\n")
+        // One-letter words arrive once.
+        type("a b c\n")
+        assertShellGot("teh .", "a b c")
+    }
+
+    @Test
+    fun quickTypingInABrowserTerminalLosesNothing() {
+        // The terminal picks finished words up on a timer, so edits that land close together can race: the same
+        // lines several times over, as fast as the test types.
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        val lines = listOf("teh .", "a b c", "git add .", "ls x y", "cd ..")
+        repeat(3) { for (l in lines) type(l + "\n", settle = false) }
+        assertShellGot(*(lines + lines + lines).toTypedArray())
+    }
+
+    @Test
+    fun backspacingIntoAWordInABrowserTerminalDoesNotSendItAgain() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        // cat, space, two backspaces, r: the shell must hold "car", not "cacar". The backspaces at a person's
+        // pace: xterm.js reports a deletion from a timer and drops the report if the next word has begun, so at
+        // the test's speed on a busy emulator one can go missing whatever the keyboard does.
+        type("cat ")
+        type("\b\b", gap = 350)
+        type("r\n")
+        assertShellGot("car")
+    }
+
+    @Test
+    fun backspaceAfterAGlideInABrowserTerminalTakesTheWholeGlideOffTheShell() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        var glides = false
+        waitFor(30_000) { instrumentation.runOnMainSync { glides = service().isGlideAllowed() }; glides }
+        assertTrue("glide is ready", glides)
+        // Glide "hello": whatever word it reads, backspace must take all of it off the shell's line, one
+        // backspace for each character.
+        stroke(*"hello".map { key(it)!!.let { k -> k.centerX to k.centerY } }.toTypedArray())
+        waitFor(4_000) { currentText().isNotEmpty() }
+        assertTrue("the glided word reached the terminal", currentText().isNotEmpty())
+        type("\b", gap = 350)
+        type("ok\n")
+        assertShellGot("ok")
+    }
+
+    // ---- Touches near the bottom row (B16) ----------------------------------------------------------
+
+    @Test
+    fun aGlideThatStartsOnBackspaceDeletesNothing() {
+        open(FieldTestActivity.MULTILINE, needsLanguage = true)
+        type("one two three four five six ")
+        assertText("one two three four five six ")
+        // A glide for "my" whose first touch lands on the left edge of backspace, beside the m, then heads up-left.
+        val back = keyFor(KeyAction.BACKSPACE)
+        val y = key('y')!!
+        stroke(back.left + back.width * 0.15f to back.centerY, y.centerX to y.centerY)
+        assertText("one two three four five six ")
+        assertEquals("nothing selected", state().optInt("selStart"), state().optInt("selEnd"))
+    }
+
+    @Test
+    fun aLevelSwipeLeftFromBackspaceStillDeletesAWord() {
+        open(FieldTestActivity.MULTILINE, needsLanguage = true)
+        type("one two three ")
+        val back = keyFor(KeyAction.BACKSPACE)
+        val kw = key('q')!!.width
+        stroke(back.centerX to back.centerY, back.centerX - kw * 1.2f to back.centerY)
+        waitFor(3_000) { currentText().length < "one two three ".length }
+        assertTrue("a word went: '${currentText()}'", currentText().trimEnd() == "one two")
+    }
+
+    @Test
+    fun slidingOnSpaceAtASentenceStartMovesTheCursorWithoutSelecting() {
+        // A field that asks for sentence capitals, as message boxes do: after ". " the keyboard turns shift on by
+        // itself for the next word. That is not the user's shift, so the slide must not select.
+        open(FieldTestActivity.SENTENCES, needsLanguage = true)
+        type("one two. ")
+        assertText("One two. ")
+        var shift = dev.shebang.devboard.view.ShiftState.OFF
+        instrumentation.runOnMainSync { shift = service().keyboardForTest!!.shiftState }
+        assertEquals("shift is on by itself at the sentence start", dev.shebang.devboard.view.ShiftState.ON, shift)
+        val space = keyFor(KeyAction.SPACE)
+        val kw = key('q')!!.width
+        // A short slide, one step left: a longer one hides the fault, since the keyboard drops its own shift once
+        // the cursor leaves the sentence start and the next plain step collapses what the first selected.
+        stroke(space.centerX to space.centerY, space.centerX - kw * 1.3f to space.centerY)
+        waitFor(2_000) { state().optInt("selEnd") < "One two. ".length }
+        assertEquals("One two. ", currentText())
+        assertEquals("nothing selected", state().optInt("selStart"), state().optInt("selEnd"))
+        assertTrue("the cursor moved left", state().optInt("selEnd") < "One two. ".length)
+    }
+
     @Test
     fun twoWordsRunTogetherAreSplitOnSpace() {
         open(FieldTestActivity.MULTILINE, needsLanguage = true)
@@ -209,25 +326,52 @@ class FieldCompatibilityTest {
         return (0 until a.length()).map { a.getString(it) }
     }
 
+    private fun keyFor(action: KeyAction): Key = service().keysForTest.first { it.action == action }
+
+    /** A finger on the keyboard view: down at the first point, moving through the rest about 60 times a second, up at the last. */
+    private fun stroke(vararg points: Pair<Float, Float>) {
+        val view = service().keyboardForTest ?: error("no keyboard view")
+        val down = SystemClock.uptimeMillis()
+        fun send(action: Int, x: Float, y: Float) {
+            val e = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+            instrumentation.runOnMainSync { view.dispatchTouchEvent(e) }
+            e.recycle()
+        }
+        send(android.view.MotionEvent.ACTION_DOWN, points[0].first, points[0].second)
+        for (i in 1 until points.size) {
+            val (x0, y0) = points[i - 1]
+            val (x1, y1) = points[i]
+            for (k in 1..12) {
+                SystemClock.sleep(16)
+                send(android.view.MotionEvent.ACTION_MOVE, x0 + (x1 - x0) * k / 12f, y0 + (y1 - y0) * k / 12f)
+            }
+        }
+        SystemClock.sleep(16)
+        send(android.view.MotionEvent.ACTION_UP, points.last().first, points.last().second)
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(400)
+    }
+
     private fun service(): DevBoardService = DevBoardService.running ?: error("the keyboard is not running")
 
     private fun key(c: Char): Key? = service().keysForTest.firstOrNull {
         when (c) {
             ' ' -> it.action == KeyAction.SPACE
             '\n' -> it.action == KeyAction.ENTER
+            '\b' -> it.action == KeyAction.BACKSPACE
             else -> it.def.text == c.toString()
         }
     }
 
     /** Taps the keys for [s], one at a time, letting each tap's work settle as a person's pace would. */
-    private fun type(s: String) {
+    private fun type(s: String, settle: Boolean = true, gap: Long = 80) {
         for (c in s) {
             val k = key(c) ?: fail("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}") as Nothing
             instrumentation.runOnMainSync { service().tapForTest(k) }
             instrumentation.waitForIdleSync()
-            SystemClock.sleep(80)
+            SystemClock.sleep(gap)
         }
-        SystemClock.sleep(300)
+        if (settle) SystemClock.sleep(300)
         instrumentation.waitForIdleSync()
     }
 

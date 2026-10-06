@@ -487,6 +487,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         super.onStartInputView(info, restarting)
         if (!restarting) closePanels()
         field = FieldInfo.from(info)
+        RecentFields.record(info, field)
         text.startInput(field)
         keyboard?.enterKind = field.enterKind
         keyboard?.enterSpoken = field.enterSpoken
@@ -577,7 +578,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         s.setClip(clipChip.chipView(offer, t, height) {
             feedback.keyPress()
             text.finishComposing()
-            ic?.commitText(offer.text, 1)
+            text.insert(offer.text)
             clipChip.markHandled(offer.stamp)
             clipOffer = null
             s.setClip(null)
@@ -736,7 +737,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                 if (sendWithStickyModifiers(KeyEvent.KEYCODE_SPACE)) return
                 if (mode == Mode.CODE || !field.allowsComposing) {
                     text.finishComposing()
-                    ic?.commitText(" ", 1)
+                    text.insert(" ")
                 } else text.space()
             }
             KeyAction.MODE_CODE -> switchMode(Mode.CODE)
@@ -905,8 +906,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onCursorMove(steps: Int, select: Boolean) {
         text.finishComposing()
         val code = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-        // With shift on, shift+arrow grows the selection, as on a hardware keyboard.
-        val meta = if (select) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
+        // With shift on, shift+arrow grows the selection, as on a hardware keyboard: only shift the user turned on,
+        // not the automatic capital at a sentence start (B16).
+        val meta = if (select && !autoShifted) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
         repeat(kotlin.math.abs(steps)) { KeySender.send(ic, KeyEventPlan(code, meta)) }
     }
 
@@ -970,7 +972,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onBarSnippet(item: BarItem) {
         text.finishComposing()
-        ic?.commitText(item.text ?: return, 1)
+        text.insert(item.text ?: return)
         afterEdit()
     }
 
@@ -1010,7 +1012,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (!done && id == android.R.id.paste) {
             val clip = (getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager)?.primaryClip
             val pasted = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)
-            if (!pasted.isNullOrEmpty()) c.commitText(pasted, 1)
+            if (!pasted.isNullOrEmpty()) text.insert(pasted)
         }
         afterEdit()
     }
@@ -1158,7 +1160,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         feedback.keyPress()
         text.finishComposing()
         if (!item.isImage) {
-            ic?.commitText(item.text, 1)
+            text.insert(item.text)
             afterEdit()
             return
         }
@@ -1267,6 +1269,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     internal val languageReadyForTest: Boolean get() = bundle != null
     internal val keysForTest: List<Key> get() = geometry?.keys.orEmpty()
     internal val enterKindForTest: EnterKind? get() = keyboard?.enterKind
+    internal val keyboardForTest: KeyboardView? get() = keyboard
 
     /** Taps [key] as the keyboard view reports a tap: key down, then the tap with the shift state shown. */
     internal fun tapForTest(key: Key) {
