@@ -16,6 +16,7 @@ import androidx.core.view.ViewCompat
 import dev.shebang.devboard.layout.Key
 import dev.shebang.devboard.layout.KeyAction
 import dev.shebang.devboard.layout.KeyboardGeometry
+import dev.shebang.devboard.R
 
 enum class ShiftState { OFF, ON, LOCKED }
 
@@ -95,7 +96,8 @@ class KeyboardView(context: Context) : View(context) {
             invalidate()
         }
     /** What a screen reader says for the Enter key ([dev.shebang.devboard.ime.FieldInfo.enterSpoken]). */
-    var enterSpoken = "Enter"
+    @androidx.annotation.StringRes
+    var enterSpoken: Int = R.string.key_enter
     var glideTrailEnabled = true
     /** Dipping into the space bar during a glide starts the next word. */
     var phraseGlideEnabled: Boolean

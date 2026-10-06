@@ -15,6 +15,7 @@ import android.widget.BaseAdapter
 import android.widget.GridView
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.shebang.devboard.R
 
 /**
  * The emoji panel: shown in place of the keys when the terminal bar's Emoji item is tapped, the same size as
@@ -162,7 +163,7 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
             v.text = TAB_ICONS[name] ?: name.take(1)
             v.gravity = Gravity.CENTER
             v.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-            v.contentDescription = name
+            v.contentDescription = TAB_NAMES[name]?.let { context.getString(it) } ?: name
             v.setTextColor(t.stripText)
             v.setOnClickListener { grid.setSelection(groupStart[i]) }
             tabs.addView(v, LayoutParams(0, LayoutParams.MATCH_PARENT, 1f))
@@ -197,6 +198,13 @@ class EmojiPanelView(context: Context) : LinearLayout(context) {
             RECENT to "🕘", "Smileys & Emotion" to "😀", "People & Body" to "👋", "Animals & Nature" to "🐻",
             "Food & Drink" to "🍔", "Travel & Places" to "🚗", "Activities" to "⚽", "Objects" to "💡",
             "Symbols" to "❤️", "Flags" to "🏳️",
+        )
+        /** What a screen reader calls each tab: the emoji list's group names (English in the asset) as resources. */
+        private val TAB_NAMES = mapOf(
+            RECENT to R.string.emoji_recent, "Smileys & Emotion" to R.string.emoji_smileys, "People & Body" to R.string.emoji_people,
+            "Animals & Nature" to R.string.emoji_animals, "Food & Drink" to R.string.emoji_food, "Travel & Places" to R.string.emoji_travel,
+            "Activities" to R.string.emoji_activities, "Objects" to R.string.emoji_objects, "Symbols" to R.string.emoji_symbols,
+            "Flags" to R.string.emoji_flags,
         )
     }
 }

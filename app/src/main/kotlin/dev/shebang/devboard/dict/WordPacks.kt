@@ -1,5 +1,7 @@
 package dev.shebang.devboard.dict
 
+import dev.shebang.devboard.R
+
 /**
  * The keyboard's word lists. The regular words are always on; the built-in packs and the lists the user imports
  * can each be turned off ([WordPackStore]). Glide and suggestions rank every word by how common the word model
@@ -19,13 +21,16 @@ object WordPacks {
     const val SLANG = 5
 
     /** A built-in pack: its id, the key it is stored under, its asset, and how it is described. */
-    class BuiltIn(val id: Int, val key: String, val asset: String, val title: String, val summary: String)
+    class BuiltIn(
+        val id: Int, val key: String, val asset: String,
+        @androidx.annotation.StringRes val title: Int, @androidx.annotation.StringRes val summary: Int,
+    )
 
     val builtIn = listOf(
-        BuiltIn(NAMES, "names", "dict/pack_names.txt", "Brands and names", "Places, people, brands and apps: Spotify, Netflix, Tokyo"),
-        BuiltIn(DEV, "dev", "dict/pack_dev.txt", "Development and terminal", "Commands, tools and code words: git, sudo, grep, async, Kubernetes"),
-        BuiltIn(COMPUTER, "computer", "dict/pack_computer.txt", "Computer terms", "Hardware, networks and files: USB, HDMI, SSD, VPN, PDF"),
-        BuiltIn(SLANG, "slang", "dict/pack_slang.txt", "Slang and abbreviations", "Chat words, offered last until you use them: lol, idk, tbh, brb"),
+        BuiltIn(NAMES, "names", "dict/pack_names.txt", R.string.pack_names, R.string.pack_names_text),
+        BuiltIn(DEV, "dev", "dict/pack_dev.txt", R.string.pack_dev, R.string.pack_dev_text),
+        BuiltIn(COMPUTER, "computer", "dict/pack_computer.txt", R.string.pack_computer, R.string.pack_computer_text),
+        BuiltIn(SLANG, "slang", "dict/pack_slang.txt", R.string.pack_slang, R.string.pack_slang_text),
     )
 
     const val REGULAR_ASSET = "dict/en_words.txt"

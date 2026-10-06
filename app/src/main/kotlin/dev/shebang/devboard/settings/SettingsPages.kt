@@ -231,13 +231,20 @@ private fun DictionariesGroups(actions: SettingsActions) {
                     context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                         if (c.moveToFirst()) c.getString(0) else null
                     }
-                }.getOrNull()?.substringBeforeLast('.') ?: resources.getString(R.string.dict_default_list_name)
+                }.getOrNull()?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: resources.getString(R.string.dict_default_list_name)
                 runCatching { context.contentResolver.openInputStream(uri)?.use { store.import(name, it) } }.getOrNull()
-                    ?: dev.shebang.devboard.dict.WordPackStore.ImportResult(null, 0, resources.getString(R.string.dict_unreadable))
+                    ?: dev.shebang.devboard.dict.WordPackStore.ImportResult(null, 0, dev.shebang.devboard.dict.WordPackStore.ImportError(R.string.dict_unreadable))
             }
             changes++
             val list = result.list
-            val message = if (list == null) result.error ?: resources.getString(R.string.dict_no_words) else {
+            val error = result.error
+            val message = if (list == null) {
+                when {
+                    error == null -> resources.getString(R.string.dict_no_words)
+                    error.plural -> resources.getQuantityString(error.text, error.arg ?: 0, error.arg)
+                    else -> resources.getString(error.text, error.arg)
+                }
+            } else {
                 val added = resources.getQuantityString(R.plurals.dict_added, list.words, "%,d".format(list.words), list.name)
                 if (result.skipped > 0) resources.getQuantityString(R.plurals.dict_left_out, result.skipped, added, "%,d".format(result.skipped)) else added
             }
@@ -260,7 +267,7 @@ private fun DictionariesGroups(actions: SettingsActions) {
             for (p in dev.shebang.devboard.dict.WordPacks.builtIn) {
                 RowDivider()
                 val on = remember(changes) { store.isEnabled(p.key) }
-                SwitchRow(p.title, "${countLabel(counts[p.asset])}${p.summary}", on) { v -> change { store.setEnabled(p.key, v) } }
+                SwitchRow(stringResource(p.title), countLabel(counts[p.asset]) + stringResource(p.summary), on) { v -> change { store.setEnabled(p.key, v) } }
             }
         }
         SettingsGroup(stringResource(R.string.dict_group_lists)) {

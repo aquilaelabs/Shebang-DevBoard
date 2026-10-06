@@ -11,6 +11,7 @@
 - Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
 - Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (880eaef)
 - The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (3603499)
+- The keyboard's own text (what a screen reader says for keys, panels and bar items, the clipboard panel, word pack names and messages) also comes from string resources, ready for translation (4d80f89)
 
 ### Fixed
 

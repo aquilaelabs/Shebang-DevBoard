@@ -73,6 +73,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
+import dev.shebang.devboard.R
 
 class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBarView.Listener, TextInputController.Ui,
     GlideSession.Listener, TextInputController.Learner, dev.shebang.devboard.view.EmojiPanelView.Listener,
@@ -554,10 +555,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             else -> android.widget.Toast.makeText(
                 this,
                 when (code) {
-                    VoiceClient.ERROR_MIC -> "The microphone is in use or unavailable"
-                    VoiceClient.ERROR_MODEL -> "Shebang Voice could not load its speech model"
-                    VoiceClient.ERROR_NOT_ALLOWED -> "Shebang Voice only works with the DevBoard it was released with"
-                    else -> "Shebang Voice is not available"
+                    VoiceClient.ERROR_MIC -> R.string.voice_error_mic
+                    VoiceClient.ERROR_MODEL -> R.string.voice_error_model
+                    VoiceClient.ERROR_NOT_ALLOWED -> R.string.voice_error_not_allowed
+                    else -> R.string.voice_error_unavailable
                 },
                 android.widget.Toast.LENGTH_SHORT,
             ).show()
@@ -1172,7 +1173,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             .any { android.content.ClipDescription.compareMimeTypes(mime, it) }
         val conn = ic
         if (!accepted || conn == null) {
-            android.widget.Toast.makeText(this, "This field doesn't take pictures", android.widget.Toast.LENGTH_SHORT).show()
+            android.widget.Toast.makeText(this, R.string.no_pictures_here, android.widget.Toast.LENGTH_SHORT).show()
             return
         }
         val uri = androidx.core.content.FileProvider.getUriForFile(this, CLIP_AUTHORITY, file)

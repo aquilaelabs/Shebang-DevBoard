@@ -14,6 +14,7 @@ import android.view.Gravity
 import android.widget.TextView
 import dev.shebang.devboard.view.KeyboardTheme
 import kotlin.math.abs
+import dev.shebang.devboard.R
 
 /**
  * What the clipboard chip offers: text copied in the last few minutes that has not been pasted from the chip
@@ -110,7 +111,7 @@ class ClipboardChip(private val context: Context) {
                 cornerRadius = 8 * density
                 setColor(theme.keyFunctional)
             }
-            contentDescription = "Paste from clipboard"
+            contentDescription = context.getString(R.string.clipboard_paste)
             setOnClickListener { onPaste() }
         }
     }

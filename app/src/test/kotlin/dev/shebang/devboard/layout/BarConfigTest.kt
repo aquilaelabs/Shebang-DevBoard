@@ -45,6 +45,14 @@ class BarConfigTest {
     }
 
     @Test
+    fun actionsDefaultLabelsAreTheirEnglishText() {
+        for ((key, action) in BarItem.ACTIONS) {
+            assertEquals(key, dev.shebang.devboard.EnglishStrings.of(action.labelRes), action.label)
+            assertTrue(key, dev.shebang.devboard.EnglishStrings.of(action.description).isNotBlank())
+        }
+    }
+
+    @Test
     fun rejectsBadItems() {
         for (json in listOf(
             """{"items":[{"type":"key","label":"x"}]}""",

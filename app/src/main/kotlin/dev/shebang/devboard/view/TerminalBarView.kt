@@ -16,6 +16,7 @@ import dev.shebang.devboard.input.Modifier
 import dev.shebang.devboard.input.ModifierState
 import dev.shebang.devboard.layout.BarConfig
 import dev.shebang.devboard.layout.BarItem
+import dev.shebang.devboard.R
 
 /** The horizontally scrolling row of terminal keys, modifiers and snippets. */
 class TerminalBarView(context: Context) : HorizontalScrollView(context) {
@@ -107,7 +108,7 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
                 v.text = ""
                 val icon = IconDrawable(glyphFor(item), theme.stripText, 20 * density)
                 v.background = android.graphics.drawable.LayerDrawable(arrayOf(chipBackground(theme.keyFunctional), icon))
-                v.contentDescription = glyphName(item)
+                v.contentDescription = context.getString(glyphName(item))
                 v.setOnClickListener {
                     listener?.onBarPress()
                     if (item.isPanel) listener?.onBarPanel(item) else listener?.onBarAction(item)
@@ -212,12 +213,13 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
             else -> KeyIcons.gear
         }
 
-        /** What a glyph item is called, for TalkBack and the bar editor. */
-        fun glyphName(item: BarItem): String = when {
-            item.type == BarItem.TYPE_EMOJI -> "Emoji"
-            item.type == BarItem.TYPE_CLIPBOARD -> "Clipboard history"
-            item.action == BarItem.ACTION_ONE_HANDED -> "One-handed mode"
-            else -> "Keyboard settings"
+        /** What a glyph item is called, for TalkBack and the bar editor: a string resource. */
+        @androidx.annotation.StringRes
+        fun glyphName(item: BarItem): Int = when {
+            item.type == BarItem.TYPE_EMOJI -> R.string.bar_glyph_emoji
+            item.type == BarItem.TYPE_CLIPBOARD -> R.string.bar_glyph_clipboard
+            item.action == BarItem.ACTION_ONE_HANDED -> R.string.bar_glyph_one_handed
+            else -> R.string.bar_glyph_settings
         }
     }
 }

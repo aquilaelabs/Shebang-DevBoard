@@ -350,7 +350,7 @@ fun BarEditorScreen(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Glyph(dev.shebang.devboard.view.TerminalBarView.glyphFor(item), 22.dp)
                                 Spacer(Modifier.width(10.dp))
-                                Text(dev.shebang.devboard.view.TerminalBarView.glyphName(item))
+                                Text(stringResource(dev.shebang.devboard.view.TerminalBarView.glyphName(item)))
                             }
                         } else {
                             Text(item.label)
@@ -375,7 +375,7 @@ fun BarEditorScreen(
 private fun describe(res: android.content.res.Resources, item: BarItem): String = when {
     item.type == BarItem.TYPE_EMOJI -> res.getString(R.string.bar_item_emoji)
     item.type == BarItem.TYPE_CLIPBOARD -> res.getString(R.string.bar_item_clipboard)
-    item.isAction -> BarItem.ACTIONS[item.action]?.second ?: res.getString(R.string.bar_item_action)
+    item.isAction -> res.getString(BarItem.ACTIONS[item.action]?.description ?: R.string.bar_item_action)
     item.isModifier -> res.getString(R.string.bar_item_modifier, item.mod)
     item.isSnippet -> res.getString(R.string.bar_item_snippet, item.text)
     else -> {
@@ -426,13 +426,15 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
     var text by remember { mutableStateOf("") }
     var action by remember { mutableStateOf(BarItem.ACTION_UNDO) }
 
+    // An action with no label of its own is labelled in the keyboard's language.
+    val actionLabel = stringResource(BarItem.ACTIONS.getValue(action).labelRes)
     val item: BarItem? = runCatching {
         when (type) {
             BarItem.TYPE_KEY -> BarItem.key(label.ifBlank { code }, code, *listOfNotNull(if (ctrl) "ctrl" else null, if (alt) "alt" else null, if (shift) "shift" else null).toTypedArray(), repeat = repeat)
             BarItem.TYPE_MODIFIER -> BarItem.modifier(label.ifBlank { mod.replaceFirstChar(Char::uppercase) }, mod)
             BarItem.TYPE_EMOJI -> if (label.isBlank()) BarItem.emoji() else BarItem.emoji(label)
             BarItem.TYPE_CLIPBOARD -> if (label.isBlank()) BarItem.clipboard() else BarItem.clipboard(label)
-            BarItem.TYPE_ACTION -> if (label.isBlank()) BarItem.action(action) else BarItem.action(action, label)
+            BarItem.TYPE_ACTION -> BarItem.action(action, label.ifBlank { actionLabel })
             else -> BarItem.snippet(label.ifBlank { text.trim() }, text)
         }.also { it.validate() }
     }.getOrNull()
@@ -482,9 +484,9 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                     BarItem.TYPE_ACTION -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         // Three to a row: the edits, then settings and one-handed mode.
                         for (row in BarItem.ACTIONS.keys.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            for (a in row) FilterChip(selected = action == a, onClick = { action = a }, label = { Text(BarItem.ACTIONS.getValue(a).first) })
+                            for (a in row) FilterChip(selected = action == a, onClick = { action = a }, label = { Text(stringResource(BarItem.ACTIONS.getValue(a).labelRes)) })
                         }
-                        Text(BarItem.ACTIONS.getValue(action).second + ".")
+                        Text(stringResource(BarItem.ACTIONS.getValue(action).description) + ".")
                     }
                     else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.bar_text_to_insert)) })
                 }

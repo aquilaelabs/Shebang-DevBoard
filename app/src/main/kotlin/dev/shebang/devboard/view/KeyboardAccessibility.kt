@@ -6,6 +6,7 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import androidx.customview.widget.ExploreByTouchHelper
 import dev.shebang.devboard.layout.Key
 import dev.shebang.devboard.layout.KeyAction
+import dev.shebang.devboard.R
 
 /**
  * The keyboard for TalkBack and other screen readers: each drawn key is a virtual view with a spoken name,
@@ -38,7 +39,8 @@ internal class KeyboardAccessibility(private val keyboard: KeyboardView) : Explo
             node.setBoundsInParent(bounds.apply { setEmpty() })
             return
         }
-        node.contentDescription = spokenName(key, keyboard.shiftState, keyboard.enterSpoken)
+        node.contentDescription = spokenNameRes(key, keyboard.shiftState, keyboard.enterSpoken)?.let { keyboard.resources.getString(it) }
+            ?: spokenLabel(key, keyboard.shiftState)
         node.className = "android.widget.Button"
         node.isClickable = true
         node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
@@ -56,26 +58,33 @@ internal class KeyboardAccessibility(private val keyboard: KeyboardView) : Explo
     }
 
     companion object {
-        /** What a screen reader says for [key]: the character it types, or what a functional key does. */
-        fun spokenName(key: Key, shift: ShiftState, enter: String = "Enter"): String = when (key.action) {
+        /**
+         * What a screen reader says for [key] when it is a functional key: what it does, as a string resource
+         * ([enter] for the Enter key, from the field). Null for a key that types something: [spokenLabel] says it.
+         */
+        @androidx.annotation.StringRes
+        fun spokenNameRes(key: Key, shift: ShiftState, @androidx.annotation.StringRes enter: Int = R.string.key_enter): Int? = when (key.action) {
             KeyAction.SHIFT -> when (shift) {
-                ShiftState.OFF -> "Shift"
-                ShiftState.ON -> "Shift, on"
-                ShiftState.LOCKED -> "Shift, caps lock"
+                ShiftState.OFF -> R.string.key_shift
+                ShiftState.ON -> R.string.key_shift_on
+                ShiftState.LOCKED -> R.string.key_shift_locked
             }
-            KeyAction.BACKSPACE -> "Delete"
+            KeyAction.BACKSPACE -> R.string.key_delete
             KeyAction.ENTER -> enter
-            KeyAction.SPACE -> "Space"
-            KeyAction.MODE_CODE -> "Code mode"
-            KeyAction.MODE_TEXT -> "Letters"
+            KeyAction.SPACE -> R.string.key_space
+            KeyAction.MODE_CODE -> R.string.key_code_mode
+            KeyAction.MODE_TEXT -> R.string.key_letters
             KeyAction.NONE -> when (key.def.code) {
-                "DPAD_LEFT" -> "Left"
-                "DPAD_RIGHT" -> "Right"
-                "DPAD_UP" -> "Up"
-                "DPAD_DOWN" -> "Down"
-                null -> if (shift != ShiftState.OFF) key.shiftedLabel else key.label
-                else -> key.label
+                "DPAD_LEFT" -> R.string.key_left
+                "DPAD_RIGHT" -> R.string.key_right
+                "DPAD_UP" -> R.string.key_up
+                "DPAD_DOWN" -> R.string.key_down
+                else -> null
             }
         }
+
+        /** What a screen reader says for a key that types something: the character, capital while shifted. */
+        fun spokenLabel(key: Key, shift: ShiftState): String =
+            if (key.def.code == null && shift != ShiftState.OFF) key.shiftedLabel else key.label
     }
 }

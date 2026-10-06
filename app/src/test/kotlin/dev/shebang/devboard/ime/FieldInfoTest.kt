@@ -2,6 +2,7 @@ package dev.shebang.devboard.ime
 
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
+import dev.shebang.devboard.EnglishStrings
 import dev.shebang.devboard.layout.FieldVariant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -92,11 +93,11 @@ class FieldInfoTest {
         assertEquals(EnterKind.RETURN, kind(text, EditorInfo.IME_ACTION_PREVIOUS))
         assertEquals(EnterKind.RETURN, kind(InputType.TYPE_NULL, EditorInfo.IME_ACTION_SEARCH))
 
-        assertEquals("Search", FieldInfo.from(text, EditorInfo.IME_ACTION_SEARCH).enterSpoken)
-        assertEquals("Send", FieldInfo.from(text, EditorInfo.IME_ACTION_SEND).enterSpoken)
-        assertEquals("Go", FieldInfo.from(text, EditorInfo.IME_ACTION_GO).enterSpoken)
-        assertEquals("Done", FieldInfo.from(text, EditorInfo.IME_ACTION_DONE).enterSpoken)
-        assertEquals("Enter", FieldInfo.from(multi, EditorInfo.IME_FLAG_NO_ENTER_ACTION).enterSpoken)
+        assertEquals("Search", EnglishStrings.of(FieldInfo.from(text, EditorInfo.IME_ACTION_SEARCH).enterSpoken))
+        assertEquals("Send", EnglishStrings.of(FieldInfo.from(text, EditorInfo.IME_ACTION_SEND).enterSpoken))
+        assertEquals("Go", EnglishStrings.of(FieldInfo.from(text, EditorInfo.IME_ACTION_GO).enterSpoken))
+        assertEquals("Done", EnglishStrings.of(FieldInfo.from(text, EditorInfo.IME_ACTION_DONE).enterSpoken))
+        assertEquals("Enter", EnglishStrings.of(FieldInfo.from(multi, EditorInfo.IME_FLAG_NO_ENTER_ACTION).enterSpoken))
     }
 
     @Test

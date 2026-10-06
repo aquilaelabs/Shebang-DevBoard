@@ -33,6 +33,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.dict.RemovedWords
@@ -54,6 +55,7 @@ import dev.shebang.devboard.R
 @Composable
 fun DictionaryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val store = remember { RemovedWords.get(context.filesDir) }
     val scope = rememberCoroutineScope()
     var all by remember { mutableStateOf<List<String>?>(null) }
@@ -68,7 +70,7 @@ fun DictionaryScreen(onBack: () -> Unit) {
             val parts = listOf(context.assets.open(LanguageLoader.DICTIONARY_ASSET).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it) }) +
                 WordPacks.builtIn.mapNotNull { p -> runCatching { context.assets.open(p.asset).bufferedReader(Charsets.UTF_8).useLines { Dictionary.parse(it, p.id) } }.getOrNull() }
             val d = Dictionary.merge(parts)
-            val titles = WordPacks.builtIn.associate { it.id to it.title }
+            val titles = WordPacks.builtIn.associate { it.id to resources.getString(it.title) }
             packOf = (0 until d.size).filter { d.packs[it].toInt() != WordPacks.REGULAR }.associate { d.words[it] to (titles[d.packs[it].toInt()] ?: "") }
             d.words.toList() to store.snapshot()
         }

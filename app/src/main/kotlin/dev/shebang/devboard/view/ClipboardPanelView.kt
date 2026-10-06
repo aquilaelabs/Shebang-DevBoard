@@ -9,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import dev.shebang.devboard.ime.ClipboardHistory
+import dev.shebang.devboard.R
 
 /**
  * The clipboard panel: shown in place of the keys when the terminal bar's Clipboard item is tapped. The text
@@ -62,14 +63,14 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
         val t = theme ?: return
         header.removeAllViews()
         val title = TextView(context).apply {
-            text = "Clipboard"
+            text = context.getString(R.string.clipboard_title)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
             setTextColor(t.keyTextSecondary)
             setPadding((12 * density).toInt(), 0, 0, 0)
         }
         header.addView(title, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
         val clear = chip("Clear", t.keyFunctional, t.stripText).apply {
-            contentDescription = "Clear the clipboard history (pinned copies stay)"
+            contentDescription = context.getString(R.string.clipboard_clear)
             setOnClickListener { listener?.onClipClear() }
         }
         header.addView(clear, LayoutParams(LayoutParams.WRAP_CONTENT, (32 * density).toInt()).apply { rightMargin = (8 * density).toInt() })
@@ -80,7 +81,7 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
         list.removeAllViews()
         if (items.isEmpty()) {
             list.addView(TextView(context).apply {
-                text = "Text and pictures you copy show here, kept on this phone for 24 hours. Pin a copy to keep it."
+                text = context.getString(R.string.clipboard_empty)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setTextColor(t.keyTextSecondary)
                 gravity = Gravity.CENTER
@@ -96,7 +97,7 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
                 background = rounded(t.key)
                 isClickable = true
                 setOnClickListener { listener?.onClipPaste(item) }
-                contentDescription = if (item.isImage) "Insert picture" else "Paste: ${item.text.take(60)}"
+                contentDescription = if (item.isImage) context.getString(R.string.clipboard_insert_picture) else context.getString(R.string.clipboard_paste_item, item.text.take(60))
             }
             val thumb = if (item.isImage) imageFile(item)?.let { thumbnail(it) } else null
             if (thumb != null) {
@@ -109,7 +110,7 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
                 row.addView(iv, LayoutParams(0, (THUMB_DP * density).toInt(), 1f))
             } else {
                 val text = TextView(context).apply {
-                    text = if (item.isImage) "Picture" else item.text.replace(Regex("\\s+"), " ").trim()
+                    text = if (item.isImage) context.getString(R.string.clipboard_picture) else item.text.replace(Regex("\\s+"), " ").trim()
                     maxLines = 2
                     ellipsize = TextUtils.TruncateAt.END
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
@@ -119,12 +120,12 @@ class ClipboardPanelView(context: Context) : LinearLayout(context) {
                 row.addView(text, LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f))
             }
             val pin = chip(if (item.pinned) "Pinned" else "Pin", if (item.pinned) t.accent else t.keyFunctional, if (item.pinned) t.onAccent else t.stripText).apply {
-                contentDescription = if (item.pinned) "Unpin" else "Pin"
+                contentDescription = context.getString(if (item.pinned) R.string.clipboard_unpin else R.string.clipboard_pin)
                 setOnClickListener { listener?.onClipPinned(item.key, !item.pinned) }
             }
             row.addView(pin, LayoutParams(LayoutParams.WRAP_CONTENT, (32 * density).toInt()).apply { rightMargin = gap })
             val remove = chip("✕", t.keyFunctional, t.stripText).apply {
-                contentDescription = "Remove"
+                contentDescription = context.getString(R.string.bar_remove)
                 setOnClickListener { listener?.onClipRemove(item.key) }
             }
             row.addView(remove, LayoutParams((36 * density).toInt(), (32 * density).toInt()).apply { rightMargin = (8 * density).toInt() })

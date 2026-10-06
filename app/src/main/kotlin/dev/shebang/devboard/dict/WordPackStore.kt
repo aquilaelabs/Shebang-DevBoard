@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.InputStream
+import dev.shebang.devboard.R
 
 /**
  * Which word packs are on, and the word lists the user imported. Built-in packs are on unless turned off. An
@@ -21,7 +22,13 @@ class WordPackStore(private val dir: File?) {
     private data class Stored(val disabled: List<String> = emptyList(), val lists: List<ImportedList> = emptyList())
 
     /** What an import did: the list added (null when nothing could be read), and the lines left out. */
-    class ImportResult(val list: ImportedList?, val skipped: Int, val error: String? = null)
+    /**
+     * Why an import was refused: a string resource, with its number ([arg]) where it has one, or a plurals resource
+     * ([plural]) counted by [arg].
+     */
+    class ImportError(val text: Int, val arg: Int? = null, val plural: Boolean = false)
+
+    class ImportResult(val list: ImportedList?, val skipped: Int, val error: ImportError? = null)
 
     private var state = Stored()
     private var loaded = false
@@ -83,11 +90,11 @@ class WordPackStore(private val dir: File?) {
     @Synchronized
     fun import(name: String, input: InputStream, now: Long = System.currentTimeMillis()): ImportResult {
         load()
-        if (state.lists.size >= MAX_LISTS) return ImportResult(null, 0, "You can keep up to $MAX_LISTS word lists. Delete one first.")
-        val text = runCatching { readCapped(input) }.getOrElse { return ImportResult(null, 0, "The file could not be read.") }
-            ?: return ImportResult(null, 0, "The file is larger than ${MAX_BYTES / 1_000_000} MB.")
+        if (state.lists.size >= MAX_LISTS) return ImportResult(null, 0, ImportError(R.plurals.import_too_many, MAX_LISTS, plural = true))
+        val text = runCatching { readCapped(input) }.getOrElse { return ImportResult(null, 0, ImportError(R.string.dict_unreadable)) }
+            ?: return ImportResult(null, 0, ImportError(R.string.import_too_large, MAX_BYTES / 1_000_000))
         val (words, counts, skipped) = parseCounted(text.lineSequence())
-        if (words.isEmpty()) return ImportResult(null, skipped, "No words found. Put one word on each line.")
+        if (words.isEmpty()) return ImportResult(null, skipped, ImportError(R.string.import_no_words))
         val tiers = tiersFor(words, counts)
         var id = "list${now}"
         while (state.lists.any { it.id == id }) id += "x"
@@ -95,7 +102,7 @@ class WordPackStore(private val dir: File?) {
         if (f != null) {
             f.parentFile?.mkdirs()
             runCatching { f.writeText(words.joinToString("\n", postfix = "\n") { "$it\t${tiers[it] ?: IMPORTED_TIER}" }) }
-                .onFailure { return ImportResult(null, skipped, "The list could not be saved.") }
+                .onFailure { return ImportResult(null, skipped, ImportError(R.string.import_not_saved)) }
         }
         val list = ImportedList(id, name.ifBlank { "Word list" }.take(60), words.size, true, now)
         state = state.copy(lists = state.lists + list)

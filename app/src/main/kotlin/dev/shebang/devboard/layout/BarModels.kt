@@ -2,6 +2,7 @@ package dev.shebang.devboard.layout
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import dev.shebang.devboard.R
 
 /** One item on the terminal bar. Flat shape so the editor and import/export stay simple. */
 @Serializable
@@ -64,16 +65,22 @@ data class BarItem(
         const val ACTION_SETTINGS = "settings"
         const val ACTION_ONE_HANDED = "one_handed"
 
-        /** Every action, in the editor's order, with its default label and what it does. */
-        val ACTIONS: Map<String, Pair<String, String>> = linkedMapOf(
-            ACTION_UNDO to ("Undo" to "Undoes the last edit in the app"),
-            ACTION_REDO to ("Redo" to "Redoes what Undo took back"),
-            ACTION_SELECT_ALL to ("All" to "Selects all the text"),
-            ACTION_CUT to ("Cut" to "Cuts the selection"),
-            ACTION_COPY to ("Copy" to "Copies the selection"),
-            ACTION_PASTE to ("Paste" to "Pastes what is on the clipboard"),
-            ACTION_SETTINGS to ("Settings" to "Opens the keyboard's settings"),
-            ACTION_ONE_HANDED to ("One-handed" to "Turns one-handed mode on or off"),
+        /**
+         * An action: its default [label] (the English one, for an item made without resources; the same text as
+         * [labelRes], which a test checks), the label as a string resource, and what it does.
+         */
+        class Action(val label: String, @androidx.annotation.StringRes val labelRes: Int, @androidx.annotation.StringRes val description: Int)
+
+        /** Every action, in the editor's order. */
+        val ACTIONS: Map<String, Action> = linkedMapOf(
+            ACTION_UNDO to Action("Undo", R.string.bar_action_undo, R.string.bar_action_undo_text),
+            ACTION_REDO to Action("Redo", R.string.bar_action_redo, R.string.bar_action_redo_text),
+            ACTION_SELECT_ALL to Action("All", R.string.bar_action_select_all, R.string.bar_action_select_all_text),
+            ACTION_CUT to Action("Cut", R.string.bar_action_cut, R.string.bar_action_cut_text),
+            ACTION_COPY to Action("Copy", R.string.bar_action_copy, R.string.bar_action_copy_text),
+            ACTION_PASTE to Action("Paste", R.string.bar_action_paste, R.string.bar_action_paste_text),
+            ACTION_SETTINGS to Action("Settings", R.string.bar_action_settings, R.string.bar_action_settings_text),
+            ACTION_ONE_HANDED to Action("One-handed", R.string.bar_action_one_handed, R.string.bar_action_one_handed_text),
         )
 
         fun key(label: String, code: String, vararg mods: String, repeat: Boolean = false) =
@@ -83,7 +90,7 @@ data class BarItem(
         fun snippet(label: String, text: String) = BarItem(TYPE_SNIPPET, label, text = text)
         fun emoji(label: String = "😀") = BarItem(TYPE_EMOJI, label)
         fun clipboard(label: String = "📋") = BarItem(TYPE_CLIPBOARD, label)
-        fun action(action: String, label: String = ACTIONS[action]?.first ?: action) = BarItem(TYPE_ACTION, label, action = action)
+        fun action(action: String, label: String = ACTIONS[action]?.label ?: action) = BarItem(TYPE_ACTION, label, action = action)
     }
 }
 

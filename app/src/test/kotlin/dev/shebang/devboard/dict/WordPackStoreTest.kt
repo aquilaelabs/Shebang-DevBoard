@@ -61,7 +61,7 @@ class WordPackStoreTest {
     fun aFileWithNoWordsIsRefused() {
         val r = WordPackStore(dir()).import("Empty", "# nothing\n\n123\n".byteInputStream())
         assertNull(r.list)
-        assertNotNull(r.error)
+        assertEquals("No words found. Put one word on each line.", dev.shebang.devboard.EnglishStrings.of(r.error!!.text))
     }
 
     @Test
