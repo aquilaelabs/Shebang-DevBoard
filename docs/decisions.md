@@ -728,3 +728,26 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   - The web page turns autocapitalize off; Chrome otherwise asks for sentence capitals.
   Putting the old Enter rule back makes the Compose search test fail, so it guards B14. It runs on an emulator
   (`./gradlew :app:connectedDebugAndroidTest`), not in CI yet, and selects Shebang DevBoard as the keyboard.
+- **Two words run together** (6 Oct, the owner's ask: "ataco" should offer "a taco"): when a typed word is not
+  in the dictionary, `Suggester` tries every cut into two common words (tier 35 or better, or used by the user;
+  a one-letter part only "a" or "i") and scores each as the first word after the words before times the second
+  after the first, times the price of the missed space as a slip (`SPLIT_COST`). The best cut is offered on the
+  strip; autocorrect makes it on space when it beats every one-word correction and clears `SPLIT_KEEP`, the
+  guard for a word typed on purpose. A split pick is learned as its two words. Measured by
+  `JoinedWordsBenchmarkTest`: neighbouring words of the held-out Tatoeba sentences run together, and the packs'
+  names and terms decided against the regular words alone, as words typed on purpose the dictionary lacks; scored
+  as the keyboard scores typed words (slip costs, tap positions unknown). Tuned on the half of sentences whose id
+  has an even tens digit, checked once on the other half:
+
+  | Test half (7,131 joined pairs, 4,578 words meant as typed) | Split right on space | Made another word | Offered on the strip | Meant words split |
+  |---|---|---|---|---|
+  | Before | 0% | 12.1% | 0% | 0% |
+  | Cost 0.25, keep 1e-7 (shipped) | 81.4% | 0.4% | 99.2% | 0.9% |
+
+  On the dev half: cost 0 splits 94% but 3.4% of meant words; cost 0.5, 78.8% and 0.6%. The meant words split are
+  mostly lowercase names and terms the packs hold ("justin", "frontend", "readme"), so they stay whole while
+  the packs are on. The TSI tap benchmark did not move (typos fixed 80.6%, made another word 3.3%, right words
+  changed 0%, words meant as typed kept 64.0%, with and without splitting). A rare second word stays on the
+  strip only: "ataco" after "i want" offers "a taco" first and keeps "ataco" on space. All 3,000 held-out
+  sentences were scored once, at the first settings tried (cost 1.0), before the halves were fixed; no choice
+  was made from it.

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Two words typed without the space between them are offered as two words on the strip ('ataco' offers 'a taco'), and common pairs are split on space ('thankyou' becomes 'thank you'); backspace right after puts back what you typed (cfea7b6)
+
 ### Changed
 
 - The enter key shows what it will do: the return arrow for a new line, a magnifier in search boxes, and an arrow where it goes, sends or finishes; screen readers say the action (8dbc2cb)

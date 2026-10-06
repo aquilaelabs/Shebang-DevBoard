@@ -287,7 +287,17 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun learnWord(word: String, previous: String?, sentenceStart: Boolean) {
         if (!settings.learnWords) return
         val dictionary = bundle?.dictionary ?: return
-        background.execute { personal.learn(word, previous, sentenceStart) { dictionary.indexOfLower(it) >= 0 } }
+        // Two words run together and split by autocorrect or a strip pick ("a taco"): learned as the two words.
+        val parts = word.split(' ').filter { it.isNotEmpty() }
+        background.execute {
+            var prev = previous
+            var start = sentenceStart
+            for (part in parts) {
+                personal.learn(part, prev, start) { dictionary.indexOfLower(it) >= 0 }
+                prev = part
+                start = false
+            }
+        }
     }
 
     override fun learnTaps(observations: FloatArray) {

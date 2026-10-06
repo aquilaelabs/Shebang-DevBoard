@@ -130,6 +130,13 @@ class FieldCompatibilityTest {
     }
 
     @Test
+    fun twoWordsRunTogetherAreSplitOnSpace() {
+        open(FieldTestActivity.MULTILINE, needsLanguage = true)
+        type("so thankyou ")
+        assertText("so thank you ")
+    }
+
+    @Test
     fun aWebAddressFieldTypesExactlyAndGoes() {
         open(FieldTestActivity.URL, needsLanguage = true)
         assertEquals(EnterKind.SUBMIT, service().enterKindForTest)

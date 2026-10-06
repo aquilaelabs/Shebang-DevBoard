@@ -148,6 +148,8 @@ class TapBenchmarkTest {
             }
         }
         System.getenv("RECASE_WEIGHT")?.toDoubleOrNull()?.let { Suggester.RECASE_WEIGHT = it }
+        // SPLIT_OFF=1 measures without splitting words run together (JoinedWordsBenchmarkTest).
+        if (System.getenv("SPLIT_OFF") != null) { Suggester.SPLIT_ENABLED = false; Suggester.SPLIT_AUTOCORRECT = false }
         val weights = if (System.getenv("AUTOCORRECT_SWEEP") != null) listOf(0f, 0.5f, 0.75f, 1f) else listOf(Suggester.CONTEXT_WEIGHT)
         for ((useTaps, useContext, weight) in listOf(Triple(false, false, 0f), Triple(true, false, 0f)) + weights.map { Triple(true, true, it) }) {
             Suggester.CONTEXT_WEIGHT = weight

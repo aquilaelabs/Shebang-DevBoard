@@ -190,6 +190,14 @@ class TypingCorrectionTest {
     }
 
     @Test
+    fun twoWordsRunTogetherAreSplitOnSpaceAndBackspaceTakesTheSplitBack() {
+        type("thankyou ")
+        assertEquals("thank you ", ic.toString())
+        controller.backspace()
+        assertEquals("thankyou", ic.toString())
+    }
+
+    @Test
     fun backspacingBackToACorrectedWordOffersWhatWasTyped() {
         type("wiht")
         // Before space: what was typed, the correction space will write, and one more suggestion.
