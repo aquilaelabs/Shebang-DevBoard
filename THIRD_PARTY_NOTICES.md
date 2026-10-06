@@ -250,6 +250,7 @@ other artwork are original to this project.
 | whisper.cpp and ggml (The ggml authors), MIT | 1.9.4 | the Shebang Voice add-on's speech engine, vendored and trimmed to the CPU build in `voice/src/main/cpp/whisper.cpp` (see `VENDORED.md` there) |
 | AndroidX Test runner and JUnit extension | 1.7.0 / 1.3.0 | device tests of the add-on only, not shipped |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |
+| xterm.js (The xterm.js authors, SourceLair, Christopher Jeffrey), MIT | 5.5.0 | device tests only: a web terminal page in the debug build's test screen (`app/src/debug/assets/fieldtest`), not in release builds |
 
 The libraries above bring in others the app also ships, all under the Apache License 2.0: further AndroidX
 libraries (Annotation, Collection, SavedState, Emoji2, ProfileInstaller, Startup, Window and the rest of

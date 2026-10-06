@@ -129,6 +129,76 @@ class FieldCompatibilityTest {
         assertText("the.")
     }
 
+    // ---- A browser terminal: xterm.js (B17) -----------------------------------------------------------
+
+    /** What a shell's line editor holds after [received]: each DEL takes a character off; lines end at Enter. */
+    private fun shellLines(received: String): List<String> {
+        val lines = ArrayList<String>()
+        val line = StringBuilder()
+        for (c in received) when (c) {
+            '\u007f' -> if (line.isNotEmpty()) line.setLength(line.length - 1)
+            '\r' -> { lines += line.toString(); line.setLength(0) }
+            else -> line.append(c)
+        }
+        return lines
+    }
+
+    private fun assertShellGot(vararg lines: String) {
+        waitFor(4_000) { shellLines(currentText()) == lines.toList() }
+        assertEquals("the terminal received ${currentText().map { if (it.code < 32 || it.code == 127) "\\x%02x".format(it.code) else it.toString() }.joinToString("")}",
+            lines.toList(), shellLines(currentText()))
+    }
+
+    @Test
+    fun aBrowserTerminalGetsExactlyWhatIsTyped() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        val f = service().fieldForTest
+        assertTrue("xterm.js's input is typed exactly (or raw): $f", f.exact || !f.allowsComposing)
+        // No autocorrect, and punctuation stays after its space ("git add ." is not "git add.").
+        type("teh .\n")
+        // One-letter words arrive once.
+        type("a b c\n")
+        assertShellGot("teh .", "a b c")
+    }
+
+    @Test
+    fun quickTypingInABrowserTerminalLosesNothing() {
+        // The terminal picks finished words up on a timer, so edits that land close together can race: the same
+        // lines several times over, as fast as the test types.
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        val lines = listOf("teh .", "a b c", "git add .", "ls x y", "cd ..")
+        repeat(3) { for (l in lines) type(l + "\n", settle = false) }
+        assertShellGot(*(lines + lines + lines).toTypedArray())
+    }
+
+    @Test
+    fun backspacingIntoAWordInABrowserTerminalDoesNotSendItAgain() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        // cat, space, two backspaces, r: the shell must hold "car", not "cacar". The backspaces at a person's
+        // pace: xterm.js reports a deletion from a timer and drops the report if the next word has begun, so at
+        // the test's speed on a busy emulator one can go missing whatever the keyboard does.
+        type("cat ")
+        type("\b\b", gap = 350)
+        type("r\n")
+        assertShellGot("car")
+    }
+
+    @Test
+    fun backspaceAfterAGlideInABrowserTerminalTakesTheWholeGlideOffTheShell() {
+        open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
+        var glides = false
+        waitFor(30_000) { instrumentation.runOnMainSync { glides = service().isGlideAllowed() }; glides }
+        assertTrue("glide is ready", glides)
+        // Glide "hello": whatever word it reads, backspace must take all of it off the shell's line, one
+        // backspace for each character.
+        stroke(*"hello".map { key(it)!!.let { k -> k.centerX to k.centerY } }.toTypedArray())
+        waitFor(4_000) { currentText().isNotEmpty() }
+        assertTrue("the glided word reached the terminal", currentText().isNotEmpty())
+        type("\b", gap = 350)
+        type("ok\n")
+        assertShellGot("ok")
+    }
+
     // ---- Touches near the bottom row (B16) ----------------------------------------------------------
 
     @Test
@@ -288,19 +358,20 @@ class FieldCompatibilityTest {
         when (c) {
             ' ' -> it.action == KeyAction.SPACE
             '\n' -> it.action == KeyAction.ENTER
+            '\b' -> it.action == KeyAction.BACKSPACE
             else -> it.def.text == c.toString()
         }
     }
 
     /** Taps the keys for [s], one at a time, letting each tap's work settle as a person's pace would. */
-    private fun type(s: String) {
+    private fun type(s: String, settle: Boolean = true, gap: Long = 80) {
         for (c in s) {
             val k = key(c) ?: fail("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}") as Nothing
             instrumentation.runOnMainSync { service().tapForTest(k) }
             instrumentation.waitForIdleSync()
-            SystemClock.sleep(80)
+            SystemClock.sleep(gap)
         }
-        SystemClock.sleep(300)
+        if (settle) SystemClock.sleep(300)
         instrumentation.waitForIdleSync()
     }
 

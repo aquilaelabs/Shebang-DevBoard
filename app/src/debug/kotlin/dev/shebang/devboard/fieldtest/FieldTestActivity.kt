@@ -68,6 +68,7 @@ class FieldTestActivity : ComponentActivity() {
             WEB_SEARCH -> web("<form onsubmit=\"Android.action('submit'); return false;\">" +
                 "<input id=f type=search autocapitalize=off autofocus oninput=\"Android.text(this.value)\" style=\"$WEB_STYLE\"></form>")
             WEB_TEXTAREA -> web("<textarea id=f autocapitalize=off autofocus oninput=\"Android.text(this.value)\" style=\"$WEB_STYLE\"></textarea>")
+            WEB_TERMINAL -> webPage("file:///android_asset/fieldtest/terminal.html")
             TERMINAL -> TerminalView(this)
             else -> error("unknown field $kind")
         }
@@ -118,7 +119,7 @@ class FieldTestActivity : ComponentActivity() {
             is ComposeView -> composeFocus.requestFocus()
             is WebView -> {
                 v.requestFocus()
-                v.evaluateJavascript("document.getElementById('f').focus()", null)
+                v.evaluateJavascript("(window.focusField || function () { document.getElementById('f').focus() })()", null)
                 imm.showSoftInput(v, 0)
             }
             else -> {
@@ -173,14 +174,20 @@ class FieldTestActivity : ComponentActivity() {
         }
     }
 
+    private fun web(body: String) = webView().apply {
+        loadDataWithBaseURL("https://localhost/", "<html><body style=\"margin:0;background:#222\">$body</body></html>", "text/html", "utf-8", null)
+    }
+
+    /** A page from the debug build's assets (the xterm.js terminal). */
+    private fun webPage(url: String) = webView().apply { loadUrl(url) }
+
     @SuppressLint("SetJavaScriptEnabled")
-    private fun web(body: String) = WebView(this).apply {
+    private fun webView() = WebView(this).apply {
         settings.javaScriptEnabled = true
         addJavascriptInterface(object {
             @JavascriptInterface fun text(value: String) { webText = value; runOnUiThread { save() } }
             @JavascriptInterface fun action(name: String) { actions += name; runOnUiThread { save() } }
         }, "Android")
-        loadDataWithBaseURL("https://localhost/", "<html><body style=\"margin:0;background:#222\">$body</body></html>", "text/html", "utf-8", null)
     }
 
     /** A terminal-like view: TYPE_NULL, so the keyboard sends key events, which are recorded as characters. */
@@ -236,6 +243,8 @@ class FieldTestActivity : ComponentActivity() {
         const val COMPOSE_PLAIN = "compose_plain"
         const val WEB_SEARCH = "web_search"
         const val WEB_TEXTAREA = "web_textarea"
+        /** xterm.js in a WebView: a browser terminal, whose field's text is everything the shell would get. */
+        const val WEB_TERMINAL = "web_terminal"
         const val TERMINAL = "terminal"
         private const val WEB_STYLE = "width:100%;height:100vh;font-size:22px;box-sizing:border-box"
 

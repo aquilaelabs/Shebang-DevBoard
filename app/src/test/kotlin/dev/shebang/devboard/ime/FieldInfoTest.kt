@@ -62,6 +62,20 @@ class FieldInfoTest {
     }
 
     @Test
+    fun aWebFieldWithoutTheAutocorrectFlagIsExact() {
+        // What Firefox 157 reports: xterm.js's input (autocorrect=off), a plain textarea, a text input.
+        assertTrue(FieldInfo.from(0x400a1, 0x12000001).exact)
+        assertTrue(FieldInfo.from(0x400a1, 0x12000001).noAutocorrect)
+        assertFalse(FieldInfo.from(0x4c0a1, 0x12000001).exact)
+        assertFalse(FieldInfo.from(0x480a1, 0x12000001).exact)
+        // Not a web field: an app's own text box rarely sets the flag and still wants autocorrect.
+        assertFalse(FieldInfo.from(InputType.TYPE_CLASS_TEXT, 0).exact)
+        assertFalse(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, 0).exact)
+        // Suggestions and glide stay.
+        assertTrue(FieldInfo.from(0x400a1, 0x12000001).allowsGlide)
+    }
+
+    @Test
     fun theEnterKeyWearsAGlyphForWhatItDoes() {
         val text = InputType.TYPE_CLASS_TEXT
         val multi = text or InputType.TYPE_TEXT_FLAG_MULTI_LINE

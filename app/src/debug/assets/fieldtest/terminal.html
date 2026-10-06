@@ -1,0 +1,13 @@
+<!doctype html>
+<!-- A web terminal for FieldCompatibilityTest: xterm.js 5.5.0 (MIT), reporting everything it would send to a shell. -->
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="xterm.css"><script src="xterm.js"></script>
+<style>body{margin:0;background:#000}#t{height:100vh}</style></head>
+<body><div id="t"></div>
+<script>
+const term = new Terminal({fontSize: 16});
+term.open(document.getElementById('t'));
+let received = '';
+term.onData(d => { received += d; Android.text(received); });
+window.focusField = () => term.focus();
+</script></body></html>

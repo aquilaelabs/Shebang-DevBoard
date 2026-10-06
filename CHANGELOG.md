@@ -17,6 +17,7 @@
 - Enter runs the search in search boxes that allow several lines, such as the Play Store's, instead of adding a second line (28f3de8)
 - The paste chip stays after you press space; it gives way when you start typing or gliding the next word, and does not come back for that copy (d30f02a)
 - A glide that starts on the edge of backspace or the space bar no longer selects and deletes text: their swipes now only work while your finger stays in the bottom row, and the space-bar slide selects only when you turned shift on yourself (69f2916)
+- Web terminals and other web pages that ask for no autocorrect (tmux or a shell in a browser) get exactly what you type: no autocorrect, no moved punctuation, and backspacing into a word no longer sends it again (d53f8d9)
 
 ## 0.5.4: 2026-10-05
 

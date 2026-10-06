@@ -578,7 +578,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         s.setClip(clipChip.chipView(offer, t, height) {
             feedback.keyPress()
             text.finishComposing()
-            ic?.commitText(offer.text, 1)
+            text.insert(offer.text)
             clipChip.markHandled(offer.stamp)
             clipOffer = null
             s.setClip(null)
@@ -737,7 +737,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                 if (sendWithStickyModifiers(KeyEvent.KEYCODE_SPACE)) return
                 if (mode == Mode.CODE || !field.allowsComposing) {
                     text.finishComposing()
-                    ic?.commitText(" ", 1)
+                    text.insert(" ")
                 } else text.space()
             }
             KeyAction.MODE_CODE -> switchMode(Mode.CODE)
@@ -972,7 +972,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onBarSnippet(item: BarItem) {
         text.finishComposing()
-        ic?.commitText(item.text ?: return, 1)
+        text.insert(item.text ?: return)
         afterEdit()
     }
 
@@ -1012,7 +1012,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         if (!done && id == android.R.id.paste) {
             val clip = (getSystemService(CLIPBOARD_SERVICE) as? android.content.ClipboardManager)?.primaryClip
             val pasted = clip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)
-            if (!pasted.isNullOrEmpty()) c.commitText(pasted, 1)
+            if (!pasted.isNullOrEmpty()) text.insert(pasted)
         }
         afterEdit()
     }
@@ -1160,7 +1160,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         feedback.keyPress()
         text.finishComposing()
         if (!item.isImage) {
-            ic?.commitText(item.text, 1)
+            text.insert(item.text)
             afterEdit()
             return
         }

@@ -59,6 +59,7 @@ object RecentFields {
             }))
             put("enterGlyph", JsonPrimitive(f.enterKind.name.lowercase()))
             put("composing", JsonPrimitive(f.allowsComposing))
+            put("exact", JsonPrimitive(f.exact))
             put("learning", JsonPrimitive(f.allowsLearning))
         })
     }

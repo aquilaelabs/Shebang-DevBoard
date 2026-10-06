@@ -19,6 +19,14 @@ data class FieldInfo(
     val inputType: Int,
     /** The app asked for no personalised learning (IME_FLAG_NO_PERSONALIZED_LEARNING, e.g. incognito tabs). */
     val noPersonalizedLearning: Boolean = false,
+    /**
+     * A web page's field that asked for no autocorrect (a web terminal such as xterm.js, a code editor): the
+     * browser leaves TYPE_TEXT_FLAG_AUTO_CORRECT off a web text box only when the page says so. Typed exactly,
+     * and nothing already written is rewritten: such pages mirror every edit somewhere it cannot be taken back
+     * (a shell), so reopening a word, moving punctuation or replacing a word garbles it (B17). Suggestions and
+     * glide stay.
+     */
+    val exact: Boolean = false,
 ) {
     val isNumeric: Boolean get() = variant == FieldVariant.NUMBER || variant == FieldVariant.PHONE || variant == FieldVariant.DATE
 
@@ -30,6 +38,8 @@ data class FieldInfo(
     val allowsAutoCaps: Boolean get() = !isTerminal && !isPassword && !isNumeric
     /** A web address or an email address: typed exactly as far as words go, so no autocorrect. */
     val isAddress: Boolean get() = variant == FieldVariant.URL || variant == FieldVariant.EMAIL
+    /** Words are left as typed: an address, or a web field that asked for no autocorrect ([exact]). */
+    val noAutocorrect: Boolean get() = isAddress || exact
     /**
      * An email address: besides no autocorrect, no spaces the keyboard adds by itself (around glides, after a
      * strip pick, the double-space period) and no next-word suggestions. A web-address field gets those like
@@ -131,6 +141,8 @@ data class FieldInfo(
                 enterIsNewline = enterIsNewline,
                 inputType = inputType,
                 noPersonalizedLearning = (imeOptions and EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING) != 0,
+                exact = klass == InputType.TYPE_CLASS_TEXT && variation == InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT &&
+                    (flags and InputType.TYPE_TEXT_FLAG_AUTO_CORRECT) == 0,
             )
         }
     }
