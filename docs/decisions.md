@@ -840,18 +840,24 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
     Lowercase "btw" sits in the pack beside the regular "BTW" (the builder claims by spelling), so "btw" typed
     stays lowercase.
   Words moving down, by the word they followed, is the next step (queued).
-- **Words move down where they were turned down** (the owner's design, 6 Oct: "when words go down in value can
-  it take into consideration what word it followed and make it mostly affect that?"). `PersonalWords.reject`
-  keeps, per (word before, word), how often the word was turned down there: an autocorrect to it undone with
-  backspace, a glide of it changed, redone or deleted while still open (not yet learned), or the check mark
-  tapped against it as the strip's correction. Simply not tapping a suggestion is not a signal. The word model
-  makes the word cost ln(1 + rejections) more after that word only; once it has been turned down after three or
-  more different words it keeps 1/(1 + 0.25 x (contexts - 2)) of its value everywhere, never below half.
-  Rejections fade by half every 21 days, count at most 5 per pair, count only from 0.5 (faded), and writing the
-  word after the same word takes one back. They live with the learned words (`personal_words.json`, so the
-  daily copies behind Undo recent learning, deleting a word and Delete all learned words cover them), at most
-  5,000, and each brings the next rebuild five learned uses nearer. Nothing is learned where learning is off.
-  Not tuned on data: the owner's own typing never shapes shipped values, and no public dataset records people
-  turning suggestions down, so the strengths are a choice, kept conservative. Checked that they behave
-  (RejectionTest, the signals in TypingCorrectionTest) and that without rejections nothing changes: FUTO 94.4%,
-  TSI 80.6%, 9.3 ms a swipe, as before.
+- **Moving words down where they were turned down: measured, dropped** (6 Oct). The owner's design was built:
+  a word turned down after a word (an autocorrect undone, a glide changed, redone or deleted at once, the check
+  mark against a correction) cost ln(1 + rejections) more after that word, and a little more everywhere once
+  turned down after three or more words; fading over three weeks, capped, taken back by use. No public data
+  records people turning suggestions down, so a proxy replayed FUTO's swipes person by person, in each person's
+  order, with two simulated keyboards learning the same way (the person writes the word meant after every
+  swipe; rebuilt every 10 swipes); where a keyboard misread a swipe, the person turned the wrong word down, and
+  only one keyboard kept that. The owner's rule: keep it only if it helps more than it hurts.
+
+  | FUTO swipes (about 28,000, 409-418 people) | Fixed | Broken | Right first try |
+  |---|---|---|---|
+  | test split, strength 1 (as built) | 0 | 0 | 94.07% / 94.07% |
+  | dev split, strength 1 | 0 | 0 | 94.58% / 94.58% |
+  | dev split, strength 5 | 0 | 0 | 94.58% / 94.58% |
+  | dev split, strength 20 | 0 | 4 | 94.58% / 94.56% |
+
+  There is almost nothing for it to do: in about 28,000 swipes the keyboard misread a swipe as a word the same
+  person had already turned down in that spot 5 times. Ordinary learning (the word meant, written after the
+  same word) already fixes repeats. Strong enough to act, it hurt: "the", turned down in several places, fell
+  everywhere ("of the" read as "of thee", "of three"). Dropped and reverted; the replay test was kept aside,
+  not in the tree.

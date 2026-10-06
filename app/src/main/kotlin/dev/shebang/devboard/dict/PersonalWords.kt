@@ -23,11 +23,6 @@ class PersonalSnapshot(
     /** Pair counts keyed "previous\u0001word", both lowercase. */
     val pairs: Map<String, Int>,
     val totalTokens: Int,
-    /**
-     * How often each word was rejected right after the word before it, keyed like [pairs] and already faded
-     * with time ([PersonalWords.reject]): the word model lowers the word mostly there.
-     */
-    val rejections: Map<String, Double> = emptyMap(),
 ) {
     companion object {
         val EMPTY = PersonalSnapshot(emptyList(), emptyMap(), 0)
@@ -54,26 +49,14 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     @Serializable
     private data class StoredPair(val p: String, val w: String, val c: Int, val t: Int)
 
-    /** A rejection of [w] right after [p]: how many (fading, so not whole) as of day [t]. */
     @Serializable
-    private data class StoredReject(val p: String, val w: String, val c: Double, val t: Int)
-
-    @Serializable
-    private data class Stored(
-        val version: Int = 1,
-        val words: List<StoredWord> = emptyList(),
-        val pairs: List<StoredPair> = emptyList(),
-        val total: Int = 0,
-        val rejects: List<StoredReject> = emptyList(),
-    )
+    private data class Stored(val version: Int = 1, val words: List<StoredWord> = emptyList(), val pairs: List<StoredPair> = emptyList(), val total: Int = 0)
 
     private class Entry(var display: String, var count: Int, var lastDay: Int, var known: Boolean)
     private class PairEntry(var count: Int, var lastDay: Int)
-    private class RejectEntry(var count: Double, var day: Int)
 
     private val words = HashMap<String, Entry>()
     private val pairs = HashMap<String, PairEntry>()
-    private val rejects = HashMap<String, RejectEntry>()
     private var total = 0
     private var loaded = false
     private var dirty = false
@@ -105,10 +88,8 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     private fun apply(stored: Stored) {
         words.clear()
         pairs.clear()
-        rejects.clear()
         for (s in stored.words) words[s.w] = Entry(s.d, s.c, s.t, s.k)
         for (s in stored.pairs) pairs[PersonalSnapshot.pairKey(s.p, s.w)] = PairEntry(s.c, s.t)
-        for (s in stored.rejects) rejects[PersonalSnapshot.pairKey(s.p, s.w)] = RejectEntry(s.c, s.t)
         total = stored.total
     }
 
@@ -119,10 +100,6 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
             StoredPair(k.substring(0, cut), k.substring(cut + 1), e.count, e.lastDay)
         },
         total = total,
-        rejects = rejects.map { (k, e) ->
-            val cut = k.indexOf('\u0001')
-            StoredReject(k.substring(0, cut), k.substring(cut + 1), e.count, e.day)
-        },
     )
 
     private fun write(f: File, stored: Stored) = JsonFile(f).write(Stored.serializer(), json, stored)
@@ -194,14 +171,13 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
                 continue
             }
             val st = read(f) ?: continue
-            if (st.words.none { it.w == lower } && st.rejects.none { it.p == lower || it.w == lower }) continue
-            val removed = st.words.firstOrNull { it.w == lower }?.c ?: 0
+            if (st.words.none { it.w == lower }) continue
+            val removed = st.words.first { it.w == lower }.c
             runCatching {
                 write(f, st.copy(
                     words = st.words.filter { it.w != lower },
                     pairs = st.pairs.filter { it.p != lower && it.w != lower },
                     total = maxOf(0, st.total - removed),
-                    rejects = st.rejects.filter { it.p != lower && it.w != lower },
                 ))
             }
         }
@@ -244,13 +220,6 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
                 p.lastDay = day
             }
         }
-        // Writing the word here again takes back a rejection of it here (after a one-letter word too: "a lot").
-        val rejectKey = PersonalSnapshot.pairKey(rejectionContext(previous), lower)
-        rejects[rejectKey]?.let { r ->
-            r.count = faded(r, day) - 1.0
-            r.day = day
-            if (r.count <= 0.05) rejects.remove(rejectKey)
-        }
         total++
         dirty = true
         countsVersion++
@@ -290,53 +259,10 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         return true
     }
 
-    /**
-     * [word] was rejected right after [previous]: an autocorrect to it undone, a glide of it changed, redone or
-     * deleted at once, or the check mark tapped against it. The word model lowers it mostly after that word, a
-     * little everywhere once it is rejected after several ([NgramModel]). A rejection fades by half every
-     * [REJECT_HALF_LIFE_DAYS], at most [REJECT_CAP] count, and writing the word there again takes one back.
-     */
-    @Synchronized
-    fun reject(word: String, previous: String?) {
-        if (!isLearnable(word)) return
-        load()
-        val day = today()
-        snapshotBefore(day)
-        val key = PersonalSnapshot.pairKey(rejectionContext(previous), word.lowercase())
-        val r = rejects[key]
-        if (r == null) rejects[key] = RejectEntry(1.0, day) else {
-            r.count = minOf(REJECT_CAP, faded(r, day) + 1.0)
-            r.day = day
-        }
-        if (rejects.size > MAX_REJECTS) {
-            rejects.entries.sortedBy { faded(it.value, day) }.take(rejects.size - MAX_REJECTS * 9 / 10).forEach { rejects.remove(it.key) }
-        }
-        dirty = true
-        // A rejection is rarer than a use and says more: it brings the next rebuild nearer.
-        countsVersion += REJECT_REBUILD_WEIGHT
-    }
-
-    /** The word before, as rejections key it: a one-letter word too ("a lot"), which is never learned itself. */
-    private fun rejectionContext(previous: String?): String {
-        val p = previous?.takeIf { w -> w.isNotEmpty() && w.length <= 32 && w.all { it.isLetter() || it == '\'' || it == '-' } }
-        return p?.lowercase() ?: NO_PREVIOUS
-    }
-
-    private fun faded(r: RejectEntry, day: Int) = r.count * Math.pow(0.5, (day - r.day).coerceAtLeast(0) / REJECT_HALF_LIFE_DAYS)
-
     @Synchronized
     fun delete(lower: String) {
         load()
-        val hadRejects = rejects.keys.removeAll { it.startsWith(lower + "\u0001") || it.endsWith("\u0001" + lower) }
-        val e = words.remove(lower)
-        if (e == null) {
-            if (hadRejects) {
-                scrubSnapshots(lower)
-                dirty = true
-                countsVersion++
-            }
-            return
-        }
+        val e = words.remove(lower) ?: return
         total = maxOf(0, total - e.count)
         pairs.keys.removeAll { it.startsWith(lower + "\u0001") || it.endsWith("\u0001" + lower) }
         scrubSnapshots(lower)
@@ -351,7 +277,6 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         load()
         words.clear()
         pairs.clear()
-        rejects.clear()
         total = 0
         // Deleting everything deletes the kept copies too.
         scrubSnapshots(null)
@@ -372,12 +297,10 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
     @Synchronized
     fun snapshot(): PersonalSnapshot {
         load()
-        val day = today()
         return PersonalSnapshot(
             words.map { (w, e) -> PersonalWord(w, e.display, e.count, e.known) },
             pairs.mapValues { it.value.count },
             total,
-            rejects.mapValues { faded(it.value, day) }.filterValues { it >= 0.05 },
         )
     }
 
@@ -402,14 +325,6 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         const val KEEP_DAYS = 14
         const val MAX_WORDS = 5000
         const val MAX_PAIRS = 20000
-        const val MAX_REJECTS = 5000
-        /** A rejection fades by half in this many days, so one bad day does not bury a word. */
-        const val REJECT_HALF_LIFE_DAYS = 21.0
-        /** At most this many rejections count for one word after one word. */
-        const val REJECT_CAP = 5.0
-        private const val REJECT_REBUILD_WEIGHT = 5
-        /** The "word before" of a rejection with none (a sentence start): it counts only toward the word itself. */
-        const val NO_PREVIOUS = "\u0002"
         private const val HALF_LIFE_DAYS = 60.0
         const val FILE = "personal_words.json"
 

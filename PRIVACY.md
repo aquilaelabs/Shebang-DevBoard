@@ -14,7 +14,7 @@ A few buttons open a web page in your browser: Source code, and the link to get 
 
 All of it is in the app's private storage, which other apps cannot read. It is left out of cloud backups and device-to-device transfers, and it is deleted when you uninstall the app.
 
-- Words you use, and which word followed which, so suggestions and glide typing fit you. Also which words you turned down after which word (an autocorrect you undid, a glided word you changed or deleted straight away, the check mark tapped against a correction), so they are offered less there; these fade over a few weeks. Nothing is learned in password, number, email, web address, terminal or no-suggestion fields, or in apps that ask keyboards not to learn. Turn it off with Settings > Learning and privacy > Learn words I type.
+- Words you use, and which word followed which, so suggestions and glide typing fit you. Nothing is learned in password, number, email, web address, terminal or no-suggestion fields, or in apps that ask keyboards not to learn. Turn it off with Settings > Learning and privacy > Learn words I type.
 - Where your taps and glides land on each key, kept only as numbers per letter. Turn these off with Adapt autocorrect to my taps and Adapt glide to my swiping.
 - How the above stood at the start of each of the last 14 days, so a bad day can be undone.
 - Word lists you import in Settings > Dictionaries, only if you import one: copied into the app's storage so the keyboard can offer their words. Delete one there and it is gone.

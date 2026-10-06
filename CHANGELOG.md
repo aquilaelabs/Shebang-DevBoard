@@ -5,7 +5,6 @@
 ### Added
 
 - A Slang and abbreviations dictionary (lol, idk, tbh, brb and more), offered after every other word until you use them, and kept as you type them; turn it off in Settings > Dictionaries (4033d59)
-- Words you turn down (an autocorrect you undo, a glided word you change or delete straight away, a correction you refuse with the check mark) are offered less after the word they followed, and a little less everywhere if you turn them down after several words; this fades over a few weeks (3f355b5)
 
 ### Changed
 

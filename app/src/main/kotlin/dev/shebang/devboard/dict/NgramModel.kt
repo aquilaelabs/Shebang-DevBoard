@@ -143,11 +143,6 @@ class NgramModel private constructor(
     /** Personal pair counts keyed (previous index, word index), and per-context totals; null without data. */
     private val personalPairs: LongIntMap?,
     private val personalCtxTotal: IntArray?,
-    /**
-     * Rejections of a word right after a word, keyed (previous index, word index), in hundredths: the word costs
-     * ln(1 + rejections) more there ([PersonalWords.reject]). Null without any.
-     */
-    private val rejected: LongIntMap? = null,
 ) {
     val size: Int get() = dictionary.size
 
@@ -160,18 +155,8 @@ class NgramModel private constructor(
     /** The dictionary index behind a context id, or -1 for the sentence start and unknown words. */
     fun wordOfContext(context: Int): Int = if (context <= 0) -1 else context - 1
 
-    /** -ln P(word | context), lowered where the user rejected the word after this one. Allocation-free. */
-    fun cost(word: Int, context: Int): Float = costBase(word, context) + rejectedCost(word, context)
-
-    /** What rejections of [word] after the word behind [context] add to its cost there: ln(1 + rejections). */
-    private fun rejectedCost(word: Int, context: Int): Float {
-        val r = rejected ?: return 0f
-        if (context <= 0) return 0f
-        val hundredths = r[LongIntMap.pair(context - 1, word)]
-        return if (hundredths <= 0) 0f else ln(1.0 + hundredths / 100.0).toFloat()
-    }
-
-    private fun costBase(word: Int, context: Int): Float {
+    /** -ln P(word | context). Allocation-free. */
+    fun cost(word: Int, context: Int): Float {
         if (context == UNKNOWN) return uniCost[word]
         val lmCtx = if (context == SENTENCE_START) 0 else lmIdOfWord[context - 1]
         val pUni = exp(-uniCost[word].toDouble())
@@ -200,16 +185,15 @@ class NgramModel private constructor(
      * style with [cost] (the bigram with its personal mix); [cost] otherwise. Allocation-free.
      */
     fun cost3(word: Int, context2: Int, context1: Int): Float {
-        val penalty = rejectedCost(word, context1)
-        val bigram = costBase(word, context1)
+        val bigram = cost(word, context1)
         val t = trigramIndex(context2, context1)
-        if (t < 0) return bigram + penalty
+        if (t < 0) return bigram
         val total = data.triTotal[t]
         val types = data.triTypes[t]
-        if (total <= 0 || types <= 0) return bigram + penalty
+        if (total <= 0 || types <= 0) return bigram
         val p2 = exp(-bigram.toDouble())
         val c = followerCount(data.triFollowers, data.triCounts, data.triOffsets[t], data.triOffsets[t + 1] - 1, lmIdOfWord[word])
-        return (-ln((c + (total - triKept[t] + types) * p2) / (total + types).toDouble())).toFloat() + penalty
+        return (-ln((c + (total - triKept[t] + types) * p2) / (total + types).toDouble())).toFloat()
     }
 
     /** The counts each context kept after pruning; totals are from before it. */
@@ -386,24 +370,6 @@ class NgramModel private constructor(
                 personalPairs = pairs
                 personalCtxTotal = totals
             }
-            // Rejections: per pair for the context they were made in, and per word once a word has been rejected
-            // after several different words (a word wrong almost wherever it comes up), a little lower everywhere.
-            var rejected: LongIntMap? = null
-            val rejectedContexts = IntArray(dictionary.size)
-            if (personal != null && personal.rejections.isNotEmpty()) {
-                val map = LongIntMap(personal.rejections.size)
-                for ((key, r) in personal.rejections) {
-                    val cut = key.indexOf('\u0001')
-                    val w = dictionary.indexOfLower(key.substring(cut + 1))
-                    if (w < 0 || r < REJECT_COUNTS_FROM) continue
-                    rejectedContexts[w]++
-                    val prev = key.substring(0, cut)
-                    if (prev == PersonalWords.NO_PREVIOUS) continue
-                    val a = dictionary.indexOfLower(prev)
-                    if (a >= 0) map.add(LongIntMap.pair(a, w), (r * 100).toInt())
-                }
-                rejected = map
-            }
             val personalNorm = maxOf(personalTokens, PERSONAL_MIN_TOKENS)
             val mix = if (personalUni != null) PERSONAL_MIX * minOf(1.0, personalTokens / PERSONAL_MIN_TOKENS).coerceAtLeast(0.05) else 0.0
             val uniCost = FloatArray(dictionary.size) { i ->
@@ -413,19 +379,9 @@ class NgramModel private constructor(
                 val counted = id != 0 && !WordPacks.startsAtFloor(dictionary.packs[i].toInt())
                 val base = ((if (counted) data.lmCount[id].toDouble() else 0.0) + pseudo[i]) / norm
                 val p = if (personalUni != null) (1 - mix) * base + mix * personalUni[i] / personalNorm else base
-                (-ln(p * wordWideRejection(rejectedContexts[i]))).toFloat()
+                (-ln(p)).toFloat()
             }
-            return NgramModel(dictionary, data, uniCost, lmIdOfWord, personalPairs, personalCtxTotal, rejected)
+            return NgramModel(dictionary, data, uniCost, lmIdOfWord, personalPairs, personalCtxTotal)
         }
-
-        /** Rejections count from this much (they fade): a word rejected once, a while ago, is let be. */
-        private const val REJECT_COUNTS_FROM = 0.5
-
-        /**
-         * How much of its value a word keeps everywhere when it was rejected after [contexts] different words:
-         * all of it for up to two (the rejections then speak of those places), a quarter less for each one more,
-         * never below half.
-         */
-        fun wordWideRejection(contexts: Int): Double = if (contexts <= 2) 1.0 else maxOf(0.5, 1.0 / (1.0 + 0.25 * (contexts - 2)))
     }
 }
