@@ -9,6 +9,7 @@
 ### Changed
 
 - Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
+- Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (880eaef)
 
 ### Fixed
 

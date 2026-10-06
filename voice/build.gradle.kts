@@ -11,6 +11,13 @@ android {
     compileSdk = 36
     ndkVersion = "29.0.14206865"
 
+    // No dependency metadata block (R34): AGP adds one when it signs, encrypted with Google's key so nobody else
+    // can read it, and F-Droid asks for it to be left out. Releases are signed outside Gradle; this keeps it so.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     defaultConfig {
         applicationId = "dev.shebang.devboard.voice"
         minSdk = 26

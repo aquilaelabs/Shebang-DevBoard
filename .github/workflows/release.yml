@@ -1,0 +1,78 @@
+name: Release build
+
+# The release APKs built from a version tag (R34), so a published APK can be traced to its tag: the build is
+# made twice from clean checkouts in different directories, the two must match byte for byte, and the step
+# summary prints each APK's SHA-256. The APKs are unsigned; signing is done off CI with the project's key, and
+# F-Droid's apksigcopier (or apksigner compare) checks that a signed APK is this build plus a signature.
+on:
+  push:
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    # Pinned like the CI jobs: a moving image can change the bytes of the build.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: first
+      - uses: actions/checkout@v7
+        with:
+          path: second
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;29.0.14206865
+            cmake;4.1.2
+      # No Gradle build cache and no cached speech model: everything comes from the tag and the model's
+      # checksummed download, so the result does not depend on an earlier run.
+      - name: Fetch the speech model
+        run: |
+          (cd first && tools/fetch_voice_model.sh)
+          mkdir -p second/voice/src/main/assets
+          cp -r first/voice/src/main/assets/models second/voice/src/main/assets/
+      - name: Build twice
+        run: |
+          for dir in first second; do
+            (cd "$dir" && ./gradlew --no-daemon --no-build-cache --no-configuration-cache \
+              :app:assembleRelease :voice:assembleRelease)
+          done
+      - name: Compare the builds
+        run: |
+          {
+            echo "### Release APKs (unsigned)"
+            echo
+            echo "| APK | SHA-256 |"
+            echo "| --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          for apk in app/build/outputs/apk/release/app-release-unsigned.apk \
+                     voice/build/outputs/apk/release/voice-release-unsigned.apk; do
+            one=$(sha256sum "first/$apk" | cut -d' ' -f1)
+            two=$(sha256sum "second/$apk" | cut -d' ' -f1)
+            echo "| $(basename "$apk") | \`$one\` |" >> "$GITHUB_STEP_SUMMARY"
+            if [ "$one" != "$two" ]; then
+              echo "::error title=Not reproducible::$(basename "$apk") differs between two clean builds of the same tag"
+              status=1
+            fi
+          done
+          exit $status
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-apks
+          path: |
+            first/app/build/outputs/apk/release/app-release-unsigned.apk
+            first/voice/build/outputs/apk/release/voice-release-unsigned.apk
+          if-no-files-found: error

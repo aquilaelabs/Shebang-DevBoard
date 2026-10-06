@@ -6,6 +6,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(WHISPER_DIR ${CMAKE_CURRENT_SOURCE_DIR}/whisper.cpp)
 
+# Reproducible libraries (R34): ggml's messages name their source files, and the compiler would write the
+# checkout's absolute path into every library (and so into its build ID). Mapped to fixed names, a build from
+# the same tag gives the same bytes wherever it is checked out.
+add_compile_options(
+    -ffile-prefix-map=${CMAKE_SOURCE_DIR}=cpp
+    -ffile-prefix-map=${CMAKE_BINARY_DIR}=build
+    -ffile-prefix-map=${ANDROID_NDK}=ndk)
+
 # ggml built for the target ABI rather than this machine; no OpenMP (ggml's own threads do).
 # Phones (arm64): ggml's Android CPU variants, from plain ARMv8 to ARMv9 with SME, each a library of its own;
 # at runtime the best one the phone's CPU supports is loaded (voice_jni.c), so new phones get their fast

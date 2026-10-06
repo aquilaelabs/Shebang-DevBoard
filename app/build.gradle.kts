@@ -8,6 +8,13 @@ android {
     namespace = "dev.shebang.devboard"
     compileSdk = 36
 
+    // No dependency metadata block (R34): AGP adds one when it signs, encrypted with Google's key so nobody else
+    // can read it, and F-Droid asks for it to be left out. Releases are signed outside Gradle; this keeps it so.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     defaultConfig {
         applicationId = "dev.shebang.devboard"
         minSdk = 26

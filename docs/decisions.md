@@ -861,3 +861,14 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   same word) already fixes repeats. Strong enough to act, it hurt: "the", turned down in several places, fell
   everywhere ("of the" read as "of thee", "of three"). Dropped and reverted; the replay test was kept aside,
   not in the tree.
+- **Release builds from the tag, checked to reproduce** (R34, 6 Oct). The Release build workflow runs on a
+  `v*` tag (ubuntu-24.04, pinned): it builds the unsigned release APKs of both apps from two clean checkouts
+  in different directories, fails if they differ, and prints their SHA-256s in the run's summary. The keyboard
+  already reproduced. Shebang Voice did not: whisper.cpp's messages name their source files, so the compiler
+  wrote the checkout's absolute path into every native library, and the GNU build ID (a hash of the library)
+  differed with it. The CMake build now maps the source, build and NDK directories to fixed names
+  (`-ffile-prefix-map`), and two builds in different directories give the same bytes. AGP's dependency
+  metadata is turned off in both apps (F-Droid asks for it; only AGP's own signing adds it). Releases stay
+  signed on the node with `bb sign`, from those same unsigned builds, so a published APK is its tag's build
+  plus a signature, which `apksigcopier compare` checks. No build cache and no cached model in the workflow,
+  so a run does not depend on an earlier one.
