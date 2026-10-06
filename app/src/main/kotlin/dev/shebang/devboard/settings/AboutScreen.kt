@@ -27,6 +27,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 /**
  * Shows one of the documents shipped in the app's assets (the licence, the credits) as readable text:
@@ -44,7 +46,7 @@ fun AboutDocScreen(title: String, asset: String, onBack: () -> Unit) {
     Scaffold(topBar = {
         TopAppBar(
             title = { Text(title) },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
         )
     }) { padding ->
         val link = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))

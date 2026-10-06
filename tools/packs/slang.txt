@@ -1,0 +1,88 @@
+# Chat abbreviations and slang for the "Slang and abbreviations" pack. Written for this project (MIT). One
+# "word<TAB>tier" per line, as spelled (lowercase, as people type them in chat). Tier 70 is below every other
+# word: these start last and rise only with use (docs/decisions.md, "Word values come from the model"). A word
+# that is already a common English word (tier 35 or better) stays with the regular words whatever this says.
+
+# Laughing and reacting
+lol	70
+lmao	70
+lmfao	70
+rofl	70
+omg	70
+smh	70
+wtf	70
+bruh	70
+ikr	70
+xoxo	70
+
+# Saying how it is
+tbh	70
+tbf	70
+ngl	70
+imo	70
+imho	70
+fr	70
+af	70
+fwiw	70
+iirc	70
+afaik	70
+obv	70
+ofc	70
+rly	70
+srsly	70
+sus	70
+
+# Getting around
+brb	70
+btw	70
+fyi	70
+gtg	70
+omw	70
+afk	70
+irl	70
+wfh	70
+rn	70
+tmrw	70
+idk	70
+idc	70
+idgaf	70
+nvm	70
+nm	70
+dw	70
+jk	70
+np	70
+ty	70
+tysm	70
+thx	70
+pls	70
+plz	70
+ur	70
+bc	70
+cuz	70
+abt	70
+ppl	70
+bday	70
+hbd	70
+gm	70
+gn	70
+
+# Keeping in touch
+ttyl	70
+lmk	70
+hmu	70
+dm	70
+dms	70
+wyd	70
+wbu	70
+hbu	70
+wdym	70
+ily	70
+gg	70
+nbd	70
+til	70
+tldr	70
+icymi	70
+ftw	70
+fomo	70
+yolo	70
+imma	70

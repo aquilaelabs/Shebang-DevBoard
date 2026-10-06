@@ -374,8 +374,10 @@ class NgramModel private constructor(
             val mix = if (personalUni != null) PERSONAL_MIX * minOf(1.0, personalTokens / PERSONAL_MIN_TOKENS).coerceAtLeast(0.05) else 0.0
             val uniCost = FloatArray(dictionary.size) { i ->
                 val id = lmIdOfWord[i]
-                // A pack's word counts a little less than a regular word as common as it (WordPacks.weight).
-                val base = ((if (id != 0) data.lmCount[id].toDouble() else 0.0) + pseudo[i]) / norm * WordPacks.weight(dictionary.packs[i].toInt())
+                // Every word's value comes from the model's count, whatever list it is in; a word the model has no
+                // count for starts from its tier. A floor pack's words (slang) ignore the count, so they start last.
+                val counted = id != 0 && !WordPacks.startsAtFloor(dictionary.packs[i].toInt())
+                val base = ((if (counted) data.lmCount[id].toDouble() else 0.0) + pseudo[i]) / norm
                 val p = if (personalUni != null) (1 - mix) * base + mix * personalUni[i] / personalNorm else base
                 (-ln(p)).toFloat()
             }

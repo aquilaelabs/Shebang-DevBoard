@@ -2,9 +2,24 @@
 
 ## Unreleased
 
+### Added
+
+- A Slang and abbreviations dictionary (lol, idk, tbh, brb and more), offered after every other word until you use them, and kept as you type them; turn it off in Settings > Dictionaries (4033d59)
+
+### Changed
+
+- Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
+- Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (880eaef)
+- The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (3603499)
+- The keyboard's own text (what a screen reader says for keys, panels and bar items, the clipboard panel, word pack names and messages) also comes from string resources, ready for translation (4d80f89)
+- Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (ada9bbd)
+
 ### Fixed
 
 - Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)
+- The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
+- In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (0c79a33)
+- Dictionaries settings: the word counts keep their space before each pack's description again (1a8d59f)
 
 ## 0.5.5: 2026-10-06
 

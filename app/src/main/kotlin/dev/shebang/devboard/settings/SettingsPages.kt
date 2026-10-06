@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.ime.VoiceClient
 import dev.shebang.devboard.view.Palettes
@@ -40,18 +41,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 /** The settings pages the home page opens, in its order. */
-enum class SettingsPageId(val title: String) {
-    APPEARANCE("Appearance"),
-    TYPING("Typing and glide"),
-    CORRECTIONS("Corrections and suggestions"),
-    DICTIONARIES("Dictionaries"),
-    SOUND("Sound and vibration"),
-    BAR("Terminal bar"),
-    VOICE("Voice typing"),
-    LEARNING("Learning and privacy"),
-    ABOUT("About"),
+enum class SettingsPageId(@androidx.annotation.StringRes val title: Int) {
+    APPEARANCE(R.string.page_appearance),
+    TYPING(R.string.page_typing),
+    CORRECTIONS(R.string.page_corrections),
+    DICTIONARIES(R.string.page_dictionaries),
+    SOUND(R.string.page_sound),
+    BAR(R.string.page_bar),
+    VOICE(R.string.page_voice),
+    LEARNING(R.string.page_learning),
+    ABOUT(R.string.page_about),
 }
 
 /** What the settings pages open beyond themselves. */
@@ -74,7 +78,7 @@ private fun voiceInstalled(context: Context): Boolean = context.packageManager.q
 private fun appVersion(context: Context): String =
     runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
 
-private fun onOff(on: Boolean) = if (on) "on" else "off"
+private fun onOff(res: android.content.res.Resources, on: Boolean) = res.getString(if (on) R.string.summary_on else R.string.summary_off)
 
 /**
  * The first settings page: the app and whether it is the keyboard in use, then one row per page, each
@@ -83,6 +87,7 @@ private fun onOff(on: Boolean) = if (on) "on" else "off"
 @Composable
 fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (SettingsPageId) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val version = remember { appVersion(context) }
     val voice = remember { voiceInstalled(context) }
     var status by remember { mutableStateOf(ImeStatus.check(context)) }
@@ -98,24 +103,27 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
     val dictionariesSummary = remember(status) {
         val on = dev.shebang.devboard.dict.WordPacks.builtIn.count { packStore.isEnabled(it.key) }
         val lists = packStore.lists().count { it.enabled }
-        "Regular words and $on of ${dev.shebang.devboard.dict.WordPacks.builtIn.size} packs" + if (lists > 0) " · ${plural(lists, "list")} of yours" else ""
+        val packs = dev.shebang.devboard.dict.WordPacks.builtIn.size
+        if (lists > 0) resources.getQuantityString(R.plurals.summary_dictionaries_lists, packs, on, packs, resources.getQuantityString(R.plurals.summary_lists, lists, lists))
+        else resources.getQuantityString(R.plurals.summary_dictionaries, packs, on, packs)
     }
     fun summary(page: SettingsPageId): String = when (page) {
-        SettingsPageId.APPEARANCE -> buildString {
-            append(themeName).append(" theme · ").append(kotlin.math.round(settings.heightScale * 100).toInt()).append("% height")
-            if (settings.oneHanded) append(" · one-handed")
-        }
-        SettingsPageId.TYPING -> if (settings.glide) "Glide on · trail ${onOff(settings.glideTrail)}" else "Glide off"
-        SettingsPageId.CORRECTIONS -> "Autocorrect ${onOff(settings.autocorrect)} · next word ${onOff(settings.nextWord)}"
+        SettingsPageId.APPEARANCE -> resources.getString(
+            if (settings.oneHanded) R.string.summary_appearance_one_handed else R.string.summary_appearance,
+            themeName, kotlin.math.round(settings.heightScale * 100).toInt(),
+        )
+        SettingsPageId.TYPING -> if (settings.glide) resources.getString(R.string.summary_typing, onOff(resources, settings.glideTrail)) else resources.getString(R.string.summary_typing_off)
+        SettingsPageId.CORRECTIONS -> resources.getString(R.string.summary_corrections, onOff(resources, settings.autocorrect), onOff(resources, settings.nextWord))
         SettingsPageId.SOUND -> {
-            val buzz = if (!settings.haptics) "Vibration off" else "Vibration " + listOf("light", "medium", "strong")[settings.hapticStrength - 1]
-            "$buzz · key sounds ${onOff(settings.keySounds)}"
+            val strength = listOf(R.string.vibration_light, R.string.vibration_medium, R.string.vibration_strong)[settings.hapticStrength - 1]
+            val buzz = if (!settings.haptics) resources.getString(R.string.summary_vibration_off) else resources.getString(R.string.summary_vibration, resources.getString(strength))
+            resources.getString(R.string.summary_sound, buzz, onOff(resources, settings.keySounds))
         }
-        SettingsPageId.BAR -> (if (settings.barJson == null) "Default bar" else "Your own bar") + " · strip: " + stripLabel(settings.stripMode)
-        SettingsPageId.VOICE -> if (voice) "Shebang Voice is installed" else "Add-on not installed"
+        SettingsPageId.BAR -> resources.getString(if (settings.barJson == null) R.string.summary_bar_default else R.string.summary_bar_own, stripLabel(resources, settings.stripMode))
+        SettingsPageId.VOICE -> resources.getString(if (voice) R.string.summary_voice_installed else R.string.summary_voice_missing)
         SettingsPageId.DICTIONARIES -> dictionariesSummary
-        SettingsPageId.LEARNING -> (if (settings.learnWords) "Learns your words" else "Not learning words") + ", on this phone only"
-        SettingsPageId.ABOUT -> "Version $version · licence, credits, privacy, diagnostics"
+        SettingsPageId.LEARNING -> resources.getString(if (settings.learnWords) R.string.summary_learning_on else R.string.summary_learning_off)
+        SettingsPageId.ABOUT -> resources.getString(R.string.summary_about, version)
     }
     fun icon(page: SettingsPageId) = when (page) {
         SettingsPageId.APPEARANCE -> SettingsIcons.keyboard
@@ -129,21 +137,21 @@ fun SettingsHome(settings: Settings, actions: SettingsActions, onOpen: (Settings
         SettingsPageId.ABOUT -> SettingsIcons.info
     }
 
-    SettingsPage(title = "Settings", onBack = onBack) {
+    SettingsPage(title = stringResource(R.string.settings_home_title), onBack = onBack) {
         item { HomeHeader(version, status, actions.onSetup) }
         val groups = listOf(
-            "Keyboard" to listOf(
+            R.string.home_group_keyboard to listOf(
                 SettingsPageId.APPEARANCE, SettingsPageId.TYPING, SettingsPageId.CORRECTIONS, SettingsPageId.DICTIONARIES,
                 SettingsPageId.SOUND, SettingsPageId.BAR, SettingsPageId.VOICE,
             ),
-            "Your data" to listOf(SettingsPageId.LEARNING),
+            R.string.home_group_data to listOf(SettingsPageId.LEARNING),
             null to listOf(SettingsPageId.ABOUT),
         )
         for ((title, pages) in groups) item {
-            SettingsGroup(title) {
+            SettingsGroup(title?.let { stringResource(it) }) {
                 pages.forEachIndexed { i, page ->
                     if (i > 0) RowDivider()
-                    NavRow(page.title, summary(page), icon(page)) { onOpen(page) }
+                    NavRow(stringResource(page.title), summary(page), icon(page)) { onOpen(page) }
                 }
             }
         }
@@ -159,8 +167,8 @@ private fun HomeHeader(version: String, status: ImeStatus, onSetup: () -> Unit) 
                 AppMark(56.dp)
                 Spacer(Modifier.width(14.dp))
                 Column {
-                    Text("Shebang DevBoard", style = MaterialTheme.typography.titleLarge)
-                    Text("Version $version · on-device, no network", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                    Text(stringResource(R.string.home_version, version), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             Spacer(Modifier.padding(top = 12.dp))
@@ -174,20 +182,19 @@ private fun HomeHeader(version: String, status: ImeStatus, onSetup: () -> Unit) 
                 Spacer(Modifier.width(10.dp))
                 Text(
                     when {
-                        ready -> "It is your current keyboard"
-                        status.enabled -> "Turned on, but not your current keyboard"
-                        else -> "Not turned on in the system's keyboard list"
+                        ready -> stringResource(R.string.home_ready)
+                        status.enabled -> stringResource(R.string.home_enabled_only)
+                        else -> stringResource(R.string.home_not_enabled)
                     },
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )
-                if (!ready) Button(onClick = onSetup, shape = RoundedCornerShape(6.dp)) { Text("Set up") }
+                if (!ready) Button(onClick = onSetup, shape = RoundedCornerShape(6.dp)) { Text(stringResource(R.string.home_set_up)) }
             }
         }
     }
 }
 
-private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
 
 /**
  * The word lists the keyboard uses: the regular words (always on), the built-in packs, each with a switch, the
@@ -196,6 +203,7 @@ private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun
 @Composable
 private fun DictionariesGroups(actions: SettingsActions) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val store = remember { dev.shebang.devboard.dict.WordPackStore.get(context.filesDir) }
     val scope = rememberCoroutineScope()
     // Bumped after every change, so the rows read the store again.
@@ -223,15 +231,22 @@ private fun DictionariesGroups(actions: SettingsActions) {
                     context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                         if (c.moveToFirst()) c.getString(0) else null
                     }
-                }.getOrNull()?.substringBeforeLast('.') ?: "Word list"
+                }.getOrNull()?.substringBeforeLast('.')?.takeIf { it.isNotBlank() } ?: resources.getString(R.string.dict_default_list_name)
                 runCatching { context.contentResolver.openInputStream(uri)?.use { store.import(name, it) } }.getOrNull()
-                    ?: dev.shebang.devboard.dict.WordPackStore.ImportResult(null, 0, "The file could not be read.")
+                    ?: dev.shebang.devboard.dict.WordPackStore.ImportResult(null, 0, dev.shebang.devboard.dict.WordPackStore.ImportError(R.string.dict_unreadable))
             }
             changes++
             val list = result.list
-            val message = if (list == null) result.error ?: "No words found." else buildString {
-                append("Added ").append("%,d".format(list.words)).append(if (list.words == 1) " word" else " words").append(" from ").append(list.name)
-                if (result.skipped > 0) append(" (").append("%,d".format(result.skipped)).append(" lines left out)")
+            val error = result.error
+            val message = if (list == null) {
+                when {
+                    error == null -> resources.getString(R.string.dict_no_words)
+                    error.plural -> resources.getQuantityString(error.text, error.arg ?: 0, error.arg)
+                    else -> resources.getString(error.text, error.arg)
+                }
+            } else {
+                val added = resources.getQuantityString(R.plurals.dict_added, list.words, "%,d".format(list.words), list.name)
+                if (result.skipped > 0) resources.getQuantityString(R.plurals.dict_left_out, result.skipped, added, "%,d".format(result.skipped)) else added
             }
             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
@@ -239,33 +254,31 @@ private fun DictionariesGroups(actions: SettingsActions) {
     val lists = remember(changes) { store.lists() }
     Column(verticalArrangement = Arrangement.spacedBy(GroupGap)) {
         PageNote(
-            "Where two words are about as likely, glide and suggestions prefer regular words, then brands, names and your " +
-                "own lists, then development words, then computer terms. Autocorrect only ever corrects to everyday words, and a word typed exactly as a " +
-                "pack spells it is left as typed. Changes apply the next time the keyboard opens.",
+            stringResource(R.string.dict_note),
         )
-        SettingsGroup("Built in") {
+        SettingsGroup(stringResource(R.string.dict_group_built_in)) {
             // Always on: a label, not a switch that cannot move (a disabled switch reads as off).
             androidx.compose.material3.ListItem(
-                headlineContent = { Text("Regular words") },
-                supportingContent = { Text("${countLabel(counts[dev.shebang.devboard.dict.WordPacks.REGULAR_ASSET])}everyday English") },
-                trailingContent = { Text("Always on", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
+                headlineContent = { Text(stringResource(R.string.dict_regular)) },
+                supportingContent = { Text(stringResource(R.string.dict_regular_text, countLabel(counts[dev.shebang.devboard.dict.WordPacks.REGULAR_ASSET]))) },
+                trailingContent = { Text(stringResource(R.string.dict_always_on), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) },
                 colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
             )
             for (p in dev.shebang.devboard.dict.WordPacks.builtIn) {
                 RowDivider()
                 val on = remember(changes) { store.isEnabled(p.key) }
-                SwitchRow(p.title, "${countLabel(counts[p.asset])}${p.summary}", on) { v -> change { store.setEnabled(p.key, v) } }
+                SwitchRow(stringResource(p.title), countLabel(counts[p.asset]) + stringResource(p.summary), on) { v -> change { store.setEnabled(p.key, v) } }
             }
         }
-        SettingsGroup("Your word lists") {
+        SettingsGroup(stringResource(R.string.dict_group_lists)) {
             for (l in lists) {
                 androidx.compose.material3.ListItem(
                     headlineContent = { Text(l.name) },
-                    supportingContent = { Text("%,d".format(l.words) + if (l.words == 1) " word" else " words") },
+                    supportingContent = { Text(pluralStringResource(R.plurals.dict_list_words, l.words, "%,d".format(l.words))) },
                     trailingContent = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             androidx.compose.material3.IconButton(onClick = { deleting = l }) {
-                                Icon(Icons.Filled.Delete, contentDescription = "Delete ${l.name}")
+                                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.dictionary_delete_word, l.name))
                             }
                             androidx.compose.material3.Switch(checked = l.enabled, onCheckedChange = { v -> change { store.setListEnabled(l.id, v) } })
                         }
@@ -275,86 +288,88 @@ private fun DictionariesGroups(actions: SettingsActions) {
                 RowDivider()
             }
             NavRow(
-                "Import a word list",
-                "A text file with one word per line, such as names, project terms or another language's words. A CSV works " +
-                    "too (its first column). Kept on this phone.",
+                stringResource(R.string.dict_import),
+                stringResource(R.string.dict_import_text),
                 opensPage = false,
             ) { importer.launch(arrayOf("text/*", "application/csv", "application/octet-stream")) }
         }
-        SettingsGroup("Edit") {
-            NavRow("Built-in words", "Browse every built-in word, remove ones you never want offered, and restore them any time", onClick = actions.onDictionary)
+        SettingsGroup(stringResource(R.string.dict_group_edit)) {
+            NavRow(stringResource(R.string.dict_built_in_words), stringResource(R.string.dict_built_in_words_text), onClick = actions.onDictionary)
         }
     }
     deleting?.let { l ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { deleting = null },
-            title = { Text("Delete ${l.name}?") },
-            text = { Text("Its words are no longer offered or glided. The file you imported it from is not touched.") },
-            confirmButton = { androidx.compose.material3.TextButton(onClick = { deleting = null; change { store.delete(l.id) } }) { Text("Delete") } },
-            dismissButton = { androidx.compose.material3.TextButton(onClick = { deleting = null }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.dict_delete_list_title, l.name)) },
+            text = { Text(stringResource(R.string.dict_delete_list_text)) },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { deleting = null; change { store.delete(l.id) } }) { Text(stringResource(R.string.action_delete)) } },
+            dismissButton = { androidx.compose.material3.TextButton(onClick = { deleting = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
 
-private fun countLabel(n: Int?): String = if (n == null || n == 0) "" else "%,d words · ".format(n)
+@Composable
+private fun countLabel(n: Int?): String = if (n == null || n == 0) "" else pluralStringResource(R.plurals.dict_count_prefix, n, "%,d".format(n))
 
-private fun stripLabel(m: StripMode) = when (m) {
-    StripMode.AUTO -> "Auto"
-    StripMode.ALWAYS_BAR -> "Always bar"
-    StripMode.TWO_ROWS -> "Two rows"
-}
+private fun stripLabel(res: android.content.res.Resources, m: StripMode): String = res.getString(
+    when (m) {
+        StripMode.AUTO -> R.string.strip_auto
+        StripMode.ALWAYS_BAR -> R.string.strip_always_bar
+        StripMode.TWO_ROWS -> R.string.strip_two_rows
+    },
+)
 
 /** One settings page's groups. */
 @Composable
 fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: SettingsActions, onBack: () -> Unit) {
     val update = actions.update
-    SettingsPage(title = page.title, onBack = onBack) {
+    SettingsPage(title = stringResource(page.title), onBack = onBack) {
         when (page) {
             SettingsPageId.APPEARANCE -> {
                 item {
-                    SettingsGroup("Theme") {
+                    SettingsGroup(stringResource(R.string.group_theme)) {
                         ThemePicker(settings.palette) { v -> update { it.copy(palette = v) } }
                     }
                 }
                 item {
-                    SettingsGroup("Size and layout") {
+                    SettingsGroup(stringResource(R.string.group_size)) {
                         // Rounded, not cut off: 1.1 is stored as 1.0999999 and read as 109%. Stored snapped to the
                         // slider's 10% steps.
-                        SliderRow("Keyboard height", "${kotlin.math.round(settings.heightScale * 100).toInt()}%", settings.heightScale, 0.7f..1.4f, steps = 6) { v ->
+                        SliderRow(stringResource(R.string.keyboard_height), stringResource(R.string.percent, kotlin.math.round(settings.heightScale * 100).toInt()), settings.heightScale, 0.7f..1.4f, steps = 6) { v ->
                             update { it.copy(heightScale = kotlin.math.round(v * 10) / 10f) }
                         }
                         RowDivider()
                         // Also from the bar's one-handed item, and the side panel's arrows while it is on.
                         ChoiceRow(
-                            "One-handed mode",
-                            "Narrower keys on one side, within a thumb's reach",
-                            listOf("off" to "Off", "left" to "Left", "right" to "Right"),
+                            stringResource(R.string.one_handed),
+                            stringResource(R.string.one_handed_text),
+                            listOf("off" to stringResource(R.string.one_handed_off), "left" to stringResource(R.string.one_handed_left), "right" to stringResource(R.string.one_handed_right)),
                             if (!settings.oneHanded) "off" else if (settings.oneHandedLeft) "left" else "right",
                         ) { v -> update { if (v == "off") it.copy(oneHanded = false) else it.copy(oneHanded = true, oneHandedLeft = v == "left") } }
                         RowDivider()
-                        SwitchRow("Number row", "Digits above the letters in text mode", settings.numberRow) { v -> update { it.copy(numberRow = v) } }
+                        SwitchRow(stringResource(R.string.number_row), stringResource(R.string.number_row_text), settings.numberRow) { v -> update { it.copy(numberRow = v) } }
                         RowDivider()
-                        SwitchRow("Key preview", "Pop up the character while a key is pressed", settings.keyPreview) { v -> update { it.copy(keyPreview = v) } }
+                        SwitchRow(stringResource(R.string.key_preview), stringResource(R.string.key_preview_text), settings.keyPreview) { v -> update { it.copy(keyPreview = v) } }
                     }
                 }
             }
             SettingsPageId.TYPING -> {
                 item {
-                    SettingsGroup("Glide typing") {
-                        SwitchRow("Glide typing", "Slide across letters to write a word", settings.glide) { v -> update { it.copy(glide = v) } }
+                    SettingsGroup(stringResource(R.string.group_glide)) {
+                        SwitchRow(stringResource(R.string.glide), stringResource(R.string.glide_text), settings.glide) { v -> update { it.copy(glide = v) } }
                         RowDivider()
-                        SwitchRow("Glide trail", "Draw the path while gliding", settings.glideTrail, enabled = settings.glide) { v -> update { it.copy(glideTrail = v) } }
+                        SwitchRow(stringResource(R.string.glide_trail), stringResource(R.string.glide_trail_text), settings.glideTrail, enabled = settings.glide) { v -> update { it.copy(glideTrail = v) } }
                         RowDivider()
-                        SwitchRow("Phrase gliding", "Dip into the space bar mid-glide to start the next word", settings.phraseGlide, enabled = settings.glide) { v ->
+                        SwitchRow(stringResource(R.string.phrase_glide), stringResource(R.string.phrase_glide_text), settings.phraseGlide, enabled = settings.glide) { v ->
                             update { it.copy(phraseGlide = v) }
                         }
                         RowDivider()
-                        NavRow("Record glides", "Glide prompted words to measure accuracy on your own fingers. Kept on this phone.", onClick = actions.onRecordGlides)
+                        NavRow(stringResource(R.string.record_glides), stringResource(R.string.record_glides_text), onClick = actions.onRecordGlides)
                     }
                 }
                 item {
-                    SettingsGroup("Keys") {
-                        SwitchRow("Hold backspace for whole words", "After a second of holding backspace, it deletes a word at a time", settings.holdDeletesWords) { v ->
+                    SettingsGroup(stringResource(R.string.group_keys)) {
+                        SwitchRow(stringResource(R.string.hold_backspace), stringResource(R.string.hold_backspace_text), settings.holdDeletesWords) { v ->
                             update { it.copy(holdDeletesWords = v) }
                         }
                     }
@@ -362,26 +377,26 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
             }
             SettingsPageId.CORRECTIONS -> {
                 item {
-                    SettingsGroup("As you type") {
-                        SwitchRow("Autocorrect", "Fix the word when you press space", settings.autocorrect) { v -> update { it.copy(autocorrect = v) } }
+                    SettingsGroup(stringResource(R.string.group_as_you_type)) {
+                        SwitchRow(stringResource(R.string.autocorrect), stringResource(R.string.autocorrect_text), settings.autocorrect) { v -> update { it.copy(autocorrect = v) } }
                         RowDivider()
-                        SwitchRow("Auto-capitalize", "Shift at the start of sentences", settings.autoCaps) { v -> update { it.copy(autoCaps = v) } }
+                        SwitchRow(stringResource(R.string.auto_caps), stringResource(R.string.auto_caps_text), settings.autoCaps) { v -> update { it.copy(autoCaps = v) } }
                         RowDivider()
-                        SwitchRow("Double-space period", "Two spaces insert \". \"", settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } }
+                        SwitchRow(stringResource(R.string.double_space), stringResource(R.string.double_space_text), settings.doubleSpacePeriod) { v -> update { it.copy(doubleSpacePeriod = v) } }
                     }
                 }
                 item {
-                    SettingsGroup("Suggestions") {
-                        SwitchRow("Next-word suggestions", "After a space, the strip offers the words likely to come next", settings.nextWord) { v -> update { it.copy(nextWord = v) } }
+                    SettingsGroup(stringResource(R.string.group_suggestions)) {
+                        SwitchRow(stringResource(R.string.next_word), stringResource(R.string.next_word_text), settings.nextWord) { v -> update { it.copy(nextWord = v) } }
                         RowDivider()
-                        SwitchRow("Fix the last glided word", "When the next glide makes it unlikely, the word glided just before is corrected; tap it to change it back", settings.fixPreviousGlide) { v ->
+                        SwitchRow(stringResource(R.string.fix_previous_glide), stringResource(R.string.fix_previous_glide_text), settings.fixPreviousGlide) { v ->
                             update { it.copy(fixPreviousGlide = v) }
                         }
                     }
                 }
                 item {
-                    SettingsGroup("Code mode") {
-                        SwitchRow("Pair brackets and quotes", "( [ { and quotes come in pairs, and typing the closing one steps over it", settings.pairBrackets) { v ->
+                    SettingsGroup(stringResource(R.string.group_code_mode)) {
+                        SwitchRow(stringResource(R.string.pair_brackets), stringResource(R.string.pair_brackets_text), settings.pairBrackets) { v ->
                             update { it.copy(pairBrackets = v) }
                         }
                     }
@@ -389,17 +404,17 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
             }
             SettingsPageId.SOUND -> {
                 item {
-                    SettingsGroup("Vibration") {
-                        SwitchRow("Vibrate on key press", null, settings.haptics) { v -> update { it.copy(haptics = v) } }
+                    SettingsGroup(stringResource(R.string.group_vibration)) {
+                        SwitchRow(stringResource(R.string.vibrate), null, settings.haptics) { v -> update { it.copy(haptics = v) } }
                         RowDivider()
-                        ChoiceRow("Strength", null, listOf(1 to "Light", 2 to "Medium", 3 to "Strong"), settings.hapticStrength, enabled = settings.haptics) { v ->
+                        ChoiceRow(stringResource(R.string.strength), null, listOf(1 to stringResource(R.string.strength_light), 2 to stringResource(R.string.strength_medium), 3 to stringResource(R.string.strength_strong)), settings.hapticStrength, enabled = settings.haptics) { v ->
                             update { it.copy(hapticStrength = v) }
                         }
                     }
                 }
                 item {
-                    SettingsGroup("Sound") {
-                        SwitchRow("Key sounds", "The system's own key clicks", settings.keySounds) { v -> update { it.copy(keySounds = v) } }
+                    SettingsGroup(stringResource(R.string.group_sound)) {
+                        SwitchRow(stringResource(R.string.key_sounds), stringResource(R.string.key_sounds_text), settings.keySounds) { v -> update { it.copy(keySounds = v) } }
                     }
                 }
             }
@@ -407,19 +422,19 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
                 item {
                     SettingsGroup {
                         ChoiceRow(
-                            "Strip above the keys",
+                            stringResource(R.string.strip_mode),
                             when (settings.stripMode) {
-                                StripMode.AUTO -> "Suggestions while you type a word, the terminal bar otherwise"
-                                StripMode.ALWAYS_BAR -> "Always the terminal bar; no suggestions"
-                                StripMode.TWO_ROWS -> "The bar and the suggestions, one above the other"
+                                StripMode.AUTO -> stringResource(R.string.strip_auto_text)
+                                StripMode.ALWAYS_BAR -> stringResource(R.string.strip_always_bar_text)
+                                StripMode.TWO_ROWS -> stringResource(R.string.strip_two_rows_text)
                             },
-                            listOf(StripMode.AUTO to "Auto", StripMode.ALWAYS_BAR to "Always bar", StripMode.TWO_ROWS to "Two rows"),
+                            listOf(StripMode.AUTO to stringResource(R.string.strip_auto), StripMode.ALWAYS_BAR to stringResource(R.string.strip_always_bar), StripMode.TWO_ROWS to stringResource(R.string.strip_two_rows)),
                             settings.stripMode,
                         ) { v -> update { it.copy(stripMode = v) } }
                         RowDivider()
                         NavRow(
-                            "Edit terminal bar",
-                            if (settings.barJson == null) "The default bar. Add keys, snippets and actions, reorder, or give an app its own bar." else "Your own bar. Add, reorder, or give an app its own bar.",
+                            stringResource(R.string.edit_bar),
+                            if (settings.barJson == null) stringResource(R.string.edit_bar_default) else stringResource(R.string.edit_bar_own),
                             onClick = actions.onEditBar,
                         )
                     }
@@ -432,39 +447,39 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
                     SettingsGroup {
                         // Voice typing is a separate app (it holds the microphone permission; the keyboard does not).
                         NavRow(
-                            if (installed) "Shebang Voice is installed" else "Get Shebang Voice",
-                            if (installed) "Tap the mic at the end of the strip. Speech is turned into text on this phone."
-                            else "A separate add-on from GitHub (about 60 MB) that turns speech into text on this phone. The keyboard itself never uses the microphone.",
+                            if (installed) stringResource(R.string.summary_voice_installed) else stringResource(R.string.voice_get),
+                            if (installed) stringResource(R.string.voice_installed_text)
+                            else stringResource(R.string.voice_get_text),
                             opensPage = !installed,
                             onClick = if (installed) null else ({ runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VoiceClient.RELEASES_URL))) } }),
                         )
                         RowDivider()
-                        SwitchRow("Tidy dictation", "Drop um and uh, stutters and repeats, and act on spoken corrections like \"no wait\" and \"scratch that\"", settings.tidyDictation) { v ->
+                        SwitchRow(stringResource(R.string.tidy_dictation), stringResource(R.string.tidy_dictation_text), settings.tidyDictation) { v ->
                             update { it.copy(tidyDictation = v) }
                         }
                     }
                 }
             }
             SettingsPageId.LEARNING -> {
-                item { PageNote("Everything here stays on this phone. The keyboard has no network access.") }
+                item { PageNote(stringResource(R.string.learning_note)) }
                 item {
-                    SettingsGroup("What it learns") {
-                        SwitchRow("Learn words I type", "New words and the ones you use most", settings.learnWords) { v -> update { it.copy(learnWords = v) } }
+                    SettingsGroup(stringResource(R.string.group_learns)) {
+                        SwitchRow(stringResource(R.string.learn_words), stringResource(R.string.learn_words_text), settings.learnWords) { v -> update { it.copy(learnWords = v) } }
                         RowDivider()
-                        SwitchRow("Remember email addresses", "Offer the addresses you entered in email fields as you type them again", settings.rememberEmails) { v ->
+                        SwitchRow(stringResource(R.string.remember_emails), stringResource(R.string.remember_emails_text), settings.rememberEmails) { v ->
                             update { it.copy(rememberEmails = v) }
                         }
                         RowDivider()
-                        SwitchRow("Adapt autocorrect to my taps", "Learn where your taps land on each key, from the words you type right", settings.adaptTaps) { v -> update { it.copy(adaptTaps = v) } }
+                        SwitchRow(stringResource(R.string.adapt_taps), stringResource(R.string.adapt_taps_text), settings.adaptTaps) { v -> update { it.copy(adaptTaps = v) } }
                         RowDivider()
-                        SwitchRow("Adapt glide to my swiping", "Learn how your glides lean off each key, most from the words you correct", settings.adaptGlide, enabled = settings.glide) { v ->
+                        SwitchRow(stringResource(R.string.adapt_glide), stringResource(R.string.adapt_glide_text), settings.adaptGlide, enabled = settings.glide) { v ->
                             update { it.copy(adaptGlide = v) }
                         }
                     }
                 }
                 item {
-                    SettingsGroup("Words") {
-                        NavRow("Personal words", "Add words, review or delete what was learned and the addresses remembered, or reset adaptation", onClick = actions.onPersonalWords)
+                    SettingsGroup(stringResource(R.string.group_words)) {
+                        NavRow(stringResource(R.string.personal_title), stringResource(R.string.personal_words_text), onClick = actions.onPersonalWords)
                     }
                 }
             }
@@ -481,6 +496,7 @@ fun SettingsCategory(page: SettingsPageId, settings: Settings, actions: Settings
 @Composable
 private fun AboutGroups(settings: Settings, actions: SettingsActions) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val version = remember { appVersion(context) }
     val scope = rememberCoroutineScope()
     // Off each time the page opens: including the recent fields is chosen for one export, not kept.
@@ -491,34 +507,31 @@ private fun AboutGroups(settings: Settings, actions: SettingsActions) {
             val ok = withContext(Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)?.use { DiagnosticsExport.write(context, settings, it, includeFields) } }.isSuccess
             }
-            Toast.makeText(context, if (ok) "Diagnostics saved" else "Couldn't save diagnostics", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (ok) R.string.diagnostics_saved else R.string.diagnostics_failed, Toast.LENGTH_SHORT).show()
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(GroupGap)) {
         SettingsGroup {
-            NavRow("Shebang DevBoard $version", "A keyboard for developers. MIT licence.", opensPage = true) { actions.onDoc("about/LICENSE", "Licence") }
+            NavRow(stringResource(R.string.about_app, version), stringResource(R.string.about_app_text), opensPage = true) { actions.onDoc("about/LICENSE", resources.getString(R.string.about_licence)) }
             RowDivider()
-            NavRow("Source code", REPO_URL.removePrefix("https://"), opensPage = false) {
+            NavRow(stringResource(R.string.about_source), REPO_URL.removePrefix("https://"), opensPage = false) {
                 runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(REPO_URL))) }
             }
             RowDivider()
-            NavRow("Credits", "The word lists, data, models and libraries this keyboard is built on, with their licences") { actions.onDoc("about/THIRD_PARTY_NOTICES.md", "Credits") }
+            NavRow(stringResource(R.string.about_credits), stringResource(R.string.about_credits_text)) { actions.onDoc("about/THIRD_PARTY_NOTICES.md", resources.getString(R.string.about_credits)) }
             RowDivider()
-            NavRow("Privacy policy", "Nothing you type or say leaves your phone. What the keyboard keeps, and how to delete it") { actions.onDoc("about/PRIVACY.md", "Privacy policy") }
+            NavRow(stringResource(R.string.about_privacy), stringResource(R.string.about_privacy_text)) { actions.onDoc("about/PRIVACY.md", resources.getString(R.string.about_privacy)) }
         }
-        SettingsGroup("Help") {
+        SettingsGroup(stringResource(R.string.group_help)) {
             SwitchRow(
-                "Include recent fields",
-                "Add the last ${dev.shebang.devboard.ime.RecentFields.MAX} fields the keyboard opened in: which app, and what kind of field " +
-                    "it said it was (search box, email, password...). Never their text. Helps when typing goes wrong in one app.",
+                stringResource(R.string.include_fields),
+                pluralStringResource(R.plurals.include_fields_text, dev.shebang.devboard.ime.RecentFields.MAX, dev.shebang.devboard.ime.RecentFields.MAX),
                 includeFields,
             ) { includeFields = it }
             RowDivider()
             NavRow(
-                "Export diagnostics",
-                "Save a file to send to the developer if typing or gliding isn't working well: settings, how your taps and glides lean, " +
-                    "how recent glides ended up, recorded glides, and where the app crashed. Learned words, email addresses, the clipboard, " +
-                    "your terminal bar and anything you typed are left out.",
+                stringResource(R.string.export_diagnostics),
+                stringResource(R.string.export_diagnostics_text),
                 opensPage = false,
             ) { diagnosticsLauncher.launch("devboard-diagnostics.json") }
         }

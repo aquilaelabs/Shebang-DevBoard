@@ -6,6 +6,7 @@ import android.graphics.drawable.LayerDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
+import dev.shebang.devboard.R
 
 /**
  * The strip beside the keys in one-handed mode: a chevron that moves the keys to the other side, and a
@@ -31,7 +32,7 @@ class OneHandedPanelView(context: Context) : LinearLayout(context) {
         setPadding(pad, pad, pad, pad)
         addView(switchSide, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f).apply { bottomMargin = pad })
         addView(fullWidth, LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f))
-        fullWidth.contentDescription = "Full-width keyboard"
+        fullWidth.contentDescription = context.getString(R.string.one_handed_full_width)
     }
 
     private fun button(onClick: () -> Unit) = View(context).apply {
@@ -56,7 +57,7 @@ class OneHandedPanelView(context: Context) : LinearLayout(context) {
         val t = theme ?: return
         val size = 24 * density
         switchSide.background = layered(if (keysOnLeft) KeyIcons.dockRight else KeyIcons.dockLeft, t, size)
-        switchSide.contentDescription = if (keysOnLeft) "Move the keyboard right" else "Move the keyboard left"
+        switchSide.contentDescription = context.getString(if (keysOnLeft) R.string.one_handed_move_right else R.string.one_handed_move_left)
         fullWidth.background = layered(KeyIcons.fullWidth, t, size)
     }
 

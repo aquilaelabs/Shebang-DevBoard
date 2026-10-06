@@ -10,6 +10,7 @@ and suggestions rank after the regular words (see docs/decisions.md, "Dictionari
                      proper-names lists, plus tools/packs/names.txt
   pack_dev.txt       development, Linux and terminal words: tools/packs/dev.txt
   pack_computer.txt  computer terms: tools/packs/computer.txt
+  pack_slang.txt     chat abbreviations and slang: tools/packs/slang.txt (tier 70, below every other word)
 A word in a pack list leaves the regular words unless it is a common one there (tier 35 or better), so
 turning a pack off never takes away an everyday word ("terminal", "kernel" if common).
 
@@ -45,7 +46,7 @@ def is_s_contraction(word):
 
 PACKS_DIR = os.path.join(os.path.dirname(__file__), "packs")
 # Explicit pack lists, in the order they claim words: a word listed in two goes to the first.
-PACK_LISTS = [("dev", "dev.txt"), ("computer", "computer.txt"), ("names", "names.txt")]
+PACK_LISTS = [("dev", "dev.txt"), ("computer", "computer.txt"), ("names", "names.txt"), ("slang", "slang.txt")]
 
 
 def read_list(path):
@@ -91,7 +92,7 @@ def main():
     max_level = args.max_level
     final = os.path.join(root, "final")
     core = {}
-    packs = {"names": {}, "dev": {}, "computer": {}}
+    packs = {"names": {}, "dev": {}, "computer": {}, "slang": {}}
 
     def placed(w):
         return w in core or any(w in p for p in packs.values())
@@ -147,7 +148,7 @@ def main():
             packs[pack][w] = tier
     os.makedirs(args.out_dir, exist_ok=True)
     write_list(os.path.join(args.out_dir, "en_words.txt"), core)
-    for pack in ("names", "dev", "computer"):
+    for pack in ("names", "dev", "computer", "slang"):
         write_list(os.path.join(args.out_dir, f"pack_{pack}.txt"), packs[pack])
 
 

@@ -19,13 +19,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # What the build pins: platform and build-tools 36, and for Shebang Voice the NDK and CMake in
+      # What the build pins: platform 37 and build-tools 36, and for Shebang Voice the NDK and CMake in
       # voice/build.gradle.kts. setup-android v3 asked for the retired 'tools' package and failed.
       - uses: android-actions/setup-android@v4
         with:
           packages: >-
             platform-tools
-            platforms;android-36
+            platforms;android-37.0
             build-tools;36.0.0
             ndk;29.0.14206865
             cmake;4.1.2
@@ -67,7 +67,7 @@ jobs:
         with:
           packages: >-
             platform-tools
-            platforms;android-36
+            platforms;android-37.0
             build-tools;36.0.0
             ndk;29.0.14206865
             cmake;4.1.2

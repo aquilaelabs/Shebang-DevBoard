@@ -811,3 +811,79 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   meant. FieldCompatibilityTest runs xterm.js (bundled in the debug build's assets only) in a WebView for the
   Chromium side: four tests, the first two failing without the rule ("the." and "cat car"). Not compared with
   Gboard: on the AVD it shows only a floating toolbar.
+- **Joined-word splits need no seen-pair rule** (6 Oct, the owner's ask to stop nonsense splits such as "nor a"
+  from "nora"): requiring the two words to be a pair the word model has seen written, everywhere or only when a
+  part has two letters or fewer, was measured on the dev half of JoinedWordsBenchmarkTest (keyboard scoring
+  path). It cut words typed on purpose split from 0.8% to 0.7% but joined pairs split right fell from 81.5% to
+  76.9% (seen everywhere) or 79.8% (short parts), and splits offered on the strip from 99.4% to 85.6% or 95.1%;
+  at equal harm, a higher SPLIT_KEEP with no rule always recovered more. Not shipped; the test half was not
+  looked at. The nonsense cuts left are mostly lowercase names the regular words lack, which the names pack
+  (on by default) knows, so they are not split there.
+- **Word values come from the model** (the owner's design, 6 Oct): "all the baseline rankings from the words
+  should come from the initial model ... then the words can move up and down ... the more or less you use
+  them", and "when you add a custom dictionary, where would it put the weight". The pack weights (names 0.9,
+  development 0.85, computer terms 0.8, imported 0.9) are gone: every word's starting value is the word model's
+  count plus its tier's small pseudo-count, whichever list it is in, and personal use moves it up as before.
+  Measured on the same data, current weights against none: FUTO swipes top-1 94.4% / 94.4%, TSI typos fixed
+  80.6% / 80.6% (made another word 3.3% / 3.3%), technical text pack words glided 89.7% / 89.7% (top-3 96.4% /
+  96.7%), every word 94.5% / 94.5%, next word in the three 27.4% / 27.4%. Where words start without a count:
+  - an imported list at tier 50, with the rarest regular words (it was 40), unless the file has a frequency
+    column ("word,1234" or "word<TAB>1234"): then its commonest quarter, on a log scale of its own counts,
+    starts at 35, the next at 40, the rest at 50, never above 35 so a list cannot push the commonest English
+    aside. Each word's tier is saved with the list; lists saved before hold bare words and start at 50;
+  - the new **Slang and abbreviations** pack (76 words written for this project: lol, lmao, idk, tbh, brb,
+    btw, ngl...) at a new floor tier, 70, below every other word, and it ignores any count the model has, so it
+    is last until used (the owner asked for it below all the others). Its words are kept as typed, never
+    autocorrected (76 of 76), and never corrected to. On by default: with it on or off, FUTO, TSI and technical
+    text measure the same to the decimal. Gliding them is weak by design: 15.8% of simulated strokes (20 each)
+    read the slang word first, a common word with the same path winning ("been" for "brb"); use lifts them.
+    Lowercase "btw" sits in the pack beside the regular "BTW" (the builder claims by spelling), so "btw" typed
+    stays lowercase.
+  Words moving down, by the word they followed, is the next step (queued).
+- **Moving words down where they were turned down: measured, dropped** (6 Oct). The owner's design was built:
+  a word turned down after a word (an autocorrect undone, a glide changed, redone or deleted at once, the check
+  mark against a correction) cost ln(1 + rejections) more after that word, and a little more everywhere once
+  turned down after three or more words; fading over three weeks, capped, taken back by use. No public data
+  records people turning suggestions down, so a proxy replayed FUTO's swipes person by person, in each person's
+  order, with two simulated keyboards learning the same way (the person writes the word meant after every
+  swipe; rebuilt every 10 swipes); where a keyboard misread a swipe, the person turned the wrong word down, and
+  only one keyboard kept that. The owner's rule: keep it only if it helps more than it hurts.
+
+  | FUTO swipes (about 28,000, 409-418 people) | Fixed | Broken | Right first try |
+  |---|---|---|---|
+  | test split, strength 1 (as built) | 0 | 0 | 94.07% / 94.07% |
+  | dev split, strength 1 | 0 | 0 | 94.58% / 94.58% |
+  | dev split, strength 5 | 0 | 0 | 94.58% / 94.58% |
+  | dev split, strength 20 | 0 | 4 | 94.58% / 94.56% |
+
+  There is almost nothing for it to do: in about 28,000 swipes the keyboard misread a swipe as a word the same
+  person had already turned down in that spot 5 times. Ordinary learning (the word meant, written after the
+  same word) already fixes repeats. Strong enough to act, it hurt: "the", turned down in several places, fell
+  everywhere ("of the" read as "of thee", "of three"). Dropped and reverted; the replay test was kept aside,
+  not in the tree.
+- **Release builds from the tag, checked to reproduce** (R34, 6 Oct). The Release build workflow runs on a
+  `v*` tag (ubuntu-24.04, pinned): it builds the unsigned release APKs of both apps from two clean checkouts
+  in different directories, fails if they differ, and prints their SHA-256s in the run's summary. The keyboard
+  already reproduced. Shebang Voice did not: whisper.cpp's messages name their source files, so the compiler
+  wrote the checkout's absolute path into every native library, and the GNU build ID (a hash of the library)
+  differed with it. The CMake build now maps the source, build and NDK directories to fixed names
+  (`-ffile-prefix-map`), and two builds in different directories give the same bytes. AGP's dependency
+  metadata is turned off in both apps (F-Droid asks for it; only AGP's own signing adds it). Releases stay
+  signed on the node with `bb sign`, from those same unsigned builds, so a published APK is its tag's build
+  plus a signature, which `apksigcopier compare` checks. No build cache and no cached model in the workflow,
+  so a run does not depend on an earlier one.
+- **Touch logic and the controller's concerns as their own classes** (R26, R27; 6 Oct). What a touch means
+  (taps, holds, alternates and backing out of them, swipes from backspace and along the space bar, a glide's
+  start and phrase-gliding dips, B16's leaving the row, shift taps and holds, space for a letter above the
+  bar) moved from KeyboardView into KeyTouch, plain Kotlin fed touches and timers, so it has unit tests
+  (KeyTouchTest, 21); the View only feeds it and draws. Turning B16's row check off fails two of them.
+  TextInputController's separable concerns became collaborators it coordinates: EmailOffers, NextWords,
+  TextIdentifiers, Corrections, GlideLearning and TargetedWord (showing, dropping, replacing and casing the
+  tapped word; what becomes the target stays in the controller). Typing and glide commits stay in the
+  controller for now: they share the composing word, the strip and the selection reports, and splitting them
+  needs a design of who owns that state. Behaviour is unchanged; all unit tests pass before and after.
+- **A quote closes one the paragraph opened** (owner's report, 6 Oct). With pairing on, a quote after a space
+  or a full stop always started a pair, so a paragraph that began with a quote got two at its end. A quote is
+  now typed alone when the paragraph before the cursor has an odd number of that quote (escaped ones and
+  apostrophes after a letter not counted). Counted per paragraph, since an unclosed quote in an earlier one
+  (a code comment, a list) says nothing about this one.

@@ -3,6 +3,7 @@ package dev.shebang.devboard.ime
 import android.text.InputType
 import android.view.inputmethod.EditorInfo
 import dev.shebang.devboard.layout.FieldVariant
+import dev.shebang.devboard.R
 
 /** What the keyboard may do in the current field, derived once per [EditorInfo]. */
 data class FieldInfo(
@@ -61,12 +62,13 @@ data class FieldInfo(
         }
 
     /** What a screen reader says for the Enter key: what it will do here. */
-    val enterSpoken: String
-        get() = if (enterKind == EnterKind.RETURN) "Enter" else when (editorAction) {
-            EditorInfo.IME_ACTION_SEARCH -> "Search"
-            EditorInfo.IME_ACTION_GO -> "Go"
-            EditorInfo.IME_ACTION_SEND -> "Send"
-            else -> "Done"
+    @get:androidx.annotation.StringRes
+    val enterSpoken: Int
+        get() = if (enterKind == EnterKind.RETURN) R.string.key_enter else when (editorAction) {
+            EditorInfo.IME_ACTION_SEARCH -> R.string.key_search
+            EditorInfo.IME_ACTION_GO -> R.string.key_go
+            EditorInfo.IME_ACTION_SEND -> R.string.key_send
+            else -> R.string.key_done
         }
 
     /** Enter should be sent as a KeyEvent (terminals, and fields without an action). */

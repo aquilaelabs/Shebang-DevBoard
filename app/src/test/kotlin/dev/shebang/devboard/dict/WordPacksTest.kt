@@ -55,22 +55,33 @@ class WordPacksTest {
     }
 
     @Test
-    fun aPacksWordCountsLessThanTheSameRegularWord() {
+    fun aPacksWordIsValuedByTheModelAsARegularWordWouldBe() {
+        // The owner's design (6 Oct): values come from the word model whatever list a word is in; no pack weights.
         val all = BuiltInWords.all()
         val flat = Dictionary(all.words, all.lower, all.tiers)
         val withPacks = NgramModel.build(all, data, null)
         val asRegular = NgramModel.build(flat, data, null)
-        for ((w, pack) in listOf("GPU" to WordPacks.COMPUTER, "sudo" to WordPacks.DEV, "Spotify" to WordPacks.NAMES)) {
+        for (w in listOf("GPU", "sudo", "Spotify", "the")) {
             val i = all.indexOf(w)
-            val diff = withPacks.unigramCost(i) - asRegular.unigramCost(i)
-            assertEquals(w, -kotlin.math.ln(WordPacks.weight(pack)), diff.toDouble(), 1e-3)
+            assertEquals(w, asRegular.unigramCost(i), withPacks.unigramCost(i), 1e-4f)
         }
-        val the = all.indexOf("the")
-        assertEquals(asRegular.unigramCost(the), withPacks.unigramCost(the), 1e-4f)
-        // The order the owner asked for: regular, then names, then development words, then computer terms.
-        assertTrue(WordPacks.weight(WordPacks.REGULAR) > WordPacks.weight(WordPacks.NAMES))
-        assertTrue(WordPacks.weight(WordPacks.NAMES) > WordPacks.weight(WordPacks.DEV))
-        assertTrue(WordPacks.weight(WordPacks.DEV) > WordPacks.weight(WordPacks.COMPUTER))
+    }
+
+    @Test
+    fun slangStartsBelowEveryOtherWord() {
+        val all = BuiltInWords.all()
+        val lm = NgramModel.build(all, data, null)
+        val slang = (0 until all.size).filter { all.packs[it].toInt() == WordPacks.SLANG }
+        val others = (0 until all.size).filter { all.packs[it].toInt() != WordPacks.SLANG }
+        assertTrue("the slang pack is loaded", slang.size > 50)
+        val cheapestSlang = slang.minOf { lm.unigramCost(it) }
+        val dearestOther = others.maxOf { lm.unigramCost(it) }
+        assertTrue("slang $cheapestSlang below every other word $dearestOther", cheapestSlang > dearestOther)
+        // Typed as spelled, a slang word is kept, not corrected to a common word a slip away ("lol" is not "lot").
+        val s = suggester(all)
+        assertNull(s.autocorrect("lol"))
+        assertNull(s.autocorrect("idk"))
+        assertNull(s.autocorrect("tbh"))
     }
 
     private fun suggester(d: Dictionary): Suggester {

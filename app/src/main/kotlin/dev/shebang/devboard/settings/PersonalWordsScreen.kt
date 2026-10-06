@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.ime.EmailMemory
 import dev.shebang.devboard.dict.PersonalWord
@@ -50,6 +51,9 @@ import dev.shebang.devboard.glide.SpaceHabit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 /**
  * What the keyboard has learned on this phone: the words it learned from typing and gliding (each can be
@@ -61,6 +65,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PersonalWordsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val personal = remember { PersonalWords.get(context.filesDir) }
     val adaptation = remember { GlideAdaptation.get(context.filesDir) }
     val taps = remember { GlideAdaptation.getTaps(context.filesDir) }
@@ -112,20 +117,20 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     Scaffold(topBar = {
         Column {
             TopAppBar(
-                title = { Text("Personal words") },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
-                actions = { IconButton(onClick = { adding = true }) { Icon(Icons.Filled.Add, contentDescription = "Add a word") } },
+                title = { Text(stringResource(R.string.personal_title)) },
+                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
+                actions = { IconButton(onClick = { adding = true }) { Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.personal_add_word)) } },
             )
             // Under the title, so the matches show below it while the keyboard is up.
             if (!words.isNullOrEmpty()) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    placeholder = { Text("Search learned words") },
+                    placeholder = { Text(stringResource(R.string.personal_search)) },
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = "Clear search") }
+                            IconButton(onClick = { query = "" }) { Icon(Icons.Filled.Clear, contentDescription = stringResource(R.string.action_clear_search)) }
                         }
                     },
                     singleLine = true,
@@ -142,16 +147,14 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             if (!searching) {
                 item {
                     PageNote(
-                        "Learned on this phone from what you type and glide, and never sent anywhere. Nothing is learned in " +
-                            "password, number, email, web address, terminal or no-suggestion fields, or where an app asks for " +
-                            "no learning. A new word is glidable after you use it twice.",
+                        stringResource(R.string.personal_note),
                     )
                 }
                 item {
-                    SettingsGroup("Words") {
-                        NavRow("Add a word", "A name, a project or a term: offered, glided and corrected to from now on", opensPage = false) { adding = true }
+                    SettingsGroup(stringResource(R.string.personal_words_group)) {
+                        NavRow(stringResource(R.string.personal_add_word), stringResource(R.string.personal_add_word_text), opensPage = false) { adding = true }
                         RowDivider()
-                        NavRow("Android personal dictionary", "Words added there are glidable too", opensPage = false) {
+                        NavRow(stringResource(R.string.personal_android_dictionary), stringResource(R.string.personal_android_dictionary_text), opensPage = false) {
                             try {
                                 context.startActivity(Intent(android.provider.Settings.ACTION_USER_DICTIONARY_SETTINGS))
                             } catch (_: ActivityNotFoundException) {
@@ -163,17 +166,21 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                 item { Spacer(Modifier.height(GroupGap)) }
                 item {
                     val today = (System.currentTimeMillis() / 86_400_000L).toInt()
-                    SettingsGroup("Adaptation") {
+                    SettingsGroup(stringResource(R.string.personal_adaptation_group)) {
                         NavRow(
-                            "Reset glide and tap adaptation",
-                            "Learned from ${plural(glides, "glide")} and ${plural(corrections, "correction")}. Resetting forgets how your swipes and taps lean off each key.",
+                            stringResource(R.string.personal_reset_adaptation),
+                            stringResource(
+                                R.string.personal_reset_adaptation_text,
+                                pluralStringResource(R.plurals.personal_glides, glides, glides),
+                                pluralStringResource(R.plurals.personal_corrections, corrections, corrections),
+                            ),
                             opensPage = false,
                         ) { confirmReset = true }
                         RowDivider()
                         NavRow(
-                            "Undo recent learning",
-                            if (restoreDays.isEmpty()) "Nothing to undo yet. Where things stood at the start of each of the last ${PersonalWords.KEEP_DAYS} days is kept."
-                            else "Go back to how words and adaptation stood at the start of a recent day, if a sloppy day taught the wrong things.",
+                            stringResource(R.string.personal_undo),
+                            if (restoreDays.isEmpty()) pluralStringResource(R.plurals.personal_undo_nothing, PersonalWords.KEEP_DAYS, PersonalWords.KEEP_DAYS)
+                            else stringResource(R.string.personal_undo_text),
                             opensPage = false,
                             enabled = restoreDays.isNotEmpty(),
                         ) { choosingDay = true }
@@ -181,12 +188,12 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     if (choosingDay) {
                         AlertDialog(
                             onDismissRequest = { choosingDay = false },
-                            title = { Text("Go back to the start of") },
+                            title = { Text(stringResource(R.string.personal_go_back_to_start_of)) },
                             text = {
                                 Column {
                                     for (d in restoreDays) {
                                         ListItem(
-                                            headlineContent = { Text(dayLabel(d, today)) },
+                                            headlineContent = { Text(dayLabel(resources, d, today)) },
                                             modifier = Modifier.clickable {
                                                 choosingDay = false
                                                 confirmDay = d
@@ -196,20 +203,20 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                                 }
                             },
                             confirmButton = {},
-                            dismissButton = { TextButton(onClick = { choosingDay = false }) { Text("Cancel") } },
+                            dismissButton = { TextButton(onClick = { choosingDay = false }) { Text(stringResource(R.string.action_cancel)) } },
                         )
                     }
                 }
             }
             if (!searching && emails.isNotEmpty()) {
                 item { Spacer(Modifier.height(GroupGap)) }
-                item { GroupTitle("Email addresses") }
+                item { GroupTitle(stringResource(R.string.personal_emails_group)) }
                 val rows = emails.size + 1
                 item {
                     CardRow(0, rows) {
                         CardListItem(
-                            "Forget all addresses",
-                            "Entered in email fields and offered there again as you type them",
+                            stringResource(R.string.personal_forget_emails),
+                            stringResource(R.string.personal_forget_emails_text),
                             modifier = Modifier.clickable { confirmClearEmails = true },
                         )
                     }
@@ -218,7 +225,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                     CardRow(i + 1, rows) {
                         CardListItem(
                             e.address,
-                            if (e.count == 1) "Entered once" else "Entered ${e.count} times",
+                            pluralStringResource(R.plurals.personal_email_entered, e.count, e.count),
                             trailing = {
                                 IconButton(onClick = {
                                     scope.launch {
@@ -227,7 +234,7 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                                             emailMemory.list()
                                         }
                                     }
-                                }) { Icon(Icons.Filled.Delete, contentDescription = "Forget ${e.address}") }
+                                }) { Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.personal_forget_email, e.address)) }
                             },
                         )
                     }
@@ -236,31 +243,31 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
             if (!searching) item { Spacer(Modifier.height(GroupGap)) }
             val list = words
             when {
-                list == null -> item { PageNote("Loading…") }
+                list == null -> item { PageNote(stringResource(R.string.loading)) }
                 list.isEmpty() -> {
-                    item { GroupTitle("Learned words") }
-                    item { CardRow(0, 1) { CardListItem("No learned words yet", "Words you type and glide show up here") } }
+                    item { GroupTitle(stringResource(R.string.personal_learned_group)) }
+                    item { CardRow(0, 1) { CardListItem(stringResource(R.string.personal_none_learned), stringResource(R.string.personal_none_learned_text)) } }
                 }
                 else -> {
                     val q = query.trim().lowercase()
                     val shown = if (q.isEmpty()) list else list.filter { q in it.lower || q in it.display.lowercase() }
-                    item { GroupTitle(if (searching) "Matching words" else "Learned words (${list.size})") }
+                    item { GroupTitle(if (searching) stringResource(R.string.personal_matching) else stringResource(R.string.personal_learned_count, list.size)) }
                     val head = if (searching) 0 else 1
                     if (!searching) item {
                         CardRow(0, shown.size + head) {
-                            CardListItem("Delete all learned words", plural(list.size, "word"), modifier = Modifier.clickable { confirmClear = true })
+                            CardListItem(stringResource(R.string.personal_delete_all), pluralStringResource(R.plurals.personal_words_count, list.size, list.size), modifier = Modifier.clickable { confirmClear = true })
                         }
                     }
-                    if (shown.isEmpty()) item { CardRow(0, 1) { CardListItem("No learned words match \"${query.trim()}\"") } }
+                    if (shown.isEmpty()) item { CardRow(0, 1) { CardListItem(stringResource(R.string.personal_none_match, query.trim())) } }
                     itemsIndexed(shown, key = { _, w -> w.lower }) { i, w ->
                         CardRow(i + head, shown.size + head) {
-                            val used = if (w.count == 1) "Used once" else "Used ${w.count} times"
+                            val used = pluralStringResource(R.plurals.personal_used, w.count, w.count)
                             CardListItem(
                                 w.display,
-                                if (w.known) used else "$used · new word, glidable after 2 uses",
+                                if (w.known) used else stringResource(R.string.personal_new_word, used),
                                 trailing = {
                                     IconButton(onClick = { change { personal.delete(w.lower) } }) {
-                                        Icon(Icons.Filled.Delete, contentDescription = "Delete ${w.display}")
+                                        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.personal_delete_word, w.display))
                                     }
                                 },
                             )
@@ -289,8 +296,8 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
     if (confirmClearEmails) {
         AlertDialog(
             onDismissRequest = { confirmClearEmails = false },
-            title = { Text("Forget all email addresses?") },
-            text = { Text("The keyboard stops offering them until you enter them again. Settings > Learning and privacy > Remember email addresses turns remembering off.") },
+            title = { Text(stringResource(R.string.personal_forget_emails_title)) },
+            text = { Text(stringResource(R.string.personal_forget_emails_dialog)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmClearEmails = false
@@ -300,26 +307,26 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                             emailMemory.list()
                         }
                     }
-                }) { Text("Forget all") }
+                }) { Text(stringResource(R.string.personal_forget_all)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClearEmails = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmClearEmails = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Delete all learned words?") },
-            text = { Text("The keyboard forgets every word and word pair it learned. The Android personal dictionary is not touched.") },
-            confirmButton = { TextButton(onClick = { confirmClear = false; change { personal.clear() } }) { Text("Delete all") } },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.personal_delete_all_title)) },
+            text = { Text(stringResource(R.string.personal_delete_all_text)) },
+            confirmButton = { TextButton(onClick = { confirmClear = false; change { personal.clear() } }) { Text(stringResource(R.string.personal_delete_all_button)) } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     confirmDay?.let { day ->
         val today = (System.currentTimeMillis() / 86_400_000L).toInt()
         AlertDialog(
             onDismissRequest = { confirmDay = null },
-            title = { Text("Go back to ${dayLabel(day, today).replaceFirstChar { it.lowercase() }}?") },
-            text = { Text("Words, swipe and tap habits learned since then are forgotten. Words you deleted stay deleted.") },
+            title = { Text(stringResource(R.string.personal_go_back_title, dayLabel(resources, day, today).replaceFirstChar { it.lowercase() })) },
+            text = { Text(stringResource(R.string.personal_go_back_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDay = null
@@ -328,18 +335,18 @@ fun PersonalWordsScreen(onBack: () -> Unit) {
                         adaptation.restore(day)
                         taps.restore(day)
                     }
-                }) { Text("Go back") }
+                }) { Text(stringResource(R.string.personal_go_back)) }
             },
-            dismissButton = { TextButton(onClick = { confirmDay = null }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmDay = null }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
-            title = { Text("Reset glide and tap adaptation?") },
-            text = { Text("Gliding and autocorrect go back to the keyboard's defaults and start learning your swipes and taps again.") },
-            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset(); SpaceHabit.get(context.filesDir).reset(); dev.shebang.devboard.glide.GlideOutcomes.get(context.filesDir).reset() } }) { Text("Reset") } },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("Cancel") } },
+            title = { Text(stringResource(R.string.personal_reset_title)) },
+            text = { Text(stringResource(R.string.personal_reset_text)) },
+            confirmButton = { TextButton(onClick = { confirmReset = false; change { adaptation.reset(); taps.reset(); SpaceHabit.get(context.filesDir).reset(); dev.shebang.devboard.glide.GlideOutcomes.get(context.filesDir).reset() } }) { Text(stringResource(R.string.personal_reset)) } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }
@@ -352,18 +359,18 @@ private fun AddWordDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
     val ok = PersonalWords.isLearnable(w)
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add a word") },
+        title = { Text(stringResource(R.string.personal_add_word)) },
         text = {
             OutlinedTextField(
                 value = word,
                 onValueChange = { word = it },
-                label = { Text("Word") },
+                label = { Text(stringResource(R.string.personal_word_label)) },
                 singleLine = true,
                 isError = w.isNotEmpty() && !ok,
                 supportingText = {
                     Text(
-                        if (w.isNotEmpty() && !ok) "2 to 32 letters; ' - and _ may go between them. No digits or spaces."
-                        else "Written as you type it here: GitHub keeps its capitals.",
+                        if (w.isNotEmpty() && !ok) stringResource(R.string.personal_word_invalid)
+                        else stringResource(R.string.personal_word_hint),
                     )
                 },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -373,17 +380,15 @@ private fun AddWordDialog(onDismiss: () -> Unit, onAdd: (String) -> Unit) {
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (ok) onAdd(w) }),
             )
         },
-        confirmButton = { TextButton(onClick = { onAdd(w) }, enabled = ok) { Text("Add") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        confirmButton = { TextButton(onClick = { onAdd(w) }, enabled = ok) { Text(stringResource(R.string.personal_add)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
     )
 }
 
-private fun plural(n: Int, noun: String) = if (n == 1) "1 $noun" else "$n ${noun}s"
-
 /** "Today", "Yesterday", or the weekday and date of a day (days since 1970, UTC). */
-private fun dayLabel(day: Int, today: Int): String = when (day) {
-    today -> "Today"
-    today - 1 -> "Yesterday"
+private fun dayLabel(res: android.content.res.Resources, day: Int, today: Int): String = when (day) {
+    today -> res.getString(R.string.day_today)
+    today - 1 -> res.getString(R.string.day_yesterday)
     else -> java.text.SimpleDateFormat("EEEE d MMMM", java.util.Locale.getDefault())
         .apply { timeZone = java.util.TimeZone.getTimeZone("UTC") }
         .format(java.util.Date(day * 86_400_000L))

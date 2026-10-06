@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.view.View
+import dev.shebang.devboard.R
 
 /**
  * The voice typing button at the end of the strip, shown when the Shebang Voice add-on is installed. Idle it
@@ -39,7 +40,7 @@ class MicButton(context: Context) : View(context) {
         }
 
     init {
-        contentDescription = "Voice typing"
+        contentDescription = context.getString(R.string.voice_typing)
         isClickable = true
     }
 

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -64,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.PathParser
 import dev.shebang.devboard.R
 import dev.shebang.devboard.view.IconDrawable
+import androidx.compose.ui.res.stringResource
 
 /*
  * The settings app's building blocks, in the design language's terms: rows grouped on cards of the theme's key
@@ -151,7 +153,7 @@ internal fun SettingsPage(
             LargeTopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) }
                 },
                 actions = actions,
                 scrollBehavior = scroll,
@@ -159,7 +161,7 @@ internal fun SettingsPage(
         },
     ) { padding ->
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding(),
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
             contentPadding = PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(GroupGap),
             content = content,

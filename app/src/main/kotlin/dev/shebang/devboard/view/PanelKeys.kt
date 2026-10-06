@@ -11,6 +11,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import dev.shebang.devboard.R
 
 /** What the keys along the bottom of a panel (emoji, clipboard) do. */
 interface PanelKeyListener {
@@ -46,17 +47,17 @@ object PanelKeys {
             return v
         }
         key("ABC", 1.5f, true).apply {
-            contentDescription = "Back to the keyboard"
+            contentDescription = context.getString(R.string.panel_back)
             setOnClickListener { listener()?.onPanelClose() }
         }
         key("—", 5f, false).apply {
             setTextColor(theme.keyTextSecondary)
-            contentDescription = "Space"
+            contentDescription = context.getString(R.string.key_space)
             setOnClickListener { listener()?.onPanelSpace() }
         }
         key("", 1.5f, true).apply {
             background = LayerDrawable(arrayOf(background, IconDrawable(KeyIcons.backspace, theme.keyText, 22 * density)))
-            contentDescription = "Delete"
+            contentDescription = context.getString(R.string.key_delete)
             repeatWhileHeld(this) { first -> listener()?.onPanelBackspace(first) }
         }
     }
