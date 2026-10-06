@@ -20,7 +20,9 @@ import java.io.OutputStream
  * device, the settings, how taps and glides lean on each key, how much has been learned (counts only), and
  * the recorder's glides of prompted words. Scrubbed of everything personal: no learned words or word pairs,
  * no email addresses, nothing from the clipboard, no terminal-bar keys or snippets, no app names, nothing
- * typed. Written only through the system file picker; the keyboard sends nothing anywhere.
+ * typed. The one exception is chosen at export time: the last few fields the keyboard opened in (their apps and
+ * what they asked for, never their text), to look into a problem in one app. Written only through the system file
+ * picker; the keyboard sends nothing anywhere.
  */
 object DiagnosticsExport {
     /** What is left out, written into the file so whoever reads it knows. */
@@ -30,10 +32,13 @@ object DiagnosticsExport {
         "email addresses (count only)",
         "clipboard history",
         "terminal bar keys and snippets",
-        "names of apps",
+        NAMES_OF_APPS,
         "anything typed",
         "error messages (crash reports keep only where the code failed)",
     )
+
+    private const val NAMES_OF_APPS = "names of apps"
+    private const val NAMES_OF_APPS_BUT_FIELDS = "names of apps, except those of the recent fields you chose to include (their text is left out)"
 
     data class Device(val app: String, val model: String, val android: Int, val widthPx: Int, val heightPx: Int, val density: Float)
 
@@ -50,10 +55,13 @@ object DiagnosticsExport {
         spaceHabit: Triple<Float, Float, Boolean>? = null,
         glideOutcomes: JsonObject? = null,
         wordPacks: JsonObject? = null,
+        /** The recent fields ([dev.shebang.devboard.ime.RecentFields]), only when the user chose to include them. */
+        recentFields: JsonArray? = null,
     ): JsonObject = buildJsonObject {
         put("format", JsonPrimitive("shebang-devboard-diagnostics"))
         put("version", JsonPrimitive(1))
-        put("leftOut", JsonArray(LEFT_OUT.map { JsonPrimitive(it) }))
+        val leftOut = if (recentFields == null) LEFT_OUT else LEFT_OUT.map { if (it == NAMES_OF_APPS) NAMES_OF_APPS_BUT_FIELDS else it }
+        put("leftOut", JsonArray(leftOut.map { JsonPrimitive(it) }))
         put("app", JsonPrimitive(device.app))
         put("device", buildJsonObject {
             put("model", JsonPrimitive(device.model))
@@ -80,6 +88,7 @@ object DiagnosticsExport {
                 put("on", JsonPrimitive(on))
             })
         }
+        recentFields?.let { put("recentFields", it) }
         put("glideRecordings", JsonArray(recordings.mapNotNull { line -> runCatching { json.parseToJsonElement(line) }.getOrNull() }))
         put("crashes", JsonArray(crashes.map { c ->
             buildJsonObject {
@@ -124,7 +133,7 @@ object DiagnosticsExport {
     }
 
     /** Gathers everything on this phone and writes the file to [out]. Off the main thread. */
-    fun write(context: Context, settings: Settings, out: OutputStream) {
+    fun write(context: Context, settings: Settings, out: OutputStream, includeFields: Boolean = false) {
         val dir = context.filesDir
         val personal = PersonalWords.get(dir).also { it.load() }
         val words = personal.list()
@@ -142,6 +151,7 @@ object DiagnosticsExport {
             dev.shebang.devboard.glide.SpaceHabit.get(dir).summary(),
             dev.shebang.devboard.glide.GlideOutcomes.get(dir).summary(),
             wordPacksJson(dev.shebang.devboard.dict.WordPackStore.get(dir)),
+            if (includeFields) dev.shebang.devboard.ime.RecentFields.json() else null,
         )
         out.write(pretty.encodeToString(JsonObject.serializer(), doc).toByteArray())
     }

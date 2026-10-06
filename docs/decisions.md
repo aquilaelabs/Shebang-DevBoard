@@ -754,3 +754,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   strip only: "ataco" after "i want" offers "a taco" first and keeps "ataco" on space. All 3,000 held-out
   sentences were scored once, at the first settings tried (cost 1.0), before the halves were fixed; no choice
   was made from it.
+- **Recent fields in diagnostics** (R35, 6 Oct): `RecentFields` keeps the last 10 fields the keyboard opened in,
+  in memory only: each one's package name, input type and IME options (raw and decoded into names), and how
+  `FieldInfo` read it (variant, multi-line, Enter as newline, key event or action, the Enter glyph, composing,
+  learning). Never the text, the hint or the label. Export diagnostics adds them only when Include recent fields
+  is on for that export; the switch is not saved, so it is off each time the About page opens. With it on, the
+  file's `leftOut` says app names are included for those fields. Why: B14 had to be diagnosed by guessing the
+  Play Store's EditorInfo; a user's export now shows it. Package names are the one identifying thing the export
+  can hold, hence opt-in per export, in memory only, and named in the policy.

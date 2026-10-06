@@ -9,6 +9,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** The diagnostics file: what is in it, and what is scrubbed. */
@@ -37,6 +38,27 @@ class DiagnosticsExportTest {
         val s = doc()["settings"]!!.jsonObject
         assertEquals("true", s["customBar"]!!.jsonPrimitive.content)
         assertEquals(1, s["appBars"]!!.jsonPrimitive.int)
+    }
+
+    @Test
+    fun recentFieldsAreInOnlyWhenChosenAndNeverTheirText() {
+        assertFalse(doc().containsKey("recentFields"))
+        assertTrue(doc()["leftOut"]!!.jsonArray.any { it.jsonPrimitive.content == "names of apps" })
+        val info = android.view.inputmethod.EditorInfo().apply {
+            packageName = "com.android.vending"; inputType = android.text.InputType.TYPE_CLASS_TEXT
+            hintText = "Search for apps"
+        }
+        val entry = dev.shebang.devboard.ime.RecentFields.Entry(info.packageName, info.inputType, info.imeOptions,
+            dev.shebang.devboard.ime.FieldInfo.from(info.inputType, info.imeOptions, "Search for apps"))
+        val withFields = DiagnosticsExport.build(
+            DiagnosticsExport.Device("0.1.0", "Maker Phone", 36, 1080, 2400, 2.6f), settings,
+            DiagnosticsExport.Learned(0, 0, 0, 0), GlideAdaptation(null).exportJson(), GlideAdaptation(null).exportJson(), emptyList(),
+            recentFields = dev.shebang.devboard.ime.RecentFields.json(listOf(entry)),
+        )
+        val text = Json.encodeToString(JsonObject.serializer(), withFields)
+        assertTrue(text.contains("com.android.vending"))
+        assertFalse("the hint is never written", text.contains("Search for apps"))
+        assertFalse(withFields["leftOut"]!!.jsonArray.any { it.jsonPrimitive.content == "names of apps" })
     }
 
     @Test

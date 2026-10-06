@@ -5,6 +5,7 @@
 ### Added
 
 - Two words typed without the space between them are offered as two words on the strip ('ataco' offers 'a taco'), and common pairs are split on space ('thankyou' becomes 'thank you'); backspace right after puts back what you typed (cfea7b6)
+- Export diagnostics can include the last 10 fields the keyboard opened in (which app, and what kind of field it said it was, never its text), to look into a problem in one app: turn on Include recent fields in Settings > About (1cfc532)
 
 ### Changed
 

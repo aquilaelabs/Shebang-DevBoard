@@ -487,6 +487,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         super.onStartInputView(info, restarting)
         if (!restarting) closePanels()
         field = FieldInfo.from(info)
+        RecentFields.record(info, field)
         text.startInput(field)
         keyboard?.enterKind = field.enterKind
         keyboard?.enterSpoken = field.enterSpoken
