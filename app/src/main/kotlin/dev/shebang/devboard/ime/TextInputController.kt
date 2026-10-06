@@ -84,6 +84,11 @@ class TextInputController(
         fun learnTaps(observations: FloatArray) = Unit
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
         fun glideOutcome(outcome: Int, letters: Int) = Unit
+        /**
+         * [word] was rejected right after [previous] (null at a sentence start): an autocorrect to it undone, a
+         * glide of it changed, redone or deleted, or the check mark tapped against it ([PersonalWords.reject]).
+         */
+        fun rejectWord(word: String, previous: String?) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -273,6 +278,8 @@ class TextInputController(
     private var candidates: List<Suggestion> = emptyList()
     /** The typed word [candidates] were computed for: autocorrect trusts them only for that word. */
     private var candidatesFor = ""
+    /** The correction the strip showed beside the check mark for [candidatesFor], while it shows. */
+    private var shownFix: String? = null
 
     /** The last word autocorrect changed, while it is the last thing typed: backspace puts back [typed]. */
     private class Autocorrected(val typed: String, val corrected: String, val after: String)
@@ -934,6 +941,12 @@ class TextInputController(
         lastAutocorrect = null
         if (ac != null && !isComposing && ic.getTextBeforeCursor(ac.corrected.length + ac.after.length, 0)?.toString() == ac.corrected + ac.after) {
             // Right after an autocorrect: put back what was typed (without the space), and leave it be from now on.
+            // The correction was the wrong word after the one before it.
+            if (field.allowsLearning) {
+                val before = ic.getTextBeforeCursor(CONTEXT_CHARS + ac.corrected.length + ac.after.length, 0)?.toString().orEmpty()
+                val prev = previousOf(before.dropLast(ac.corrected.length + ac.after.length)).first
+                learner.rejectWord(ac.corrected, prev)
+            }
             ic.beginBatchEdit()
             ic.deleteSurroundingText(ac.corrected.length + ac.after.length, 0)
             ic.commitText(ac.typed, 1)
@@ -952,6 +965,8 @@ class TextInputController(
                 val w = pending.removeAt(pending.size - 1)
                 recent.remove(w)
                 outcome(w, GlideOutcomes.DELETED)
+                // Glided and taken straight back: the wrong word there.
+                if (field.allowsLearning) learner.rejectWord(w.text, w.previous)
             }
             lastGlide = null
             clearCandidates()
@@ -1474,6 +1489,8 @@ class TextInputController(
         val open = pending.remove(w) or held.remove(w)
         recent.remove(w)
         if (open) outcome(w, how)
+        // A glided word changed, redone or deleted while still open was the wrong word there.
+        if (open && field.allowsLearning) learner.rejectWord(w.text, w.previous)
     }
 
     /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */
@@ -1564,6 +1581,7 @@ class TextInputController(
 
     private fun clearCandidates() {
         candidates = emptyList()
+        shownFix = null
         suggestGeneration++
         predictGeneration++
         predictions = emptyList()
@@ -1591,6 +1609,7 @@ class TextInputController(
                 if (gen != suggestGeneration || !isComposing) return@postToMain
                 candidates = result
                 candidatesFor = typed
+                shownFix = fix
                 if (fix != null) {
                     val other = otherSuggestion(typed, fix, result)
                     ui.showCorrection(typed, fix, other)
@@ -1693,7 +1712,12 @@ class TextInputController(
             reopened = null
             // Picking the word exactly as typed (the strip's check mark), or as first typed before autocorrect
             // changed it, keeps it from autocorrect from now on.
-            if (chosen == word.toString()) keptAsTyped += chosen.lowercase()
+            if (chosen == word.toString()) {
+                keptAsTyped += chosen.lowercase()
+                // The check mark against the correction beside it: that correction was wrong here.
+                val fix = shownFix
+                if (fix != null && candidatesFor == chosen && field.allowsLearning) learner.rejectWord(fix, learningContext(ic).first)
+            }
             reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
             reopenedCorrection = null
             learnTyped(ic, chosen)

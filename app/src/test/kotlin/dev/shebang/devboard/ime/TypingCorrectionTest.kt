@@ -17,6 +17,7 @@ class TypingCorrectionTest {
     private val lm get() = NgramModelTest.lm
     private val ic = FakeInputConnection()
     private val learned = ArrayList<String>()
+    private val rejected = ArrayList<String>()
     private var shown: List<String> = emptyList()
     /** Whether the strip shows what was typed behind a check mark (space would change it). */
     private var checkMark = false
@@ -45,6 +46,9 @@ class TypingCorrectionTest {
             }
             override fun learnGlide(observations: FloatArray) = Unit
             override fun correction(stroke: FloatArray?, word: Int, dictionary: dev.shebang.devboard.dict.Dictionary) = Unit
+            override fun rejectWord(word: String, previous: String?) {
+                rejected += "$previous>$word"
+            }
         },
         postToMain = { it.run() },
     ).also {
@@ -177,6 +181,35 @@ class TypingCorrectionTest {
         repeat(5) { controller.backspace() }
         assertEquals("with", ic.toString())
         assertEquals(listOf("wiht", "with", "wit"), shown)
+    }
+
+    @Test
+    fun undoingAnAutocorrectRejectsTheCorrectionAfterTheWordBefore() {
+        type("go wiht ")
+        assertEquals("go with ", ic.toString())
+        controller.backspace()
+        assertEquals(listOf("go>with"), rejected)
+    }
+
+    @Test
+    fun theCheckMarkRejectsTheCorrectionBesideIt() {
+        type("go wiht")
+        assertEquals(true, checkMark)
+        controller.pickCandidate("wiht")
+        assertEquals(listOf("go>with"), rejected)
+    }
+
+    @Test
+    fun aGlideDeletedAtOnceIsRejectedAfterTheWordBefore() {
+        type("go ")
+        glide("with")
+        controller.backspace()
+        assertEquals(listOf("go>with"), rejected)
+        // Kept, it is not.
+        rejected.clear()
+        glide("with")
+        type(" ")
+        assertEquals(emptyList<String>(), rejected)
     }
 
     @Test

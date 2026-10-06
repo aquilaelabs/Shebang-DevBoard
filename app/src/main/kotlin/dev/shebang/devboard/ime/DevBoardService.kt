@@ -300,6 +300,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
     }
 
+    override fun rejectWord(word: String, previous: String?) {
+        if (!settings.learnWords) return
+        background.execute { personal.reject(word, previous) }
+    }
+
     override fun learnTaps(observations: FloatArray) {
         if (!settings.adaptTaps) return
         background.execute { tapAdaptation.learn(observations) }
