@@ -8,7 +8,7 @@ plugins {
 
 android {
     namespace = "dev.shebang.devboard.voice"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     // No dependency metadata block (R34): AGP adds one when it signs, encrypted with Google's key so nobody else
@@ -21,7 +21,7 @@ android {
     defaultConfig {
         applicationId = "dev.shebang.devboard.voice"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         // From VERSION (major.minor.patch): 1.2.3 is 1002003, so every release installs over the one before.
         versionName = rootProject.file("VERSION").readText().trim()
         versionCode = versionName!!.split('.').map { it.takeWhile(Char::isDigit).toIntOrNull() ?: 0 }
