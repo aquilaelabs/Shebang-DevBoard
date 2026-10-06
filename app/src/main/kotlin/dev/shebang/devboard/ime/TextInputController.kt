@@ -319,25 +319,22 @@ class TextInputController(
 
     private var dictionaryInUse: Dictionary? = null
 
-    /**
-     * The word the user pointed at. [at] is the cursor (or selection start) where it was found, -1 when not
-     * known; [before] of its letters lie before the cursor and [after] after it, or it is the selection
-     * ([selection]). [glided] is the same word as glided lately, when it was.
-     */
-    private class Target(
-        val text: String,
-        val at: Int,
-        val before: Int,
-        val after: Int,
-        val selection: Boolean,
-        val glided: GlidedWord?,
-        val underlined: Boolean,
-    ) {
-        /** Whether the word begins a sentence, set when the target is found. */
-        var sentenceStart = false
-    }
-    private var target: Target? = null
-    private var targetGeneration = 0
+    /** The word the user pointed at, which the next glide or a tapped alternative replaces. */
+    private val targets = TargetedWord(object : TargetedWord.Host {
+        override fun connection() = this@TextInputController.connection()
+        override val ui get() = this@TextInputController.ui
+        override val suggester get() = this@TextInputController.suggester
+        override val dictionary get() = dictionaryInUse
+        override val background get() = this@TextInputController.background
+        override fun postToMain(r: Runnable) = this@TextInputController.postToMain(r)
+        override fun ownEdit() = this@TextInputController.ownEdit()
+        override val isComposing get() = this@TextInputController.isComposing
+    })
+    private var target: TargetedWord.Target?
+        get() = targets.current
+        set(value) {
+            targets.current = value
+        }
 
     /** The selection as the field last reported it (-1 before any report). */
     private var selStart = -1
@@ -464,7 +461,7 @@ class TextInputController(
         if (selEnd > selStart) {
             val sel = ic.getSelectedText(0)?.toString() ?: return
             if (sel.isEmpty() || !sel.all { isLetterInWord(it) } || !sel.first().isLetter()) return
-            setTarget(Target(sel, selStart, 0, 0, selection = true, glided = recentMatch(sel), underlined = false))
+            targets.set(TargetedWord.Target(sel, selStart, 0, 0, selection = true, glided = recentMatch(sel), underlined = false))
             return
         }
         val before = ic.getTextBeforeCursor(MAX_WORD, 0) ?: return
@@ -481,99 +478,24 @@ class TextInputController(
         if (!text.first().isLetter()) return
         val underlined = selStart >= 0 && ic.setComposingRegion(selStart - b, selStart + a)
         if (underlined) ownEdit()
-        setTarget(Target(text, selStart, b, a, selection = false, glided = recentMatch(text), underlined = underlined))
+        targets.set(TargetedWord.Target(text, selStart, b, a, selection = false, glided = recentMatch(text), underlined = underlined))
     }
 
     private fun isLetterInWord(c: Char) = c.isLetter() || c == '\'' || c == '’'
 
     private fun recentMatch(text: String): GlidedWord? = glides.findRecent(text)
 
-    /** Shows the target in the middle of the strip with its alternatives: its own runners-up if it was glided, else suggestions. */
-    private fun setTarget(t: Target) {
-        target = t
-        connection()?.let { t.sentenceStart = GlideText.contextWord(textBeforeTarget(it)) == GlideText.SENTENCE_START }
-        val gen = ++targetGeneration
-        val dictionary = dictionaryInUse
-        val glided = t.glided
-        if (glided != null && dictionary != null) {
-            val alts = glided.word.candidates.filter { it >= 0 && it != glided.word.word }.take(2).map { caseFor(t, dictionary.words[it]) }
-            showTarget(t, alts)
-            return
-        }
-        showTarget(t, emptyList())
-        val s = suggester ?: return
-        background.execute {
-            val found = s.suggest(t.text.lowercase(), 3).map { caseFor(t, it.word) }.filter { !it.equals(t.text, ignoreCase = true) }.take(2)
-            postToMain { if (gen == targetGeneration && target === t) showTarget(t, found) }
-        }
-    }
-
-    private fun showTarget(t: Target, alternatives: List<String>) {
-        ui.showCandidates(arrangeBestMiddle(listOf(t.text) + alternatives))
-        // The strip shows words (not the terminal bar) while a word is targeted.
-        ui.setComposing(true)
-    }
-
     /** The target is no longer wanted: remove its underline (the text stays as it is). */
-    private fun dropTarget() {
-        val t = target ?: return
-        target = null
-        targetGeneration++
-        if (t.underlined) {
-            connection()?.finishComposingText()
-            ownEdit()
-        }
-        ui.showCandidates(emptyList())
-        ui.setComposing(isComposing)
-    }
+    private fun dropTarget() = targets.drop()
 
     /** Replaces the target with [replacement] (its capitals kept); true when it was still there to replace. */
-    private fun replaceTarget(t: Target, replacement: String): Boolean {
-        val ic = connection() ?: return false
-        ownEdit()
-        target = null
-        targetGeneration++
-        ic.beginBatchEdit()
-        if (t.underlined) ic.finishComposingText()
-        val ok = if (t.selection) {
-            ic.getSelectedText(0)?.toString() == t.text
-        } else {
-            val before = ic.getTextBeforeCursor(t.before, 0)?.toString() ?: ""
-            val after = ic.getTextAfterCursor(t.after, 0)?.toString() ?: ""
-            before + after == t.text
-        }
-        if (ok) {
-            if (!t.selection) ic.deleteSurroundingText(t.before, t.after)
-            ic.commitText(replacement, 1)
-        }
-        ic.endBatchEdit()
-        return ok
-    }
+    private fun replaceTarget(t: TargetedWord.Target, replacement: String) = targets.replace(t, replacement)
 
-    /**
-     * How [word] (in its dictionary casing) is written in place of the target: capitalised when the old word's
-     * capital was the user's (a sentence start, or a normally lowercase word they shifted), in capitals when
-     * they wrote it in capitals, and as the dictionary writes it otherwise. A capital that belongs to the old
-     * word itself ("I", "I'd", a name) says nothing about the new one.
-     */
-    private fun caseFor(t: Target, word: String): String {
-        val old = t.text
-        if (old.isEmpty() || word.isEmpty()) return word
-        val dictionary = dictionaryInUse
-        val oldForm = dictionary?.indexOfLower(old.lowercase())?.takeIf { it >= 0 }?.let { dictionary.words[it] }
-        val allCaps = old.length > 1 && old.all { !it.isLetter() || it.isUpperCase() }
-        if (allCaps && (oldForm == null || !oldForm.all { !it.isLetter() || it.isUpperCase() })) return word.uppercase()
-        if (!old[0].isUpperCase()) return word
-        val ownCapital = oldForm != null && oldForm[0].isUpperCase()
-        return if (!ownCapital || t.sentenceStart) word.replaceFirstChar { it.uppercaseChar() } else word
-    }
+    /** How [word] is written in place of the target ([TargetedWord.caseFor]). */
+    private fun caseFor(t: TargetedWord.Target, word: String) = targets.caseFor(t, word)
 
     /** Text before the target's first letter (or before the cursor when nothing is targeted), for context. */
-    private fun textBeforeTarget(ic: InputConnection): CharSequence {
-        val t = target
-        val before = ic.getTextBeforeCursor(CONTEXT_CHARS + (t?.before ?: 0), 0) ?: ""
-        return if (t != null && !t.selection) before.subSequence(0, maxOf(0, before.length - t.before)) else before
-    }
+    private fun textBeforeTarget(ic: InputConnection) = targets.textBefore(ic)
 
     // ---- Typing --------------------------------------------------------------------------------------
 
@@ -822,7 +744,7 @@ class TextInputController(
      * Space with a word targeted: the cursor goes after the word (and after the space behind it, adding one
      * if there is none), so the next glide adds a word there instead of replacing this one.
      */
-    private fun skipPastTarget(ic: InputConnection, t: Target) {
+    private fun skipPastTarget(ic: InputConnection, t: TargetedWord.Target) {
         dropTarget()
         ownEdit()
         val toEnd = if (t.selection) t.text.length else t.after
@@ -1043,9 +965,9 @@ class TextInputController(
     }
 
     /** The reopened composing word as a target, so a glide replaces it the way it replaces a tapped word. */
-    private fun reopenedTarget(ic: InputConnection): Target {
+    private fun reopenedTarget(ic: InputConnection): TargetedWord.Target {
         val text = word.toString()
-        val t = Target(text, -1, text.length, 0, selection = false, glided = reopenedGlide, underlined = true)
+        val t = TargetedWord.Target(text, -1, text.length, 0, selection = false, glided = reopenedGlide, underlined = true)
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS + text.length, 0) ?: ""
         t.sentenceStart = GlideText.contextWord(before.subSequence(0, maxOf(0, before.length - text.length))) == GlideText.SENTENCE_START
         return t
@@ -1660,7 +1582,7 @@ class TextInputController(
             if (t != null && t.selection && t.text == sel) return
             dropTarget()
             if (sel.all { isLetterInWord(it) } && sel.first().isLetter()) {
-                target = Target(sel, -1, 0, 0, selection = true, glided = recentMatch(sel), underlined = false).also {
+                target = TargetedWord.Target(sel, -1, 0, 0, selection = true, glided = recentMatch(sel), underlined = false).also {
                     it.sentenceStart = GlideText.contextWord(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: "") == GlideText.SENTENCE_START
                 }
             }
@@ -1678,7 +1600,7 @@ class TextInputController(
         if (t != null && !t.selection && t.before == b && t.after == a && t.text == text) return
         dropTarget()
         if (text.isNotEmpty() && text.first().isLetter()) {
-            target = Target(text, -1, b, a, selection = false, glided = recentMatch(text), underlined = false).also {
+            target = TargetedWord.Target(text, -1, b, a, selection = false, glided = recentMatch(text), underlined = false).also {
                 it.sentenceStart = GlideText.contextWord(before.subSequence(0, before.length - b)) == GlideText.SENTENCE_START
             }
         }
