@@ -75,4 +75,34 @@ class WordPackStoreTest {
         store.setEnabled("dev", true)
         assertTrue(WordPackStore(d).isEnabled("dev"))
     }
+
+    @Test
+    fun aFrequencyColumnSetsWhereImportedWordsStart() {
+        // Counts on a log scale of the list's own: its commonest quarter at 35, the next at 40, the rest at 50.
+        val (words, counts, skipped) = WordPackStore.parseCounted(
+            sequenceOf("Zorbly\t1000000", "Quuxly,\"2000\"", "Blorp\t10", "Frizzle", "# a comment", "bad word\t5"),
+        )
+        assertEquals(listOf("Zorbly", "Quuxly", "Blorp", "Frizzle"), words)
+        assertEquals(1, skipped)
+        val tiers = WordPackStore.tiersFor(words, counts)
+        assertEquals(35, tiers["Zorbly"])
+        assertEquals(40, tiers["Quuxly"])
+        assertEquals(WordPackStore.IMPORTED_TIER, tiers["Blorp"])
+        assertEquals("no count, no tier of its own", null, tiers["Frizzle"])
+
+        val store = WordPackStore(java.nio.file.Files.createTempDirectory("packs").toFile())
+        store.import("Frequencies", "Zorbly\t1000000\nQuuxly\t2000\nFrizzle\n".byteInputStream())
+        assertEquals(listOf("Zorbly" to 35, "Quuxly" to 40, "Frizzle" to WordPackStore.IMPORTED_TIER), store.enabledImportedTiers())
+        assertEquals(listOf("Zorbly", "Quuxly", "Frizzle"), store.enabledImportedWords())
+    }
+
+    @Test
+    fun aListSavedBeforeTiersStartsAtTheImportedTier() {
+        val dir = java.nio.file.Files.createTempDirectory("packs").toFile()
+        val store = WordPackStore(dir)
+        store.import("Old", "Zorbly\nQuuxly\n".byteInputStream())
+        // Rewrite the saved list as earlier versions kept it: bare words.
+        java.io.File(dir, WordPackStore.LISTS_DIR).listFiles()!!.single().writeText("Zorbly\nQuuxly\n")
+        assertEquals(listOf("Zorbly" to WordPackStore.IMPORTED_TIER, "Quuxly" to WordPackStore.IMPORTED_TIER), store.enabledImportedTiers())
+    }
 }

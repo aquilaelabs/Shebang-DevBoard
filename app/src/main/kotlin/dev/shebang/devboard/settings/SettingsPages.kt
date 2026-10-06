@@ -239,9 +239,10 @@ private fun DictionariesGroups(actions: SettingsActions) {
     val lists = remember(changes) { store.lists() }
     Column(verticalArrangement = Arrangement.spacedBy(GroupGap)) {
         PageNote(
-            "Where two words are about as likely, glide and suggestions prefer regular words, then brands, names and your " +
-                "own lists, then development words, then computer terms. Autocorrect only ever corrects to everyday words, and a word typed exactly as a " +
-                "pack spells it is left as typed. Changes apply the next time the keyboard opens.",
+            "Glide and suggestions rank every word by how common it is, whichever list it is in, and the words you use move up. " +
+                "Slang starts below every other word, and your own lists start with the rarest everyday words (or by their frequency " +
+                "column), until you use them. Autocorrect only ever corrects to everyday words, and a word typed exactly as a pack " +
+                "spells it is left as typed. Changes apply the next time the keyboard opens.",
         )
         SettingsGroup("Built in") {
             // Always on: a label, not a switch that cannot move (a disabled switch reads as off).

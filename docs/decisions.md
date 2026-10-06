@@ -819,3 +819,24 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   at equal harm, a higher SPLIT_KEEP with no rule always recovered more. Not shipped; the test half was not
   looked at. The nonsense cuts left are mostly lowercase names the regular words lack, which the names pack
   (on by default) knows, so they are not split there.
+- **Word values come from the model** (the owner's design, 6 Oct): "all the baseline rankings from the words
+  should come from the initial model ... then the words can move up and down ... the more or less you use
+  them", and "when you add a custom dictionary, where would it put the weight". The pack weights (names 0.9,
+  development 0.85, computer terms 0.8, imported 0.9) are gone: every word's starting value is the word model's
+  count plus its tier's small pseudo-count, whichever list it is in, and personal use moves it up as before.
+  Measured on the same data, current weights against none: FUTO swipes top-1 94.4% / 94.4%, TSI typos fixed
+  80.6% / 80.6% (made another word 3.3% / 3.3%), technical text pack words glided 89.7% / 89.7% (top-3 96.4% /
+  96.7%), every word 94.5% / 94.5%, next word in the three 27.4% / 27.4%. Where words start without a count:
+  - an imported list at tier 50, with the rarest regular words (it was 40), unless the file has a frequency
+    column ("word,1234" or "word<TAB>1234"): then its commonest quarter, on a log scale of its own counts,
+    starts at 35, the next at 40, the rest at 50, never above 35 so a list cannot push the commonest English
+    aside. Each word's tier is saved with the list; lists saved before hold bare words and start at 50;
+  - the new **Slang and abbreviations** pack (76 words written for this project: lol, lmao, idk, tbh, brb,
+    btw, ngl...) at a new floor tier, 70, below every other word, and it ignores any count the model has, so it
+    is last until used (the owner asked for it below all the others). Its words are kept as typed, never
+    autocorrected (76 of 76), and never corrected to. On by default: with it on or off, FUTO, TSI and technical
+    text measure the same to the decimal. Gliding them is weak by design: 15.8% of simulated strokes (20 each)
+    read the slang word first, a common word with the same path winning ("been" for "brb"); use lifts them.
+    Lowercase "btw" sits in the pack beside the regular "BTW" (the builder claims by spelling), so "btw" typed
+    stays lowercase.
+  Words moving down, by the word they followed, is the next step (queued).

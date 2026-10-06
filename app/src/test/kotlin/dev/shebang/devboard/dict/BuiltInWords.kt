@@ -11,16 +11,11 @@ object BuiltInWords {
     private const val DIR = "src/main/assets/"
 
     fun all(): Dictionary {
-        // PACK_WEIGHTS=names,dev,computer,imported tries other weights in the benchmarks.
-        System.getenv("PACK_WEIGHTS")?.split(',')?.map { it.trim().toDouble() }?.let { w ->
-            WordPacks.NAMES_WEIGHT = w[0]
-            WordPacks.DEV_WEIGHT = w[1]
-            WordPacks.COMPUTER_WEIGHT = w[2]
-            if (w.size > 3) WordPacks.IMPORTED_WEIGHT = w[3]
-        }
         System.getenv("DEVBOARD_WORDS")?.let { path -> return File(path).useLines { Dictionary.parse(it) } }
+        // PACKS_OFF=slang,names measures with those built-in packs turned off.
+        val off = System.getenv("PACKS_OFF")?.split(',')?.map { it.trim() }.orEmpty()
         val parts = listOf(File(DIR + WordPacks.REGULAR_ASSET).useLines { Dictionary.parse(it) }) +
-            WordPacks.builtIn.map { p -> File(DIR + p.asset).useLines { Dictionary.parse(it, p.id) } }
+            WordPacks.builtIn.filter { it.key !in off }.map { p -> File(DIR + p.asset).useLines { Dictionary.parse(it, p.id) } }
         return Dictionary.merge(parts)
     }
 

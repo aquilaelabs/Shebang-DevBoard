@@ -22,9 +22,10 @@ An Android keyboard (IME) for developers, written in Kotlin.
 - **One-handed mode**: the keys shrink to one side, with buttons beside them to switch sides or go back to
   full width (from the bar or Settings > Appearance).
 - **Dictionaries you choose**: regular words, plus packs of brands and names, development and terminal
-  words, and computer terms, each one you can turn off, and your own word lists imported from a text file.
-  Glide and suggestions prefer them in that order; autocorrect never corrects to a pack word, and keeps one
-  you type ("cpu" becomes CPU).
+  words, computer terms, and slang and abbreviations, each one you can turn off, and your own word lists
+  imported from a text file (a word-frequency list sets where its words start). Every word is ranked by how
+  common the word model says it is and moves up as you use it; slang starts last. Autocorrect never
+  corrects to a pack word, and keeps one you type ("cpu" becomes CPU, "lol" stays lol).
 - **Autocorrect that knows where you tapped**: a slip is weighed by where the finger came down, and the
   keyboard learns where your own taps land on each key.
 - **Field-aware**: terminals (`TYPE_NULL`) get raw characters and no composing; passwords get no

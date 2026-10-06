@@ -84,9 +84,9 @@ class LanguageLoader(
             }
         }
         var merged = Dictionary.merge(parts)
-        val own = packs.enabledImportedWords().filter { merged.indexOfLower(it.lowercase()) < 0 }.distinctBy { it.lowercase() }
+        val own = packs.enabledImportedTiers().filter { merged.indexOfLower(it.first.lowercase()) < 0 }.distinctBy { it.first.lowercase() }
         if (own.isNotEmpty()) {
-            merged = Dictionary.merge(listOf(merged, Dictionary.parse(own.asSequence().map { "$it\t$IMPORTED_TIER" }, WordPacks.IMPORTED)))
+            merged = Dictionary.merge(listOf(merged, Dictionary.parse(own.asSequence().map { (w, t) -> "$w\t$t" }, WordPacks.IMPORTED)))
         }
         return merged
     }
@@ -134,7 +134,8 @@ class LanguageLoader(
         /** The regular words; the packs are listed in [WordPacks]. */
         const val DICTIONARY_ASSET = WordPacks.REGULAR_ASSET
         /** Tier of a word from the user's own lists: offered and glidable, never autocorrected to. */
-        const val IMPORTED_TIER = 40
+        /** Where an imported word without a frequency starts ([WordPackStore.IMPORTED_TIER]). */
+        const val IMPORTED_TIER = dev.shebang.devboard.dict.WordPackStore.IMPORTED_TIER
         private const val TAG = "DevBoard"
     }
 }

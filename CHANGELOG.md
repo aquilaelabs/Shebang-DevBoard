@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- A Slang and abbreviations dictionary (lol, idk, tbh, brb and more), offered after every other word until you use them, and kept as you type them; turn it off in Settings > Dictionaries (4033d59)
+
+### Changed
+
+- Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
+
 ### Fixed
 
 - Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)

@@ -86,14 +86,16 @@ class WordPackStore(private val dir: File?) {
         if (state.lists.size >= MAX_LISTS) return ImportResult(null, 0, "You can keep up to $MAX_LISTS word lists. Delete one first.")
         val text = runCatching { readCapped(input) }.getOrElse { return ImportResult(null, 0, "The file could not be read.") }
             ?: return ImportResult(null, 0, "The file is larger than ${MAX_BYTES / 1_000_000} MB.")
-        val (words, skipped) = parse(text.lineSequence())
+        val (words, counts, skipped) = parseCounted(text.lineSequence())
         if (words.isEmpty()) return ImportResult(null, skipped, "No words found. Put one word on each line.")
+        val tiers = tiersFor(words, counts)
         var id = "list${now}"
         while (state.lists.any { it.id == id }) id += "x"
         val f = listFile(id)
         if (f != null) {
             f.parentFile?.mkdirs()
-            runCatching { f.writeText(words.joinToString("\n", postfix = "\n")) }.onFailure { return ImportResult(null, skipped, "The list could not be saved.") }
+            runCatching { f.writeText(words.joinToString("\n", postfix = "\n") { "$it\t${tiers[it] ?: IMPORTED_TIER}" }) }
+                .onFailure { return ImportResult(null, skipped, "The list could not be saved.") }
         }
         val list = ImportedList(id, name.ifBlank { "Word list" }.take(60), words.size, true, now)
         state = state.copy(lists = state.lists + list)
@@ -101,15 +103,31 @@ class WordPackStore(private val dir: File?) {
         return ImportResult(list, skipped)
     }
 
-    /** The words of every imported list that is on, for building the dictionary. */
+    /** The words of every imported list that is on. */
+    fun enabledImportedWords(): List<String> = enabledImportedTiers().map { it.first }
+
+    /**
+     * The words of every imported list that is on, each with its tier, for building the dictionary: from the
+     * list's frequency column when it had one ([tiersFor]), otherwise [IMPORTED_TIER]. Lists saved before tiers
+     * were kept hold bare words, which get [IMPORTED_TIER].
+     */
     @Synchronized
-    fun enabledImportedWords(): List<String> {
+    fun enabledImportedTiers(): List<Pair<String, Int>> {
         load()
-        val out = ArrayList<String>()
+        val out = ArrayList<Pair<String, Int>>()
         for (l in state.lists) {
             if (!l.enabled) continue
             val f = listFile(l.id) ?: continue
-            runCatching { f.useLines { lines -> lines.filter { it.isNotBlank() }.forEach { out.add(it) } } }
+            runCatching {
+                f.useLines { lines ->
+                    for (line in lines) {
+                        if (line.isBlank()) continue
+                        val tab = line.indexOf('\t')
+                        if (tab < 0) out += line to IMPORTED_TIER
+                        else out += line.substring(0, tab) to (line.substring(tab + 1).trim().toIntOrNull() ?: IMPORTED_TIER)
+                    }
+                }
+            }
         }
         return out
     }
@@ -128,6 +146,34 @@ class WordPackStore(private val dir: File?) {
         const val MAX_LISTS = 20
         const val MAX_BYTES = 5_000_000
         private const val MAX_WORD_LENGTH = 48
+        /**
+         * Where an imported word starts when the list gives no frequency: with the rarest regular words, so the
+         * keyboard's own words come first until the user's use lifts it (the owner's design, 6 Oct).
+         */
+        const val IMPORTED_TIER = 50
+
+        /**
+         * Tiers from a list's frequency column: its commonest quarter (on a log scale of its own counts) at 35, as
+         * common as everyday words, the next quarter at 40, the rest at 50. Never above 35, so a list cannot push
+         * the commonest English aside. Words without a count, or a list without counts, get [IMPORTED_TIER].
+         */
+        fun tiersFor(words: List<String>, counts: Map<String, Double>): Map<String, Int> {
+            val max = counts.values.filter { it > 0 }.maxOrNull() ?: return emptyMap()
+            if (max <= 1.0) return emptyMap()
+            val top = kotlin.math.ln(max)
+            val out = HashMap<String, Int>()
+            for (w in words) {
+                val c = counts[w] ?: continue
+                if (c <= 0) continue
+                val r = kotlin.math.ln(maxOf(c, 1.0)) / top
+                out[w] = when {
+                    r >= 0.75 -> 35
+                    r >= 0.5 -> 40
+                    else -> IMPORTED_TIER
+                }
+            }
+            return out
+        }
         private val json = Json { ignoreUnknownKeys = true }
 
         /**
@@ -136,14 +182,25 @@ class WordPackStore(private val dir: File?) {
          * phrase), with no letter, or longer than 48 characters is skipped. Each spelling once, in file order,
          * at most [MAX_WORDS]. Returns the words and how many lines were skipped.
          */
-        fun parse(lines: Sequence<String>): Pair<List<String>, Int> {
+        fun parse(lines: Sequence<String>): Pair<List<String>, Int> = parseCounted(lines).let { (w, _, s) -> w to s }
+
+        /**
+         * As [parse], with the number in a list's second column when there is one (a word-frequency list,
+         * "word<TAB>count" or "word,count"): the words, their counts, and the lines skipped.
+         */
+        fun parseCounted(lines: Sequence<String>): Triple<List<String>, Map<String, Double>, Int> {
             val out = LinkedHashSet<String>()
+            val counts = HashMap<String, Double>()
             var skipped = 0
             for (raw in lines) {
                 var line = raw.removePrefix("\uFEFF").trim()
                 if (line.isEmpty() || line.startsWith("#")) continue
                 val cut = line.indexOfFirst { it == '\t' || it == ',' }
-                if (cut >= 0) line = line.substring(0, cut).trim()
+                var count: Double? = null
+                if (cut >= 0) {
+                    count = line.substring(cut + 1).trim().split('\t', ',', ' ').firstOrNull()?.trim()?.trim('"', '\'')?.toDoubleOrNull()
+                    line = line.substring(0, cut).trim()
+                }
                 line = line.trim('"', '\'', '“', '”').trim()
                 val ok = line.isNotEmpty() && line.length <= MAX_WORD_LENGTH && line.none { it.isWhitespace() || it.isISOControl() } &&
                     line.any { it.isLetter() }
@@ -156,8 +213,9 @@ class WordPackStore(private val dir: File?) {
                     continue
                 }
                 out.add(line)
+                if (count != null && count.isFinite() && count > 0) counts[line] = maxOf(counts[line] ?: 0.0, count)
             }
-            return out.toList() to skipped
+            return Triple(out.toList(), counts, skipped)
         }
 
         /** The stream as text, or null when it is larger than [MAX_BYTES]. */

@@ -162,8 +162,12 @@ class Dictionary(
             tier <= 35 -> 0.18
             tier <= 40 -> 0.08
             tier <= 50 -> 0.03
-            else -> 0.01
+            tier < FLOOR_TIER -> 0.01
+            else -> 0.003
         }
+
+        /** The tier below every other word's (the slang pack's): a starting weight under the rarest regular word. */
+        const val FLOOR_TIER = 70
 
         /**
          * Several word lists as one, in search order: the regular words first, then each pack (a spelling
