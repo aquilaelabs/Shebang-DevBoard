@@ -58,7 +58,7 @@ All taken from the 0.5.4 release build on Android 16.
 
 ## Build and install
 
-Requirements: JDK 17+ (21 used here), Android SDK with platform 36 and build-tools 36, and for Shebang Voice
+Requirements: JDK 17+ (21 used here), Android SDK with platform 37 and build-tools 36, and for Shebang Voice
 NDK 29.0.14206865 and CMake 4.1.2 (CI installs exactly these). Gradle is fetched by the wrapper.
 
 ```sh
