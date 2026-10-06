@@ -878,6 +878,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   bar) moved from KeyboardView into KeyTouch, plain Kotlin fed touches and timers, so it has unit tests
   (KeyTouchTest, 21); the View only feeds it and draws. Turning B16's row check off fails two of them.
   TextInputController's separable concerns became collaborators it coordinates: EmailOffers, NextWords,
-  TextIdentifiers, Corrections and GlideLearning. Typing, the targeted word and glide commits stay in the
+  TextIdentifiers, Corrections, GlideLearning and TargetedWord (showing, dropping, replacing and casing the
+  tapped word; what becomes the target stays in the controller). Typing and glide commits stay in the
   controller for now: they share the composing word, the strip and the selection reports, and splitting them
   needs a design of who owns that state. Behaviour is unchanged; all unit tests pass before and after.
+- **A quote closes one the paragraph opened** (owner's report, 6 Oct). With pairing on, a quote after a space
+  or a full stop always started a pair, so a paragraph that began with a quote got two at its end. A quote is
+  now typed alone when the paragraph before the cursor has an odd number of that quote (escaped ones and
+  apostrophes after a letter not counted). Counted per paragraph, since an unclosed quote in an earlier one
+  (a code comment, a list) says nothing about this one.
