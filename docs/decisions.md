@@ -811,3 +811,11 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   meant. FieldCompatibilityTest runs xterm.js (bundled in the debug build's assets only) in a WebView for the
   Chromium side: four tests, the first two failing without the rule ("the." and "cat car"). Not compared with
   Gboard: on the AVD it shows only a floating toolbar.
+- **Joined-word splits need no seen-pair rule** (6 Oct, the owner's ask to stop nonsense splits such as "nor a"
+  from "nora"): requiring the two words to be a pair the word model has seen written, everywhere or only when a
+  part has two letters or fewer, was measured on the dev half of JoinedWordsBenchmarkTest (keyboard scoring
+  path). It cut words typed on purpose split from 0.8% to 0.7% but joined pairs split right fell from 81.5% to
+  76.9% (seen everywhere) or 79.8% (short parts), and splits offered on the strip from 99.4% to 85.6% or 95.1%;
+  at equal harm, a higher SPLIT_KEEP with no rule always recovered more. Not shipped; the test half was not
+  looked at. The nonsense cuts left are mostly lowercase names the regular words lack, which the names pack
+  (on by default) knows, so they are not split there.
