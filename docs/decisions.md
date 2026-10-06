@@ -710,3 +710,21 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Language load time**: 0.5 to 1.2 s on the API 36 emulator, 2.4 s on the first start after installing
   (not yet compiled ahead of time); the keyboard appears at once and glide starts working when the language
   is in. Still to be measured on a phone (R7).
+- **Field compatibility tests on a device** (R33, 6 Oct): `FieldCompatibilityTest` types through the real
+  keyboard into real fields: multi-line and single-line EditTexts (search, web address, email, password,
+  number), Compose fields (multi-line asking for Search, and plain), a WebView search form and textarea, and a
+  `TYPE_NULL` view standing in for a terminal. It checks what the app received (text, editor actions, a
+  terminal's key events, no composing in a password field) and the Enter glyph. Choices it rests on:
+  - The fields live in `FieldTestActivity`, in `src/debug` so release builds do not carry it, and in a process
+    of its own (`:fields`). In the keyboard's process a WebView's field deadlocked against the keyboard (the
+    app stopped responding and a letter went missing), and real apps are always in another process.
+  - Keys are tapped through `DevBoardService.tapForTest`, the entry the keyboard view calls on a tap, so the
+    service, the controller and the app's InputConnection are all real; how a finger becomes a tap is R26's.
+    The service exposes a few read-only views for this (`running`, `fieldForTest`, `keysForTest`, ...).
+  - The field focuses itself and asks for the keyboard when its window first has focus, as an app whose field
+    opens focused does. Taps from the instrumentation (its pointer calls, an injected MotionEvent, the shell's
+    `input tap`) did not reach the field while it ran.
+  - The activity writes what its field holds to `files/fieldtest/state.json`, which the test reads.
+  - The web page turns autocapitalize off; Chrome otherwise asks for sentence capitals.
+  Putting the old Enter rule back makes the Compose search test fail, so it guards B14. It runs on an emulator
+  (`./gradlew :app:connectedDebugAndroidTest`), not in CI yet, and selects Shebang DevBoard as the keyboard.

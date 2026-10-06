@@ -148,6 +148,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onCreate() {
         super.onCreate()
+        running = this
         clipChip = ClipboardChip(this)
         clipHistory = ClipboardHistory(java.io.File(filesDir, ClipboardHistory.FILE))
         voice = VoiceClient(this, object : VoiceClient.Listener {
@@ -202,6 +203,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onDestroy() {
+        if (running === this) running = null
         settingsJob?.cancel()
         scope.cancel()
         glideSession.release()
@@ -1247,7 +1249,26 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         strip?.setClip(null)
     }
 
+    // ---- For device tests (app/src/androidTest): read-only views and the key-tap entry the keyboard view uses ----
+
+    internal val fieldForTest: FieldInfo get() = this.field
+    internal val inputShownForTest: Boolean get() = isInputViewShown
+    /** The dictionary and word model are loaded, so suggestions and autocorrect can run. */
+    internal val languageReadyForTest: Boolean get() = bundle != null
+    internal val keysForTest: List<Key> get() = geometry?.keys.orEmpty()
+    internal val enterKindForTest: EnterKind? get() = keyboard?.enterKind
+
+    /** Taps [key] as the keyboard view reports a tap: key down, then the tap with the shift state shown. */
+    internal fun tapForTest(key: Key) {
+        onKeyDown(key)
+        onKeyTap(key, keyboard?.shiftState ?: ShiftState.OFF)
+    }
+
     companion object {
+        /** The keyboard while it runs, for device tests in the same process; null otherwise. */
+        @Volatile
+        internal var running: DevBoardService? = null
+
         /** Learned uses since the last build after which hiding the keyboard rebuilds the frequencies. */
         private const val REBUILD_AFTER_WORDS = 50
         private const val TAG = "DevBoard"
