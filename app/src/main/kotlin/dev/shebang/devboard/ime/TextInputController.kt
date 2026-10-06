@@ -894,9 +894,10 @@ class TextInputController(
     }
 
     /**
-     * Deletes the [n] characters before the cursor. In an [FieldInfo.exact] field they go one at a time, each its
-     * own edit, as backspace presses would: a page that mirrors edits (a web terminal) passes a deletion on as one
-     * backspace however long it was.
+     * Deletes the [n] characters before the cursor. In an [FieldInfo.exact] field each goes as a backspace key
+     * press, one per character (an emoji's surrogate pair is one): a web terminal acts on the key at once, but
+     * notices deleted text only by comparing its input on a timer, which a slow phone can miss (B18), and passes a
+     * longer deletion on as one backspace.
      */
     private fun deleteBefore(ic: InputConnection, n: Int) {
         if (n <= 0) return
@@ -905,15 +906,8 @@ class TextInputController(
             return
         }
         val before = ic.getTextBeforeCursor(n, 0)?.toString().orEmpty()
-        var i = before.length
-        var left = n
-        while (left > 0) {
-            // A surrogate pair (an emoji) goes whole.
-            val step = if (i >= 2 && left >= 2 && Character.isSurrogatePair(before[i - 2], before[i - 1])) 2 else 1
-            ic.deleteSurroundingText(step, 0)
-            i -= step
-            left -= step
-        }
+        val presses = if (before.isEmpty()) n else before.codePointCount(0, before.length)
+        repeat(presses) { KeySender.sendPlain(ic, KeyEvent.KEYCODE_DEL) }
     }
 
     /** Replaces the [n] characters before the cursor with [text]: one edit, or step by step in an exact field. */
@@ -1004,6 +998,10 @@ class TextInputController(
         // Delete a whole surrogate pair (emoji) at once.
         val before = ic.getTextBeforeCursor(2, 0)
         val n = if (before != null && before.length == 2 && Character.isSurrogatePair(before[0], before[1])) 2 else 1
+        if (field.exact) {
+            deleteBefore(ic, n)
+            return
+        }
         ic.deleteSurroundingText(n, 0)
         reopenWordBeforeCursor(ic)
     }

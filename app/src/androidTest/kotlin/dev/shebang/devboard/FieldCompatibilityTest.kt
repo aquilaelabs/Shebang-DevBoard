@@ -173,12 +173,10 @@ class FieldCompatibilityTest {
     @Test
     fun backspacingIntoAWordInABrowserTerminalDoesNotSendItAgain() {
         open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
-        // cat, space, two backspaces, r: the shell must hold "car", not "cacar". The backspaces at a person's
-        // pace: xterm.js reports a deletion from a timer and drops the report if the next word has begun, so at
-        // the test's speed on a busy emulator one can go missing whatever the keyboard does.
-        type("cat ")
-        type("\b\b", gap = 350)
-        type("r\n")
+        // cat, space, two backspaces, r: the shell must hold "car", not "cacar" (B17) or "catr" (B18: a deletion
+        // xterm.js only noticed on a timer, missed on GitHub's slower emulator). At full test speed: backspace
+        // goes as a key press, which the terminal acts on at once.
+        type("cat \b\br\n")
         assertShellGot("car")
     }
 
@@ -193,8 +191,7 @@ class FieldCompatibilityTest {
         stroke(*"hello".map { key(it)!!.let { k -> k.centerX to k.centerY } }.toTypedArray())
         waitFor(4_000) { currentText().isNotEmpty() }
         assertTrue("the glided word reached the terminal", currentText().isNotEmpty())
-        type("\b", gap = 350)
-        type("ok\n")
+        type("\bok\n")
         assertShellGot("ok")
     }
 

@@ -221,14 +221,15 @@ class TypingCorrectionTest {
     fun backspacingIntoAWordThereDoesNotReopenIt() {
         controller.startInput(FieldInfo.from(webExact, 0))
         type("cat ")
+        ic.deletions = 0
         controller.backspace()
         controller.backspace()
-        assertEquals("ca", ic.toString())
+        // Two backspace key presses (a down and an up each), which a web terminal acts on at once (B18); no text
+        // deleted or recomposed by the keyboard itself. (The fake field cannot read a key event's code, so it does
+        // not apply them; FieldCompatibilityTest checks the result in xterm.js.)
+        assertEquals(4, ic.keyEvents.size)
+        assertEquals(0, ic.deletions)
         assertEquals("nothing is composing", -1, ic.composingStart)
-        // The next letter is a word of its own to the field: only it is sent, not "car" over "ca".
-        type("r")
-        assertEquals("car", ic.toString())
-        assertEquals(2, ic.composingStart)
     }
 
     @Test
@@ -238,9 +239,10 @@ class TypingCorrectionTest {
         assertEquals("hello", ic.toString().trim())
         val written = ic.toString().length
         ic.deletions = 0
+        ic.keyEvents.clear()
         controller.backspace()
-        assertEquals("", ic.toString())
-        assertEquals("each character its own deletion", written, ic.deletions)
+        assertEquals("one backspace press (down and up) per character", 2 * written, ic.keyEvents.size)
+        assertEquals("no text deletions", 0, ic.deletions)
     }
 
     @Test
