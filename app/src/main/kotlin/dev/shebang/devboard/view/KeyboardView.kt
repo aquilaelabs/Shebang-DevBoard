@@ -198,6 +198,11 @@ class KeyboardView(context: Context) : View(context) {
     /** Swiping left from backspace, and how many words that would delete. */
     private var deleteDrag = false
     private var deleteWords = 0
+    /**
+     * The finger left the bottom row during a touch that began on backspace or the space bar: it is gliding, not
+     * swiping, so that key's swipe is over for this touch and letting go does nothing (B16).
+     */
+    private var rowGestureOff = false
 
     // Glide path: interleaved x,y, with touch times.
     private val glidePoints = FloatArray(2 * MAX_GLIDE_POINTS)
@@ -476,6 +481,7 @@ class KeyboardView(context: Context) : View(context) {
                 cursorDragAccum = 0f
                 deleteDrag = false
                 deleteWords = 0
+                rowGestureOff = false
                 gliding = false
                 glideCount = 0
                 glideLength = 0f
@@ -540,6 +546,23 @@ class KeyboardView(context: Context) : View(context) {
         val dx = x - pointerDownX[id]
         val dy = y - pointerDownY[id]
         val kw = g.letterKeyWidth
+        // A touch that began on backspace or the space bar and then rises (or drops) into another row is a glide that
+        // started a little off its first letter, not a swipe along the key: the swipe ends there, and whatever it
+        // previewed is put back (B16: a glide from beside the m deleted five words).
+        if ((key.action == KeyAction.BACKSPACE || key.action == KeyAction.SPACE) && !repeatFired) {
+            if (rowGestureOff) return
+            if (abs(dy) > key.height * LEAVE_ROW) {
+                rowGestureOff = true
+                handler.removeCallbacks(repeatRunnable)
+                handler.removeCallbacks(longPressRunnable)
+                longPressPending = false
+                if (deleteDrag && deleteWords != 0) {
+                    deleteWords = 0
+                    listener?.onDeleteWordsPreview(0)
+                }
+                return
+            }
+        }
         if (key.action == KeyAction.BACKSPACE) {
             // Swiping left from backspace deletes whole words: one more for each step left, none if back.
             if (!deleteDrag && !repeatFired && dx < -kw * 0.6f) {
@@ -740,6 +763,7 @@ class KeyboardView(context: Context) : View(context) {
             }
             wasActive && cursorDrag -> Unit
             wasActive && deleteDrag -> l?.onDeleteWords(deleteWords)
+            wasActive && rowGestureOff -> Unit
             wasActive && repeatFired -> Unit
             key.action == KeyAction.SHIFT -> onShiftTap()
             else -> {
@@ -760,6 +784,7 @@ class KeyboardView(context: Context) : View(context) {
             cursorDrag = false
             deleteDrag = false
             deleteWords = 0
+            rowGestureOff = false
             repeatFired = false
             longPressPending = false
         }
@@ -782,6 +807,7 @@ class KeyboardView(context: Context) : View(context) {
         if (deleteDrag) listener?.onDeleteWords(0)
         deleteDrag = false
         deleteWords = 0
+        rowGestureOff = false
         resetSpaceState()
         handler.removeCallbacks(longPressRunnable)
         handler.removeCallbacks(repeatRunnable)
@@ -803,6 +829,8 @@ class KeyboardView(context: Context) : View(context) {
 
     companion object {
         private const val MAX_POINTERS = 10
+        /** How far (in rows) a touch on backspace or space may stray up or down before it counts as a glide. */
+        private const val LEAVE_ROW = 0.6f
         private const val MAX_GLIDE_POINTS = 2048
         private const val TRAIL_SEGMENTS = 60
         private const val MIN_SAMPLE_PX = 2f

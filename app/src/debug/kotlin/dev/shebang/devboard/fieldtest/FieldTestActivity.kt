@@ -54,6 +54,10 @@ class FieldTestActivity : ComponentActivity() {
         val kind = intent.getStringExtra(EXTRA_FIELD) ?: MULTILINE
         fieldView = when (kind) {
             MULTILINE -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED)
+            SENTENCES -> edit(
+                InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES,
+                EditorInfo.IME_ACTION_UNSPECIFIED,
+            )
             SEARCH -> edit(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_SEARCH)
             URL -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI, EditorInfo.IME_ACTION_GO)
             EMAIL -> edit(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS, EditorInfo.IME_ACTION_DONE)
@@ -94,6 +98,8 @@ class FieldTestActivity : ComponentActivity() {
             .put("actions", org.json.JSONArray(actions.toList()))
             .put("keys", keys.toString())
             .put("composingStart", composingStart())
+            .put("selStart", editText?.selectionStart ?: -1)
+            .put("selEnd", editText?.selectionEnd ?: -1)
         val f = stateFile(this)
         f.parentFile?.mkdirs()
         val tmp = java.io.File(f.path + ".tmp")
@@ -143,7 +149,7 @@ class FieldTestActivity : ComponentActivity() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
             override fun afterTextChanged(s: android.text.Editable?) = save()
         })
-        // The composing span changes without the text changing (a word committed as typed); keep it current.
+        // The composing span and the selection change without the text changing; keep them current.
         viewTreeObserver.addOnPreDrawListener { save(); true }
         editText = this
     }
@@ -219,6 +225,8 @@ class FieldTestActivity : ComponentActivity() {
         /** Where the activity writes what its field holds; the test reads it. Same app, so same files. */
         fun stateFile(context: Context) = java.io.File(context.filesDir, "fieldtest/state.json")
         const val MULTILINE = "multiline"
+        /** A message box: multi-line, asking for a capital at the start of each sentence. */
+        const val SENTENCES = "sentences"
         const val SEARCH = "search"
         const val URL = "url"
         const val EMAIL = "email"

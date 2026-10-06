@@ -762,3 +762,15 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   file's `leftOut` says app names are included for those fields. Why: B14 had to be diagnosed by guessing the
   Play Store's EditorInfo; a user's export now shows it. Package names are the one identifying thing the export
   can hold, hence opt-in per export, in memory only, and named in the policy.
+- **Backspace and space swipes stay in their row** (B16, 6 Oct): a glide whose first touch landed on backspace
+  (beside the m) and headed up-left into the letters became the swipe that deletes whole words, highlighting
+  and deleting about one word per key width travelled. Now a touch that began on backspace or the space bar
+  and strays more than 0.6 of a row up or down is taken as a glide that started off its first letter: the swipe
+  ends, anything it highlighted is put back, and letting go does nothing (the glide itself is not typed; the
+  touch did not start on a letter). A level swipe still deletes words and still moves the cursor. The space-bar
+  slide selects only with shift the user turned on, not the automatic capital at a sentence start: that
+  selected the character before the cursor on a one-step slide (a longer slide dropped the automatic shift and
+  the next plain step collapsed it, so it was never the cause of the lost text). Device tests in
+  FieldCompatibilityTest drive the keyboard view with real touch events for all three. Without the fix the
+  backspace test turned "one two three four five six" into "one two", and the space test left one character
+  selected.

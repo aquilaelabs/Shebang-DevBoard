@@ -906,8 +906,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onCursorMove(steps: Int, select: Boolean) {
         text.finishComposing()
         val code = if (steps > 0) KeyEvent.KEYCODE_DPAD_RIGHT else KeyEvent.KEYCODE_DPAD_LEFT
-        // With shift on, shift+arrow grows the selection, as on a hardware keyboard.
-        val meta = if (select) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
+        // With shift on, shift+arrow grows the selection, as on a hardware keyboard: only shift the user turned on,
+        // not the automatic capital at a sentence start (B16).
+        val meta = if (select && !autoShifted) KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON else 0
         repeat(kotlin.math.abs(steps)) { KeySender.send(ic, KeyEventPlan(code, meta)) }
     }
 
@@ -1268,6 +1269,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     internal val languageReadyForTest: Boolean get() = bundle != null
     internal val keysForTest: List<Key> get() = geometry?.keys.orEmpty()
     internal val enterKindForTest: EnterKind? get() = keyboard?.enterKind
+    internal val keyboardForTest: KeyboardView? get() = keyboard
 
     /** Taps [key] as the keyboard view reports a tap: key down, then the tap with the shift state shown. */
     internal fun tapForTest(key: Key) {

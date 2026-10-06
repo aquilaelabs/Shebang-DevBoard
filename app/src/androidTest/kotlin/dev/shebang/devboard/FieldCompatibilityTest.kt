@@ -129,6 +129,53 @@ class FieldCompatibilityTest {
         assertText("the.")
     }
 
+    // ---- Touches near the bottom row (B16) ----------------------------------------------------------
+
+    @Test
+    fun aGlideThatStartsOnBackspaceDeletesNothing() {
+        open(FieldTestActivity.MULTILINE, needsLanguage = true)
+        type("one two three four five six ")
+        assertText("one two three four five six ")
+        // A glide for "my" whose first touch lands on the left edge of backspace, beside the m, then heads up-left.
+        val back = keyFor(KeyAction.BACKSPACE)
+        val y = key('y')!!
+        stroke(back.left + back.width * 0.15f to back.centerY, y.centerX to y.centerY)
+        assertText("one two three four five six ")
+        assertEquals("nothing selected", state().optInt("selStart"), state().optInt("selEnd"))
+    }
+
+    @Test
+    fun aLevelSwipeLeftFromBackspaceStillDeletesAWord() {
+        open(FieldTestActivity.MULTILINE, needsLanguage = true)
+        type("one two three ")
+        val back = keyFor(KeyAction.BACKSPACE)
+        val kw = key('q')!!.width
+        stroke(back.centerX to back.centerY, back.centerX - kw * 1.2f to back.centerY)
+        waitFor(3_000) { currentText().length < "one two three ".length }
+        assertTrue("a word went: '${currentText()}'", currentText().trimEnd() == "one two")
+    }
+
+    @Test
+    fun slidingOnSpaceAtASentenceStartMovesTheCursorWithoutSelecting() {
+        // A field that asks for sentence capitals, as message boxes do: after ". " the keyboard turns shift on by
+        // itself for the next word. That is not the user's shift, so the slide must not select.
+        open(FieldTestActivity.SENTENCES, needsLanguage = true)
+        type("one two. ")
+        assertText("One two. ")
+        var shift = dev.shebang.devboard.view.ShiftState.OFF
+        instrumentation.runOnMainSync { shift = service().keyboardForTest!!.shiftState }
+        assertEquals("shift is on by itself at the sentence start", dev.shebang.devboard.view.ShiftState.ON, shift)
+        val space = keyFor(KeyAction.SPACE)
+        val kw = key('q')!!.width
+        // A short slide, one step left: a longer one hides the fault, since the keyboard drops its own shift once
+        // the cursor leaves the sentence start and the next plain step collapses what the first selected.
+        stroke(space.centerX to space.centerY, space.centerX - kw * 1.3f to space.centerY)
+        waitFor(2_000) { state().optInt("selEnd") < "One two. ".length }
+        assertEquals("One two. ", currentText())
+        assertEquals("nothing selected", state().optInt("selStart"), state().optInt("selEnd"))
+        assertTrue("the cursor moved left", state().optInt("selEnd") < "One two. ".length)
+    }
+
     @Test
     fun twoWordsRunTogetherAreSplitOnSpace() {
         open(FieldTestActivity.MULTILINE, needsLanguage = true)
@@ -207,6 +254,32 @@ class FieldCompatibilityTest {
     private fun actions(): List<String> {
         val a = state().optJSONArray("actions") ?: return emptyList()
         return (0 until a.length()).map { a.getString(it) }
+    }
+
+    private fun keyFor(action: KeyAction): Key = service().keysForTest.first { it.action == action }
+
+    /** A finger on the keyboard view: down at the first point, moving through the rest about 60 times a second, up at the last. */
+    private fun stroke(vararg points: Pair<Float, Float>) {
+        val view = service().keyboardForTest ?: error("no keyboard view")
+        val down = SystemClock.uptimeMillis()
+        fun send(action: Int, x: Float, y: Float) {
+            val e = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0)
+            instrumentation.runOnMainSync { view.dispatchTouchEvent(e) }
+            e.recycle()
+        }
+        send(android.view.MotionEvent.ACTION_DOWN, points[0].first, points[0].second)
+        for (i in 1 until points.size) {
+            val (x0, y0) = points[i - 1]
+            val (x1, y1) = points[i]
+            for (k in 1..12) {
+                SystemClock.sleep(16)
+                send(android.view.MotionEvent.ACTION_MOVE, x0 + (x1 - x0) * k / 12f, y0 + (y1 - y0) * k / 12f)
+            }
+        }
+        SystemClock.sleep(16)
+        send(android.view.MotionEvent.ACTION_UP, points.last().first, points.last().second)
+        instrumentation.waitForIdleSync()
+        SystemClock.sleep(400)
     }
 
     private fun service(): DevBoardService = DevBoardService.running ?: error("the keyboard is not running")
