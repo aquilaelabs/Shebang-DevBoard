@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -267,7 +268,7 @@ fun BarEditorScreen(
             }
         }
         LazyColumn(
-            Modifier.fillMaxSize().padding(padding).imePadding(),
+            Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding(),
             state = listState,
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = PageMargin, end = PageMargin, top = 4.dp, bottom = 24.dp),
         ) {

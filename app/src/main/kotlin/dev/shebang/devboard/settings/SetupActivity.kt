@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -96,7 +97,7 @@ fun SetupScreen(onOpenSettings: () -> Unit) {
         Column(
             // Padded for the keyboard: the page scrolls the test field into view instead of the window
             // panning up under the status bar.
-            modifier = Modifier.fillMaxSize().padding(padding).imePadding().verticalScroll(rememberScrollState())
+            modifier = Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding).imePadding().verticalScroll(rememberScrollState())
                 .padding(horizontal = PageMargin, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(GroupGap),
         ) {
