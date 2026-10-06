@@ -85,6 +85,15 @@ class KeyboardView(context: Context) : View(context) {
     var shiftState: ShiftState = ShiftState.OFF
         private set
     var keyPreviewEnabled = true
+    /** The Enter key's glyph, from what the field does with Enter. */
+    var enterKind = dev.shebang.devboard.ime.EnterKind.RETURN
+        set(value) {
+            if (field == value) return
+            field = value
+            invalidate()
+        }
+    /** What a screen reader says for the Enter key ([dev.shebang.devboard.ime.FieldInfo.enterSpoken]). */
+    var enterSpoken = "Enter"
     var glideTrailEnabled = true
     /** Dipping into the space bar during a glide starts the next word. */
     var phraseGlideEnabled = false
@@ -367,8 +376,8 @@ class KeyboardView(context: Context) : View(context) {
         val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
         when (action) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
-            // Always the enter icon, whatever the field's action (search, send, go): the user's choice.
-            KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enter, fg, false)
+            // A glyph for what Enter does here (return, search, or Go/Send/Done), never a word: the user's choice.
+            KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enterFor(enterKind), fg, false)
             // The #! key wears the Shebang mark.
             KeyAction.MODE_CODE -> drawIcon(canvas, KeyIcons.shebang, fg, false)
             KeyAction.SHIFT -> drawIcon(canvas, when (shiftState) {

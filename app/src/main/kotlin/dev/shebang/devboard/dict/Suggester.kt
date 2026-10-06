@@ -115,6 +115,16 @@ class Suggester(
             }
         }
 
+        // 4. Two words run together, the space between them missed ("ataco" -> "a taco"): each way of cutting an
+        // unknown word into two common words, priced as the two words in a row after the words before, and the
+        // missed space as a slip.
+        if (SPLIT_ENABLED && lower.length >= SPLIT_MIN_LENGTH && dict.indexOf(lower) < 0) {
+            for (sp in splits(lower, context)) {
+                val word = matchCase(typed, sp.text)
+                if (out.none { it.word.equals(word, ignoreCase = true) }) out.add(Suggestion(word, sp.score, true))
+            }
+        }
+
         // The best prefix completion always leads: what was typed so far is trusted over a correction that
         // changes it. Corrections and the remaining completions then compete on score.
         val lead = out.firstOrNull { !it.isCorrection }
@@ -138,6 +148,52 @@ class Suggester(
             if (weight(idx, context) >= CONTRACTION_RATIO * weight(known, context)) return matchCase(typed, c.word)
         }
         return null
+    }
+
+    /** A way to cut a typed word into two words: their spellings joined by a space, and how likely it is. */
+    private class Split(val text: String, val score: Double)
+
+    /**
+     * The best ways to cut [lower] into two common words (both of tier 35 or better, or used by the user; a
+     * one-letter part only "a" or "i"), each scored as the first word after [context] times the second after
+     * the first, times the price of a missed space ([SPLIT_COST], as a slip). Best first, at most two.
+     */
+    private fun splits(lower: String, context: Context?): List<Split> {
+        val found = ArrayList<Split>(2)
+        for (i in 1 until lower.length) {
+            val a = lower.substring(0, i)
+            val b = lower.substring(i)
+            if (!splitPart(a) || !splitPart(b)) continue
+            val ia = dict.indexOf(a)
+            val ib = dict.indexOf(b)
+            val score = splitScore(ia, ib, context)
+            found += Split(dict.words[ia] + " " + dict.words[ib], score)
+        }
+        return found.sortedByDescending { it.score }.take(2)
+    }
+
+    private fun splitPart(part: String): Boolean {
+        if (part.length == 1) return part == "a" || part == "i"
+        if (part.any { !it.isLetter() }) return false
+        val idx = dict.indexOf(part)
+        if (idx < 0) return false
+        return dict.bestTier(idx) <= 35 || (personalCounts?.getOrNull(idx) ?: 0) > 0
+    }
+
+    private fun splitScore(ia: Int, ib: Int, context: Context?): Double {
+        val model = lm
+        val second = if (model != null) Context(context?.context1 ?: NgramModel.UNKNOWN, model.contextOf(ia)) else null
+        return weight(ia, context) * weight(ib, second) * kotlin.math.exp(-SLIP_WEIGHT * SPLIT_COST)
+    }
+
+    /** The score of [text] as a split of two dictionary words ("a taco"), or null when it is not one. */
+    private fun splitScoreOf(text: String, context: Context?): Double? {
+        val space = text.indexOf(' ')
+        if (space <= 0 || text.indexOf(' ', space + 1) >= 0) return null
+        val ia = dict.indexOf(text.substring(0, space))
+        val ib = dict.indexOf(text.substring(space + 1))
+        if (ia < 0 || ib < 0) return null
+        return splitScore(ia, ib, context)
     }
 
     /** The single best correction for autocorrect-on-space, or null when the typed word is fine. */
@@ -177,6 +233,18 @@ class Suggester(
         var bestScore = 0.0
         var bestSame = false
         for (c in candidates) {
+            // Two words run together: autocorrect splits them only when the split beats every one-word
+            // correction and is likely enough ([SPLIT_KEEP]) to beat keeping a word typed on purpose.
+            if (' ' in c.word) {
+                if (!SPLIT_AUTOCORRECT || lower.length < SPLIT_MIN_LENGTH) continue
+                val score = splitScoreOf(c.word, context) ?: continue
+                if (score > bestScore && score >= SPLIT_KEEP) {
+                    bestScore = score
+                    best = c.word
+                    bestSame = false
+                }
+                continue
+            }
             val idx = dict.indexOf(c.word)
             if (idx < 0) continue
             val w = dict.lower[idx]
@@ -234,6 +302,17 @@ class Suggester(
          * [TAP_THREE_SLIPS_FROM] three. Chosen on TSI's taps (TapBenchmarkTest, TAPS_SLIPS): typos fixed 75.9% ->
          * 80.6%, made another word 4.3% -> 3.3%, words meant as typed kept 65.7% -> 64.6%.
          */
+        /** Two words run together are offered on the strip ([splits]). */
+        var SPLIT_ENABLED = true
+        /** ...and autocorrect may split them on space. */
+        var SPLIT_AUTOCORRECT = true
+        /** The shortest typed word that is looked at as two words ("ofa" is three letters). */
+        var SPLIT_MIN_LENGTH = 3
+        /** The price of the missed space, in the units of [SlipCost] (one ordinary slip costs about 1). */
+        var SPLIT_COST = 0.25
+        /** How likely a split must be for autocorrect to make it, against keeping a word typed on purpose. */
+        var SPLIT_KEEP = 1e-7
+
         var TAP_TWO_SLIPS_FROM = 3
         var TAP_THREE_SLIPS_FROM = 6
 

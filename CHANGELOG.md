@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Two words typed without the space between them are offered as two words on the strip ('ataco' offers 'a taco'), and common pairs are split on space ('thankyou' becomes 'thank you'); backspace right after puts back what you typed (cfea7b6)
+
+### Changed
+
+- The enter key shows what it will do: the return arrow for a new line, a magnifier in search boxes, and an arrow where it goes, sends or finishes; screen readers say the action (8dbc2cb)
+
+### Fixed
+
+- Settings > About > Credits names every library the app ships, including the ones its libraries bring in, and says that five strokes from the FUTO swipe dataset are kept for tests (bf63adb)
+- Enter runs the search in search boxes that allow several lines, such as the Play Store's, instead of adding a second line (28f3de8)
+- The paste chip stays after you press space; it gives way when you start typing or gliding the next word, and does not come back for that copy (d30f02a)
+
 ## 0.5.4: 2026-10-05
 
 ### Fixed

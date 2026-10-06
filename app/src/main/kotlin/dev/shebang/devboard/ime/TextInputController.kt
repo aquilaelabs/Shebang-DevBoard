@@ -50,6 +50,13 @@ class TextInputController(
         fun showCandidates(words: List<String>)
         fun setComposing(composing: Boolean)
         /**
+         * The strip shows next-word suggestions after a space: no word is in progress, so chips (the paste chip,
+         * autofill) keep their row until a word is started (B15).
+         */
+        fun setPredicting() = setComposing(true)
+        /** A letter was typed into a word: a chip offering to paste is no longer wanted. */
+        fun wordStarted() = Unit
+        /**
          * Space will autocorrect [typed] to [fix]: the strip offers [typed] with a check mark to keep it, the
          * correction marked as the one that will go in, and [other].
          */
@@ -652,6 +659,7 @@ class TextInputController(
             }
             ic.setComposingText(word, 1)
             ui.setComposing(true)
+            ui.wordStarted()
             requestSuggestions()
             return
         }
@@ -798,7 +806,7 @@ class TextInputController(
                 predictions = words
                 predictedBefore = before.toString()
                 ui.showCandidates(arrangeBestMiddle(words))
-                ui.setComposing(true)
+                ui.setPredicting()
             }
         }
     }

@@ -38,7 +38,7 @@ internal class KeyboardAccessibility(private val keyboard: KeyboardView) : Explo
             node.setBoundsInParent(bounds.apply { setEmpty() })
             return
         }
-        node.contentDescription = spokenName(key, keyboard.shiftState)
+        node.contentDescription = spokenName(key, keyboard.shiftState, keyboard.enterSpoken)
         node.className = "android.widget.Button"
         node.isClickable = true
         node.addAction(AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_CLICK)
@@ -57,14 +57,14 @@ internal class KeyboardAccessibility(private val keyboard: KeyboardView) : Explo
 
     companion object {
         /** What a screen reader says for [key]: the character it types, or what a functional key does. */
-        fun spokenName(key: Key, shift: ShiftState): String = when (key.action) {
+        fun spokenName(key: Key, shift: ShiftState, enter: String = "Enter"): String = when (key.action) {
             KeyAction.SHIFT -> when (shift) {
                 ShiftState.OFF -> "Shift"
                 ShiftState.ON -> "Shift, on"
                 ShiftState.LOCKED -> "Shift, caps lock"
             }
             KeyAction.BACKSPACE -> "Delete"
-            KeyAction.ENTER -> "Enter"
+            KeyAction.ENTER -> enter
             KeyAction.SPACE -> "Space"
             KeyAction.MODE_CODE -> "Code mode"
             KeyAction.MODE_TEXT -> "Letters"

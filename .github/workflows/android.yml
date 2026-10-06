@@ -7,7 +7,9 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moves to a newer Ubuntu on GitHub's schedule (Ubuntu 26 from 19 Oct 2026), which can
+    # break the build with no change here. Move it on purpose.
+    runs-on: ubuntu-24.04
     env:
       # The unit tests read this for how many test JVMs to run (app/build.gradle.kts).
       BB_TEST_WORKERS: 4
@@ -47,4 +49,48 @@ jobs:
             app/build/reports/
             voice/build/reports/
             app/build/outputs/apk/debug/*.apk
+          if-no-files-found: ignore
+
+  # The keyboard in real fields (FieldCompatibilityTest, R33/R38): an API 36 emulator on the runner's KVM types
+  # through the real keyboard into EditText, Compose and WebView fields and a terminal-like view.
+  device-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      # The same packages as the build job: the voice module is configured too, though not built here.
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: >-
+            platform-tools
+            platforms;android-36
+            build-tools;36.0.0
+            ndk;29.0.14206865
+            cmake;4.1.2
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Let the emulator use KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Device tests on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: ./gradlew :app:connectedDebugAndroidTest --stacktrace
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: device-test-reports
+          path: |
+            app/build/reports/androidTests/
+            app/build/outputs/androidTest-results/
           if-no-files-found: ignore

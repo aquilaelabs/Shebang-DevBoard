@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: the activity the device tests type into (app/src/androidTest, FieldCompatibilityTest). It runs
+     in a process of its own, so the keyboard talks to its fields across processes as it does with any app; in the
+     keyboard's own process a WebView's field deadlocks against it. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <activity
+            android:name=".fieldtest.FieldTestActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:process=":fields"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
+</manifest>

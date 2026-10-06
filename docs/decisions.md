@@ -281,9 +281,11 @@ data. Newest first at the top, then the original design notes.
   up, when a field opens or the clip changes, and nothing of it is kept or learned. Freshness goes by when
   the keyboard saw the clip change, else by the clip's own timestamp (its clock differs between releases,
   so either is accepted). Terminals get no chip.
-- **Enter key**: always the enter icon, whatever the field asks for (search, go, send, done); it still
-  performs that action. Labels such as "Search" were drawn on the key until the user found them too big and
-  preferred the icon not to change.
+- **Enter key**: a glyph for what Enter does, never a word: the return arrow for a new line, a plain Enter,
+  Next and Previous and terminals; a magnifier for Search; a straight arrow with the return arrow's chevron
+  for Go, Send and Done. Screen readers hear the action ("Search", "Send"). Labels such as "Search" were drawn
+  on the key until the user found them too big, then the key always showed the return arrow; on 6 Oct the
+  user asked for a glyph per action, with no text.
 - **Autofill chips** (R11): the strip asks the autofill service for inline suggestions, styled with the
   bar-chip colour and strip text colours, and shows them in the bar's row (or the suggestions' in Auto mode)
   while no word is composed, so the keyboard's height never changes. They show in password fields too: they
@@ -669,9 +671,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Shift + letter on the main keyboard** types the capital as text; Ctrl/Alt/Meta + a main key becomes a
   `KeyEvent` using the character's US keycode (adding Shift meta for shifted symbols such as `_`).
 - **TYPE_NULL fields**: letters and symbols are committed as text, Backspace and Enter as `KeyEvent`s.
-- **Enter**: newline when the field is multiline or sets `IME_FLAG_NO_ENTER_ACTION`; otherwise
-  `performEditorAction` for Go/Search/Send/Next/Done/Previous; a plain Enter `KeyEvent` when the action is
-  none/unspecified or the field is a terminal.
+- **Enter**: newline when the field sets `IME_FLAG_NO_ENTER_ACTION`, or is multiline and names no action;
+  otherwise `performEditorAction` for Go/Search/Send/Next/Done/Previous; a plain Enter `KeyEvent` when the
+  action is none/unspecified or the field is a terminal. This is Android's rule as LatinIME and Gboard follow
+  it (5 Oct, B14): the first version gave every multiline field a newline, which made Enter add a second line
+  in the Play Store's search box, a Compose field that is multiline and asks for Search. TextView adds
+  `IME_FLAG_NO_ENTER_ACTION` to every multiline EditText itself, so message boxes still get their newline.
 - **Permissions**: the merged manifest declares `VIBRATE` and nothing else. AndroidX Core's automatic
   `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` is removed with `tools:node="remove"`; no code here or in the
   Compose/DataStore dependencies registers a runtime receiver through `ContextCompat`. If a future dependency
@@ -705,3 +710,47 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
 - **Language load time**: 0.5 to 1.2 s on the API 36 emulator, 2.4 s on the first start after installing
   (not yet compiled ahead of time); the keyboard appears at once and glide starts working when the language
   is in. Still to be measured on a phone (R7).
+- **Field compatibility tests on a device** (R33, 6 Oct): `FieldCompatibilityTest` types through the real
+  keyboard into real fields: multi-line and single-line EditTexts (search, web address, email, password,
+  number), Compose fields (multi-line asking for Search, and plain), a WebView search form and textarea, and a
+  `TYPE_NULL` view standing in for a terminal. It checks what the app received (text, editor actions, a
+  terminal's key events, no composing in a password field) and the Enter glyph. Choices it rests on:
+  - The fields live in `FieldTestActivity`, in `src/debug` so release builds do not carry it, and in a process
+    of its own (`:fields`). In the keyboard's process a WebView's field deadlocked against the keyboard (the
+    app stopped responding and a letter went missing), and real apps are always in another process.
+  - Keys are tapped through `DevBoardService.tapForTest`, the entry the keyboard view calls on a tap, so the
+    service, the controller and the app's InputConnection are all real; how a finger becomes a tap is R26's.
+    The service exposes a few read-only views for this (`running`, `fieldForTest`, `keysForTest`, ...).
+  - The field focuses itself and asks for the keyboard when its window first has focus, as an app whose field
+    opens focused does. Taps from the instrumentation (its pointer calls, an injected MotionEvent, the shell's
+    `input tap`) did not reach the field while it ran.
+  - The activity writes what its field holds to `files/fieldtest/state.json`, which the test reads.
+  - The web page turns autocapitalize off; Chrome otherwise asks for sentence capitals.
+  Putting the old Enter rule back makes the Compose search test fail, so it guards B14. It runs on an emulator
+  (`./gradlew :app:connectedDebugAndroidTest`) and selects Shebang DevBoard as the keyboard. CI runs it too
+  (R38): the `device-tests` job boots an API 36 google_apis x86_64 emulator on the runner's KVM with
+  reactivecircus/android-emulator-runner. Both CI jobs name `ubuntu-24.04` rather than `ubuntu-latest`, which
+  moves to Ubuntu 26 from 19 Oct 2026; move it on purpose.
+- **Two words run together** (6 Oct, the owner's ask: "ataco" should offer "a taco"): when a typed word is not
+  in the dictionary, `Suggester` tries every cut into two common words (tier 35 or better, or used by the user;
+  a one-letter part only "a" or "i") and scores each as the first word after the words before times the second
+  after the first, times the price of the missed space as a slip (`SPLIT_COST`). The best cut is offered on the
+  strip; autocorrect makes it on space when it beats every one-word correction and clears `SPLIT_KEEP`, the
+  guard for a word typed on purpose. A split pick is learned as its two words. Measured by
+  `JoinedWordsBenchmarkTest`: neighbouring words of the held-out Tatoeba sentences run together, and the packs'
+  names and terms decided against the regular words alone, as words typed on purpose the dictionary lacks; scored
+  as the keyboard scores typed words (slip costs, tap positions unknown). Tuned on the half of sentences whose id
+  has an even tens digit, checked once on the other half:
+
+  | Test half (7,131 joined pairs, 4,578 words meant as typed) | Split right on space | Made another word | Offered on the strip | Meant words split |
+  |---|---|---|---|---|
+  | Before | 0% | 12.1% | 0% | 0% |
+  | Cost 0.25, keep 1e-7 (shipped) | 81.4% | 0.4% | 99.2% | 0.9% |
+
+  On the dev half: cost 0 splits 94% but 3.4% of meant words; cost 0.5, 78.8% and 0.6%. The meant words split are
+  mostly lowercase names and terms the packs hold ("justin", "frontend", "readme"), so they stay whole while
+  the packs are on. The TSI tap benchmark did not move (typos fixed 80.6%, made another word 3.3%, right words
+  changed 0%, words meant as typed kept 64.0%, with and without splitting). A rare second word stays on the
+  strip only: "ataco" after "i want" offers "a taco" first and keeps "ataco" on space. All 3,000 held-out
+  sentences were scored once, at the first settings tried (cost 1.0), before the halves were fixed; no choice
+  was made from it.

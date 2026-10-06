@@ -63,6 +63,7 @@ NDK 29.0.14206865 and CMake 4.1.2 (CI installs exactly these). Gradle is fetched
 ```sh
 tools/fetch_voice_model.sh             # Shebang Voice's speech model (57 MB, not in git); its build needs it
 ./gradlew assembleDebug test lint      # what CI runs (.github/workflows/android.yml)
+./gradlew :app:connectedDebugAndroidTest   # the keyboard in real fields, on an emulator; CI's device-tests job runs it too
 ./gradlew installDebug                 # install on the connected device or emulator
 adb shell ime enable dev.shebang.devboard/.ime.DevBoardService
 adb shell ime set dev.shebang.devboard/.ime.DevBoardService

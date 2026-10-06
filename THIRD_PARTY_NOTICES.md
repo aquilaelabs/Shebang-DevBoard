@@ -190,9 +190,11 @@ authorization of the copyright holder.
 - Used for: measuring and tuning the glide decoder on real swipes (`FutoSwipesTest`, `FrictionTest`); the
   decoder's default parameters (`GlideParams`) were chosen on its dev split. The glide model shipped in the
   app (`app/src/main/assets/glide/glide_model.bin`) was trained on its training split by
-  `tools/glide_model/train.py`: the file holds the network's learned weights, none of the swipes. Apart from
-  those weights no part of the data is in this repository or the app: the tests and training read a copy
-  downloaded to the machine they run on.
+  `tools/glide_model/train.py`: the file holds the network's learned weights, none of the swipes. The
+  repository also keeps five strokes from its dev split in `app/src/test/resources/glide/glide_model_vectors.txt`
+  (touch points only, with no words), which `GlideModelTest` uses to check the app reads strokes as the trained
+  model does. Apart from those no part of the data is in this repository or the app: the tests and training
+  read a copy downloaded to the machine they run on.
 - Source: FUTO, <https://huggingface.co/datasets/futo-org/swipe.futo.org> (`train.jsonl`, `dev.jsonl`,
   `test.jsonl` and `swipe-5/layouts/qwerty.json`), downloaded 2026-09-30 and 2026-10-02.
 - Licence: MIT.
@@ -232,7 +234,7 @@ SOFTWARE.
 The key glyphs (backspace, return, shift), the launcher icon ("#!"), the theme palettes and names, and all
 other artwork are original to this project.
 
-## Libraries (all Apache License 2.0)
+## Libraries (Apache License 2.0 unless noted)
 
 | Library | Version | Use |
 |---|---|---|
@@ -248,6 +250,11 @@ other artwork are original to this project.
 | whisper.cpp and ggml (The ggml authors), MIT | 1.9.4 | the Shebang Voice add-on's speech engine, vendored and trimmed to the CPU build in `voice/src/main/cpp/whisper.cpp` (see `VENDORED.md` there) |
 | AndroidX Test runner and JUnit extension | 1.7.0 / 1.3.0 | device tests of the add-on only, not shipped |
 | JUnit 4 (Eclipse Public License 1.0) | 4.13.2 | unit tests only, not shipped |
+
+The libraries above bring in others the app also ships, all under the Apache License 2.0: further AndroidX
+libraries (Annotation, Collection, SavedState, Emoji2, ProfileInstaller, Startup, Window and the rest of
+Compose's), Okio 3.9.1 (Square, used by DataStore), JSpecify 1.0.0 annotations, Guava ListenableFuture 1.0
+and JetBrains annotations 23.0.0. Shebang Voice ships only the Kotlin standard library and whisper.cpp.
 
 ## Tools
 

@@ -19,6 +19,8 @@ class KeyboardAccessibilityTest {
     @Test
     fun functionalKeysSayWhatTheyDo() {
         assertEquals("Delete", KeyboardAccessibility.spokenName(key(KeyDef(action = "backspace")), ShiftState.OFF))
+        assertEquals("Enter", KeyboardAccessibility.spokenName(key(KeyDef(action = "enter")), ShiftState.OFF))
+        assertEquals("Search", KeyboardAccessibility.spokenName(key(KeyDef(action = "enter")), ShiftState.OFF, "Search"))
         assertEquals("Shift, caps lock", KeyboardAccessibility.spokenName(key(KeyDef(action = "shift")), ShiftState.LOCKED))
         assertEquals("Code mode", KeyboardAccessibility.spokenName(key(KeyDef(label = "#!", action = "mode_code")), ShiftState.OFF))
         assertEquals("Left", KeyboardAccessibility.spokenName(key(KeyDef(label = "←", code = "DPAD_LEFT")), ShiftState.OFF))

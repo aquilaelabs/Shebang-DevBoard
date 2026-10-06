@@ -9,7 +9,8 @@ import dev.shebang.devboard.settings.StripMode
  * The area above the keys: the terminal bar, the suggestion strip, or both, per the strip setting.
  * In AUTO mode the bar is replaced by suggestions while a word is being composed. Autofill chips from a
  * password manager, and a chip for pasting what was just copied, take the bar's row while no word is being
- * composed, so the strip keeps its height.
+ * composed, so the strip keeps its height. Next-word suggestions after a space do not count as a word: the
+ * chips keep the row over them until a word is started or the chips are swiped away.
  */
 class TopStripView(context: Context) : LinearLayout(context) {
     val bar = TerminalBarView(context)
@@ -21,6 +22,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
     private val rows = LinearLayout(context).apply { orientation = VERTICAL }
     private var mode = StripMode.AUTO
     private var composing = false
+    /** The suggestions are next-word predictions, not a word in progress. */
+    private var predicting = false
     private var codeMode = false
     private var hasAutofill = false
     /** The user swiped the chips away in this field; new suggestions for it stay hidden. */
@@ -72,9 +75,12 @@ class TopStripView(context: Context) : LinearLayout(context) {
         apply()
     }
 
-    fun setComposing(c: Boolean) {
-        if (composing == c) return
+    /** Suggestions are showing ([c]); [predicting] when they are next words after a space, not a word typed. */
+    fun setComposing(c: Boolean, predicting: Boolean = false) {
+        val p = c && predicting
+        if (composing == c && this.predicting == p) return
         composing = c
+        this.predicting = p
         apply()
     }
 
@@ -120,8 +126,10 @@ class TopStripView(context: Context) : LinearLayout(context) {
                 showSuggestions = composing
             }
         }
-        // Chips take the bar's row, or the suggestions' in Auto mode when no word is composed.
-        val showAutofill = (hasAutofill || autofill.hasClip) && !composing && (showBar || showSuggestions)
+        // Chips take the bar's row, or the suggestions' in Auto mode when no word is composed. Next-word
+        // predictions are not a word: the chips stay over them.
+        val wordInProgress = composing && !predicting
+        val showAutofill = (hasAutofill || autofill.hasClip) && !wordInProgress && (showBar || showSuggestions)
         autofill.visibility = if (showAutofill) VISIBLE else GONE
         bar.visibility = if (showBar && !showAutofill) VISIBLE else GONE
         suggestions.visibility = if (showSuggestions && !(showAutofill && !showBar)) VISIBLE else GONE

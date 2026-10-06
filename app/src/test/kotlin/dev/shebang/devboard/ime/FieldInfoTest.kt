@@ -62,15 +62,54 @@ class FieldInfoTest {
     }
 
     @Test
+    fun theEnterKeyWearsAGlyphForWhatItDoes() {
+        val text = InputType.TYPE_CLASS_TEXT
+        val multi = text or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        fun kind(type: Int, options: Int) = FieldInfo.from(type, options).enterKind
+        assertEquals(EnterKind.SEARCH, kind(text, EditorInfo.IME_ACTION_SEARCH))
+        assertEquals(EnterKind.SEARCH, kind(multi, EditorInfo.IME_ACTION_SEARCH))
+        assertEquals(EnterKind.SUBMIT, kind(text or InputType.TYPE_TEXT_VARIATION_URI, EditorInfo.IME_ACTION_GO))
+        assertEquals(EnterKind.SUBMIT, kind(text, EditorInfo.IME_ACTION_SEND))
+        assertEquals(EnterKind.SUBMIT, kind(text, EditorInfo.IME_ACTION_DONE))
+        // A new line, a plain Enter, moving between fields, and terminals keep the return arrow.
+        assertEquals(EnterKind.RETURN, kind(multi, EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_ENTER_ACTION))
+        assertEquals(EnterKind.RETURN, kind(text, EditorInfo.IME_ACTION_UNSPECIFIED))
+        assertEquals(EnterKind.RETURN, kind(text, EditorInfo.IME_ACTION_NEXT))
+        assertEquals(EnterKind.RETURN, kind(text, EditorInfo.IME_ACTION_PREVIOUS))
+        assertEquals(EnterKind.RETURN, kind(InputType.TYPE_NULL, EditorInfo.IME_ACTION_SEARCH))
+
+        assertEquals("Search", FieldInfo.from(text, EditorInfo.IME_ACTION_SEARCH).enterSpoken)
+        assertEquals("Send", FieldInfo.from(text, EditorInfo.IME_ACTION_SEND).enterSpoken)
+        assertEquals("Go", FieldInfo.from(text, EditorInfo.IME_ACTION_GO).enterSpoken)
+        assertEquals("Done", FieldInfo.from(text, EditorInfo.IME_ACTION_DONE).enterSpoken)
+        assertEquals("Enter", FieldInfo.from(multi, EditorInfo.IME_FLAG_NO_ENTER_ACTION).enterSpoken)
+    }
+
+    @Test
     fun enterFollowsImeOptions() {
         val go = FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_GO)
         assertEquals(EditorInfo.IME_ACTION_GO, go.editorAction)
         assertFalse(go.enterIsNewline)
         assertFalse(go.enterIsKeyEvent)
 
-        val multi = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_SEND)
-        assertTrue(multi.multiline)
-        assertTrue(multi.enterIsNewline)
+        // A multi-line field that asks for an action without IME_FLAG_NO_ENTER_ACTION gets it (the Play Store's
+        // search box, B14); with the flag, as TextView adds to every multi-line EditText, Enter is a new line.
+        val multiSearch = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_SEARCH)
+        assertTrue(multiSearch.multiline)
+        assertFalse(multiSearch.enterIsNewline)
+        assertFalse(multiSearch.enterIsKeyEvent)
+        assertEquals(EditorInfo.IME_ACTION_SEARCH, multiSearch.editorAction)
+
+        val messageBox = FieldInfo.from(
+            InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE,
+            EditorInfo.IME_ACTION_SEND or EditorInfo.IME_FLAG_NO_ENTER_ACTION,
+        )
+        assertTrue(messageBox.enterIsNewline)
+
+        val multiPlain = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE, EditorInfo.IME_ACTION_UNSPECIFIED)
+        assertTrue(multiPlain.enterIsNewline)
+        val multiNone = FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_IME_MULTI_LINE, EditorInfo.IME_ACTION_NONE)
+        assertTrue(multiNone.enterIsNewline)
 
         val noAction = FieldInfo.from(InputType.TYPE_CLASS_TEXT, EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_ENTER_ACTION)
         assertTrue(noAction.enterIsNewline)
