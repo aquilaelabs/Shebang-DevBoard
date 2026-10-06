@@ -314,40 +314,15 @@ class TextInputController(
     )
     private var lastGlide: GlideCommit? = null
 
-    /**
-     * A glided word with what learning needs: the word before it, whether it began a sentence, where its
-     * stroke passed each letter, and the stroke itself (for re-aligning after a correction).
-     */
-    private class GlidedWord(
-        var text: String,
-        var word: GlideWord,
-        var previous: String?,
-        var sentenceStart: Boolean,
-        var observations: FloatArray?,
-        val stroke: FloatArray?,
-        /** How this word ends up if it is kept from now on: as glided, or fixed from the strip or by the next glide. */
-        var fixedBy: Int = GlideOutcomes.KEPT,
-    )
+    /** When glided words are learned: the last glide's words are open, then held a while, then learned. */
+    private val glides = GlideLearning(learner) { field }
 
-    /** The last glide, not yet learned: backspace can still remove it and the strip can still swap its last word. */
-    private val pending = ArrayList<GlidedWord>()
-
-    /**
-     * Glided words that are final but not learned yet, newest last: the last [HELD_WORDS]. A wrong glide is
-     * often noticed a few words later and fixed by backing up to it; one changed or replaced while held is
-     * dropped unlearned ([abandon]), so the mistake does not teach its word, its pairs or its stroke. The rest
-     * are learned as newer ones push them out, and all of them when the field changes.
-     */
-    private val held = ArrayDeque<GlidedWord>()
-
-    /** Words glided in this field lately, newest last: a tapped word found here has its runners-up and stroke. */
-    private val recent = ArrayDeque<GlidedWord>()
     private var dictionaryInUse: Dictionary? = null
 
     /**
      * The word the user pointed at. [at] is the cursor (or selection start) where it was found, -1 when not
      * known; [before] of its letters lie before the cursor and [after] after it, or it is the selection
-     * ([selection]). [glided] is the same word from [recent], when there is one.
+     * ([selection]). [glided] is the same word as glided lately, when it was.
      */
     private class Target(
         val text: String,
@@ -402,8 +377,7 @@ class TextInputController(
         // An email field left for another field: its addresses are remembered.
         rememberEmails()
         // What was glided in the last field is learned under that field's rules.
-        settle()
-        flushHeld()
+        glides.finish()
         this.field = field
         resetState()
     }
@@ -423,9 +397,8 @@ class TextInputController(
         joinOffer = null
         lastGlide = null
         target = null
-        recent.clear()
-        settle()
-        flushHeld()
+        glides.forgetRecent()
+        glides.finish()
         lastActionWasSpace = false
         spaceAfterPunctuation = false
         lastOwnTail = null
@@ -513,7 +486,7 @@ class TextInputController(
 
     private fun isLetterInWord(c: Char) = c.isLetter() || c == '\'' || c == '’'
 
-    private fun recentMatch(text: String): GlidedWord? = recent.lastOrNull { it.text.equals(text, ignoreCase = true) }
+    private fun recentMatch(text: String): GlidedWord? = glides.findRecent(text)
 
     /** Shows the target in the middle of the strip with its alternatives: its own runners-up if it was glided, else suggestions. */
     private fun setTarget(t: Target) {
@@ -924,11 +897,7 @@ class TextInputController(
         // right before the cursor (a quick tap elsewhere can outrun the cursor report).
         if (glide != null && ic.getTextBeforeCursor(glide.text.length, 0)?.toString() == glide.text) {
             deleteBefore(ic, glide.text.length)
-            repeat(minOf(glide.words, pending.size)) {
-                val w = pending.removeAt(pending.size - 1)
-                recent.remove(w)
-                outcome(w, GlideOutcomes.DELETED)
-            }
+            glides.deletePending(glide.words)
             lastGlide = null
             clearCandidates()
             return
@@ -1149,14 +1118,9 @@ class TextInputController(
      * teach its word or its stroke. The rest of that glide is final.
      */
     private fun forgetDeletedGlide(n: Int) {
-        val fromPending = minOf(n, pending.size)
-        repeat(fromPending) {
-            val w = pending.removeAt(pending.size - 1)
-            recent.remove(w)
-            outcome(w, GlideOutcomes.DELETED)
-        }
+        val fromPending = glides.deletePending(n)
         // Words before the last glide that went too were glided before it, if they were glided at all.
-        if (pending.isEmpty()) repeat(minOf(n - fromPending, held.size)) { abandon(held.last(), GlideOutcomes.DELETED) }
+        if (glides.pendingCount == 0) glides.deleteHeld(n - fromPending)
         settle()
     }
 
@@ -1407,39 +1371,11 @@ class TextInputController(
 
     // ---- Learning glided words ------------------------------------------------------------------------
 
-    /** The last glide can no longer be undone or swapped: its words are held, then learned ([held]). */
-    private fun settle() {
-        for (w in pending) {
-            held.addLast(w)
-            while (held.size > HELD_WORDS) retire(held.removeFirst())
-        }
-        pending.clear()
-    }
-
-    private fun flushHeld() {
-        while (held.isNotEmpty()) retire(held.removeFirst())
-    }
+    /** The last glide can no longer be undone or swapped: its words are held, then learned. */
+    private fun settle() = glides.settle()
 
     /** A glided word the user changed or replaced ([how]): never learned as it was glided. */
-    private fun abandon(w: GlidedWord, how: Int) {
-        // Counted only while it was still open: a word redone after it was final has had its outcome.
-        val open = pending.remove(w) or held.remove(w)
-        recent.remove(w)
-        if (open) outcome(w, how)
-    }
-
-    /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */
-    private fun outcome(w: GlidedWord, how: Int) {
-        if (!field.noPersonalizedLearning) learner.glideOutcome(how, w.text.length)
-    }
-
-    /** A glided word is final: learn it, and where its stroke passed its letters. */
-    private fun retire(w: GlidedWord) {
-        outcome(w, w.fixedBy)
-        if (!field.allowsLearning) return
-        learner.learnWord(w.text, w.previous, w.sentenceStart)
-        w.observations?.let { learner.learnGlide(it) }
-    }
+    private fun abandon(w: GlidedWord, how: Int) = glides.abandon(w, how)
 
     // ---- Suggestions ---------------------------------------------------------------------------------
 
@@ -1548,7 +1484,7 @@ class TextInputController(
             if (replaceTarget(t, chosen)) {
                 val idx = dictionary?.indexOfLower(chosen.lowercase()) ?: -1
                 if (dictionary != null && idx >= 0) learner.correction(t.glided?.stroke, idx, dictionary)
-                t.glided?.let { recent.remove(it) }
+                t.glided?.let { glides.forgetRecent(it) }
                 if (field.allowsLearning) learner.learnWord(chosen, prev.first, prev.second)
             }
             clearCandidates()
@@ -1571,7 +1507,7 @@ class TextInputController(
             // The run of glided words becomes one name.
             if (ic.getTextBeforeCursor(join.runText.length, 0)?.toString() == join.runText) {
                 replaceBefore(ic, join.runText.length, chosen)
-                pending.clear()
+                glides.dropPending()
                 if (field.allowsLearning) learner.learnWord(chosen, null, false)
             }
             joinOffer = null
@@ -1591,7 +1527,7 @@ class TextInputController(
             glide.lastWord = chosen
             // A word picked by hand is a correction; it is learned as picked, and its stroke not trusted.
             val idx = glide.alternatives.indexOf(chosen)
-            val last = pending.lastOrNull()
+            val last = glides.lastPending()
             if (last != null && idx >= 0) {
                 val dictionary = dictionaryInUse
                 if (dictionary != null && glide.alternativeWords[idx] != last.word.word) {
@@ -1672,7 +1608,7 @@ class TextInputController(
     private fun revisableBefore(ic: InputConnection): Revisable? {
         if (!settings.fixPreviousGlide || !field.allowsComposing || field.exact || target != null || isComposing) return null
         val g = lastGlide ?: return null
-        val last = pending.lastOrNull() ?: return null
+        val last = glides.lastPending() ?: return null
         if (last.word.locked || last.text != g.lastWord) return null
         if (!ic.getSelectedText(0).isNullOrEmpty()) return null
         val tail = last.text + g.after
@@ -1796,9 +1732,8 @@ class TextInputController(
                 lastOwnTail = text
                 val first = fresh.first()
                 if (!first.text.equals(t.text, ignoreCase = true)) learner.correction(t.glided?.stroke, first.word.word, dictionary)
-                t.glided?.let { recent.remove(it) }
-                remember(fresh)
-                pending.addAll(fresh)
+                t.glided?.let { glides.forgetRecent(it) }
+                glides.add(fresh)
                 val alternatives = result.alternatives.map { caseFor(t, dictionary.words[it]) }
                 lastGlide = GlideCommit(text, fresh.last().text, alternatives, result.alternatives, fresh.size, "")
                 ui.showCandidates(arrangeBestMiddle(alternatives))
@@ -1818,8 +1753,7 @@ class TextInputController(
         lastOwnTail = ownText
         // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
         lastActionWasSpace = trailingSpace
-        remember(fresh)
-        pending.addAll(fresh)
+        glides.add(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
         val glide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after)
         lastGlide = glide
@@ -1875,20 +1809,12 @@ class TextInputController(
         }
     }
 
-    private fun remember(words: List<GlidedWord>) {
-        for (w in words) {
-            recent.addLast(w)
-            if (recent.size > MAX_RECENT) recent.removeFirst()
-        }
-    }
-
     /** The language was rebuilt: dictionary indices changed, so remembered glides and the target go. */
     fun onLanguageChanged() {
         dropTarget()
-        settle()
-        flushHeld()
+        glides.finish()
         lastGlide = null
-        recent.clear()
+        glides.forgetRecent()
     }
 
     /** No space at the field start, after whitespace or a newline, or after an opening bracket. */
@@ -1936,10 +1862,6 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
-        /** Glided words remembered for redoing. */
-        private const val MAX_RECENT = 32
-        /** Glided words held back from learning, in case one turns out wrong a few words on ([held]). */
-        private const val HELD_WORDS = 8
 
         /** Strip order for glide alternatives: runner-up left, best in the middle, third right. */
         fun arrangeBestMiddle(ranked: List<String>): List<String> = when (ranked.size) {
