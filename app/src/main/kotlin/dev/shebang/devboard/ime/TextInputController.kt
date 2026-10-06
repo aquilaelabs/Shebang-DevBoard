@@ -279,20 +279,10 @@ class TextInputController(
     /** The last word autocorrect changed, while it is the last thing typed: backspace puts back [typed]. */
     private class Autocorrected(val typed: String, val corrected: String, val after: String)
     private var lastAutocorrect: Autocorrected? = null
-    /** Words the user took back from autocorrect in this field (lowercase): typed again, they stay as typed. */
-    private val keptAsTyped = HashSet<String>()
-
-    /**
-     * A word autocorrect changed, found again by the text before it: [upTo] is the text up to and including
-     * [corrected] as it stood after the correction ([atStart]: all of the text before it, which was short).
-     * [other] is the third word the strip offered for [typed] beside the correction, so going back to the word
-     * shows the strip as it was before the correction.
-     */
-    private class Correction(val typed: String, val corrected: String, val upTo: String, val atStart: Boolean, val other: String?)
-    /** The latest corrections in this field, oldest first: backspace back to one offers what was typed. */
-    private val corrections = ArrayDeque<Correction>()
-    /** The correction backspace walked back to, while it is the reopened word: picking [Correction.typed] keeps it. */
-    private var reopenedCorrection: Correction? = null
+    /** The latest corrections in this field, and the words taken back from autocorrect. */
+    private val corrections = Corrections()
+    /** The correction backspace walked back to, while it is the reopened word: picking [Corrections.Entry.typed] keeps it. */
+    private var reopenedCorrection: Corrections.Entry? = null
 
     /**
      * The word backspace walked back into and reopened as the composing word, while it stands unchanged: a
@@ -423,7 +413,6 @@ class TextInputController(
         candidates = emptyList()
         candidatesFor = ""
         lastAutocorrect = null
-        keptAsTyped.clear()
         corrections.clear()
         emailOffers.clear()
         reopenedCorrection = null
@@ -925,8 +914,8 @@ class TextInputController(
             ic.deleteSurroundingText(ac.corrected.length + ac.after.length, 0)
             ic.commitText(ac.typed, 1)
             ic.endBatchEdit()
-            keptAsTyped += ac.typed.lowercase()
-            corrections.removeAll { it.typed == ac.typed && it.corrected == ac.corrected }
+            corrections.keepAsTyped(ac.typed)
+            corrections.forget(ac.typed, ac.corrected)
             return
         }
         val glide = lastGlide
@@ -1001,7 +990,7 @@ class TextInputController(
      */
     private fun reopenWordBeforeCursor(ic: InputConnection) {
         val text = recomposeWordBeforeCursor(ic) ?: return
-        val c = correctionEndingAtCursor(ic, text)
+        val c = corrections.endingAtCursor(ic, text)
         reopenedCorrection = c
         if (c != null) {
             // Back to a word autocorrect changed: it stays, and the strip offers the words it offered before the
@@ -1031,29 +1020,9 @@ class TextInputController(
         }
     }
 
-    /** Remembers that autocorrect wrote [corrected] for [typed], with [trailing] characters after it before the cursor. */
-    private fun rememberCorrection(ic: InputConnection, typed: String, corrected: String, trailing: Int, other: String?) {
-        val n = CORRECTION_CONTEXT + corrected.length + trailing
-        val before = ic.getTextBeforeCursor(n, 0)?.toString() ?: return
-        val upTo = before.dropLast(trailing)
-        if (before.length < trailing || !upTo.endsWith(corrected)) return
-        corrections.addLast(Correction(typed, corrected, upTo, atStart = before.length < n, other))
-        if (corrections.size > MAX_CORRECTIONS) corrections.removeFirst()
-    }
-
     /** The strip's third word beside a correction: the best of [ranked] that is neither [typed] nor [fix]. */
     private fun otherSuggestion(typed: String, fix: String, ranked: List<Suggestion>): String? =
         ranked.map { it.word }.firstOrNull { !it.equals(fix, ignoreCase = true) && !it.equals(typed, ignoreCase = true) }
-
-    /** The remembered correction that [text], the word just before the cursor, still is, in the same place. */
-    private fun correctionEndingAtCursor(ic: InputConnection, text: String): Correction? {
-        for (c in corrections.asReversed()) {
-            if (c.corrected != text) continue
-            val before = ic.getTextBeforeCursor(c.upTo.length + 1, 0)?.toString() ?: return null
-            if (if (c.atStart) before == c.upTo else before.length > c.upTo.length && before.endsWith(c.upTo)) return c
-        }
-        return null
-    }
 
     /**
      * Makes the word ending at the cursor the composing word again and returns it, or null when there is none:
@@ -1271,7 +1240,7 @@ class TextInputController(
         val untouched = reopenedUnchanged
         reopened = null
         val canCorrect = correct && !untouched && settings.autocorrect && field.allowsComposing && !field.noAutocorrect &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
+            !corrections.isKeptAsTyped(typed) && !looksLikeCode(typed) && !startsAnIdentifier(typed) && !gluedToPrevious(ic, typed) &&
             !capitalisedOnPurpose(ic, typed)
         var commit = typed
         var defer = false
@@ -1304,7 +1273,7 @@ class TextInputController(
         clearCandidates()
         if (commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
             lastAutocorrect = Autocorrected(typed, commit, after)
-            rememberCorrection(ic, typed, commit, after.length, other)
+            corrections.remember(ic, typed, commit, after.length, other)
         }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
@@ -1336,7 +1305,7 @@ class TextInputController(
                     ic2.endBatchEdit()
                     // Backspace's undo of a correction only applies while it is the last thing typed.
                     if (next.isEmpty()) lastAutocorrect = Autocorrected(typed, late, after)
-                    rememberCorrection(ic2, typed, late, after.length + next.length, otherSuggestion(typed, late, ranked))
+                    corrections.remember(ic2, typed, late, after.length + next.length, otherSuggestion(typed, late, ranked))
                     learnAs(late, context)
                 } else {
                     learnAs(commit, context)
@@ -1535,7 +1504,7 @@ class TextInputController(
         // Whether space would autocorrect this word, as endWord decides it (the text check is done here,
         // on the main thread).
         val correctable = settings.autocorrect && field.allowsComposing && !field.noAutocorrect && !reopenedUnchanged &&
-            typed.lowercase() !in keptAsTyped && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
+            !corrections.isKeptAsTyped(typed) && !looksLikeCode(typed) && !startsAnIdentifier(typed) &&
             (ic == null || (!gluedToPrevious(ic, typed) && !capitalisedOnPurpose(ic, typed))) &&
             (ic == null || !appearsInText(ic, typed))
         background.execute {
@@ -1647,8 +1616,8 @@ class TextInputController(
             reopened = null
             // Picking the word exactly as typed (the strip's check mark), or as first typed before autocorrect
             // changed it, keeps it from autocorrect from now on.
-            if (chosen == word.toString()) keptAsTyped += chosen.lowercase()
-            reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) keptAsTyped += chosen.lowercase() }
+            if (chosen == word.toString()) corrections.keepAsTyped(chosen)
+            reopenedCorrection?.let { if (reopenedUnchanged && chosen == it.typed) corrections.keepAsTyped(chosen) }
             reopenedCorrection = null
             learnTyped(ic, chosen)
             // An email address goes on as typed: no space after the word.
@@ -1967,10 +1936,6 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
-        /** Characters before a corrected word that find it again: enough to tell two of the same word apart. */
-        private const val CORRECTION_CONTEXT = 32
-        /** Corrections remembered per field for backspace to take back. */
-        private const val MAX_CORRECTIONS = 16
         /** Glided words remembered for redoing. */
         private const val MAX_RECENT = 32
         /** Glided words held back from learning, in case one turns out wrong a few words on ([held]). */
