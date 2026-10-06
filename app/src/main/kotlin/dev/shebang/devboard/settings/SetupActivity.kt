@@ -54,6 +54,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 /** Launcher screen: three setup steps with their done state, and a way into the settings. */
 class SetupActivity : ComponentActivity() {
@@ -103,10 +105,9 @@ fun SetupScreen(onOpenSettings: () -> Unit) {
         ) {
             AppMark(72.dp)
             Spacer(Modifier.height(4.dp))
-            Text("Shebang DevBoard", style = MaterialTheme.typography.headlineMedium)
+            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium)
             Text(
-                "A keyboard for developers: glide typing, a code mode with every symbol, and a terminal bar. " +
-                    "Everything stays on this phone.",
+                stringResource(R.string.setup_intro),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -119,39 +120,39 @@ fun SetupScreen(onOpenSettings: () -> Unit) {
                     drawStopIndicator = {},
                 )
                 Spacer(Modifier.width(12.dp))
-                Text(if (done == 3) "All set" else "$done of 3 done", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                Text(if (done == 3) stringResource(R.string.setup_all_set) else stringResource(R.string.setup_progress, done), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(Modifier.height(4.dp))
             StepCard(
-                number = 1, title = "Turn it on", done = status.enabled,
-                description = "Switch on Shebang DevBoard in the system's keyboard list. Android warns that keyboards can see what you type: this one has no network access, so nothing leaves the phone.",
-                buttonLabel = "Open keyboard list",
+                number = 1, title = stringResource(R.string.setup_step1_title), done = status.enabled,
+                description = stringResource(R.string.setup_step1_text),
+                buttonLabel = stringResource(R.string.setup_step1_button),
             ) { context.startActivity(Intent(SysSettings.ACTION_INPUT_METHOD_SETTINGS)) }
             StepCard(
-                number = 2, title = "Make it your keyboard", done = status.selected,
-                description = "Pick Shebang DevBoard as the keyboard to use.",
-                buttonLabel = "Choose keyboard",
+                number = 2, title = stringResource(R.string.setup_step2_title), done = status.selected,
+                description = stringResource(R.string.setup_step2_text),
+                buttonLabel = stringResource(R.string.setup_step2_button),
                 enabled = status.enabled,
             ) { (context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showInputMethodPicker() }
             StepSurface {
-                StepHeader(3, "Try it", done = testText.isNotEmpty())
+                StepHeader(3, stringResource(R.string.setup_step3_title), done = testText.isNotEmpty())
                 Text(
-                    "Type here, glide across the letters to write a word, and tap #! for every symbol.",
+                    stringResource(R.string.setup_step3_text),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 OutlinedTextField(
                     value = testText, onValueChange = { testText = it },
-                    modifier = Modifier.fillMaxWidth(), placeholder = { Text("Test field") }, minLines = 3,
+                    modifier = Modifier.fillMaxWidth(), placeholder = { Text(stringResource(R.string.setup_test_field)) }, minLines = 3,
                     shape = RoundedCornerShape(6.dp),
                 )
             }
             Spacer(Modifier.height(6.dp))
             val ready = status.enabled && status.selected
             if (ready) {
-                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text("Open settings") }
+                Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text(stringResource(R.string.setup_open_settings)) }
             } else {
-                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text("Open settings") }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(6.dp)) { Text(stringResource(R.string.setup_open_settings)) }
             }
         }
     }
@@ -174,11 +175,11 @@ private fun StepHeader(number: Int, title: String, done: Boolean) {
             modifier = Modifier.size(32.dp).background(bg, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            if (done) Icon(Icons.Default.Check, contentDescription = "Done", tint = fg, modifier = Modifier.size(20.dp))
+            if (done) Icon(Icons.Default.Check, contentDescription = stringResource(R.string.setup_step_done), tint = fg, modifier = Modifier.size(20.dp))
             else Text("$number", color = fg, style = MaterialTheme.typography.titleSmall)
         }
         Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-        if (done) Text("Done", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+        if (done) Text(stringResource(R.string.setup_step_done), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
     }
 }
 

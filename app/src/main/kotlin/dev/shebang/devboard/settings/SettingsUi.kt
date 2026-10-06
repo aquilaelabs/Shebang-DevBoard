@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.PathParser
 import dev.shebang.devboard.R
 import dev.shebang.devboard.view.IconDrawable
+import androidx.compose.ui.res.stringResource
 
 /*
  * The settings app's building blocks, in the design language's terms: rows grouped on cards of the theme's key
@@ -152,7 +153,7 @@ internal fun SettingsPage(
             LargeTopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) }
                 },
                 actions = actions,
                 scrollBehavior = scroll,

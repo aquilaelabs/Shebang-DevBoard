@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.shebang.devboard.ime.VoiceClient
@@ -83,6 +84,9 @@ import dev.shebang.devboard.layout.KeyCodeNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -175,6 +179,7 @@ fun BarEditorScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var addDialog by remember { mutableStateOf(false) }
     var menuOpen by remember { mutableStateOf(false) }
     var appMenuOpen by remember { mutableStateOf(false) }
@@ -187,30 +192,30 @@ fun BarEditorScreen(
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
             context.contentResolver.openOutputStream(uri)?.use { it.write(bar.toJson().toByteArray()) }
-        }.onFailure { Toast.makeText(context, "Export failed: ${it.message}", Toast.LENGTH_LONG).show() }
-            .onSuccess { Toast.makeText(context, "Bar exported", Toast.LENGTH_SHORT).show() }
+        }.onFailure { Toast.makeText(context, resources.getString(R.string.bar_export_failed, it.message), Toast.LENGTH_LONG).show() }
+            .onSuccess { Toast.makeText(context, R.string.bar_exported, Toast.LENGTH_SHORT).show() }
     }
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         uri ?: return@rememberLauncherForActivityResult
         runCatching {
             val text = context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: error("empty file")
             BarConfig.parse(text)
-        }.onFailure { Toast.makeText(context, "Import failed: ${it.message}", Toast.LENGTH_LONG).show() }
-            .onSuccess { onChange(it); Toast.makeText(context, "Bar imported", Toast.LENGTH_SHORT).show() }
+        }.onFailure { Toast.makeText(context, resources.getString(R.string.bar_import_failed, it.message), Toast.LENGTH_LONG).show() }
+            .onSuccess { onChange(it); Toast.makeText(context, R.string.bar_imported, Toast.LENGTH_SHORT).show() }
     }
 
     Scaffold(topBar = {
         TopAppBar(
-            title = { Text("Terminal bar") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            title = { Text(stringResource(R.string.bar_title)) },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
             actions = {
-                IconButton(onClick = { addDialog = true }) { Icon(Icons.Default.Add, contentDescription = "Add item") }
-                TextButton(onClick = { menuOpen = true }) { Text("More") }
+                IconButton(onClick = { addDialog = true }) { Icon(Icons.Default.Add, contentDescription = stringResource(R.string.bar_add_item)) }
+                TextButton(onClick = { menuOpen = true }) { Text(stringResource(R.string.bar_more)) }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(text = { Text("Export JSON") }, onClick = { menuOpen = false; exportLauncher.launch("devboard-bar.json") })
-                    DropdownMenuItem(text = { Text("Import JSON") }, onClick = { menuOpen = false; importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bar_export_json)) }, onClick = { menuOpen = false; exportLauncher.launch("devboard-bar.json") })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bar_import_json)) }, onClick = { menuOpen = false; importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) })
                     DropdownMenuItem(
-                        text = { Text(if (app == null) "Reset to default" else "Use the bar for all apps") },
+                        text = { Text(if (app == null) stringResource(R.string.bar_reset) else stringResource(R.string.bar_use_all_apps)) },
                         enabled = app == null || appHasOwnBar,
                         onClick = { menuOpen = false; onReset() },
                     )
@@ -275,28 +280,30 @@ fun BarEditorScreen(
             item {
                 CardRow(0, 1) { ListItem(
                     colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-                    headlineContent = { Text(if (app == null) "Bar for all apps" else "Bar for ${appName(app)}") },
+                    headlineContent = { Text(if (app == null) stringResource(R.string.bar_for_all_apps) else stringResource(R.string.bar_for_app, appName(app))) },
                     supportingContent = {
                         Text(
                             when {
-                                app == null -> "Tap to give an app you have typed in a bar of its own"
-                                appHasOwnBar -> "This app's own bar"
-                                else -> "Uses the bar for all apps until you change it here"
+                                app == null -> stringResource(R.string.bar_for_all_apps_text)
+                                appHasOwnBar -> stringResource(R.string.bar_app_own)
+                                else -> stringResource(R.string.bar_app_uses_all)
                             }
                         )
                     },
                     modifier = Modifier.clickable { appMenuOpen = true },
                 ) }
                 DropdownMenu(expanded = appMenuOpen, onDismissRequest = { appMenuOpen = false }) {
-                    DropdownMenuItem(text = { Text("All apps") }, onClick = { appMenuOpen = false; onPickApp(null) })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.bar_all_apps)) }, onClick = { appMenuOpen = false; onPickApp(null) })
                     for (pkg in apps) {
                         DropdownMenuItem(text = { Text(appName(pkg)) }, onClick = { appMenuOpen = false; onPickApp(pkg) })
                     }
                 }
             }
-            item { GroupTitle("Items (${order.size}) · drag the handle to reorder") }
+            item { GroupTitle(stringResource(R.string.bar_items, order.size)) }
             itemsIndexed(order, key = { _, entry -> entry.first }) { index, (id, item) ->
                 val lifted = dragging == id
+                val moveUp = stringResource(R.string.bar_move_up)
+                val moveDown = stringResource(R.string.bar_move_down)
                 CardRow(
                     index, order.size,
                     modifier = Modifier
@@ -310,8 +317,8 @@ fun BarEditorScreen(
                         .semantics {
                             // Without dragging (TalkBack): move up and down from the item's actions.
                             customActions = listOfNotNull(
-                                if (index > 0) CustomAccessibilityAction("Move up") { commit(order.move(index, index - 1)); true } else null,
-                                if (index < order.size - 1) CustomAccessibilityAction("Move down") { commit(order.move(index, index + 1)); true } else null,
+                                if (index > 0) CustomAccessibilityAction(moveUp) { commit(order.move(index, index - 1)); true } else null,
+                                if (index < order.size - 1) CustomAccessibilityAction(moveDown) { commit(order.move(index, index + 1)); true } else null,
                             )
                         },
                     lifted = lifted,
@@ -321,7 +328,7 @@ fun BarEditorScreen(
                         // Drag the handle to move the item.
                         Icon(
                             Icons.Default.Menu,
-                            contentDescription = "Drag to reorder",
+                            contentDescription = stringResource(R.string.bar_drag),
                             modifier = Modifier.pointerInput(id) {
                                 detectDragGestures(
                                     onDragStart = { rowOf(id)?.let { dragTop = it.offset.toFloat(); dragging = id } },
@@ -349,10 +356,10 @@ fun BarEditorScreen(
                             Text(item.label)
                         }
                     },
-                    supportingContent = { Text(describe(item)) },
+                    supportingContent = { Text(describe(resources, item)) },
                     trailingContent = {
                         IconButton(onClick = { commit(order.filter { it.first != id }) }, enabled = order.size > 1) {
-                            Icon(Icons.Default.Delete, contentDescription = "Remove")
+                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.bar_remove))
                         }
                     },
                 ) }
@@ -365,17 +372,19 @@ fun BarEditorScreen(
     }
 }
 
-private fun describe(item: BarItem): String = when {
-    item.type == BarItem.TYPE_EMOJI -> "Opens the emoji panel"
-    item.type == BarItem.TYPE_CLIPBOARD -> "Opens the clipboard history"
-    item.isAction -> BarItem.ACTIONS[item.action]?.second ?: "Action"
-    item.isModifier -> "Sticky modifier: ${item.mod}"
-    item.isSnippet -> "Snippet: \"${item.text}\""
-    else -> buildString {
-        append("Key: ")
-        if (item.mods.isNotEmpty()) append(item.mods.joinToString("+") { it.replaceFirstChar(Char::uppercase) }).append("+")
-        append(item.code)
-        if (item.repeat) append(" (repeats)")
+private fun describe(res: android.content.res.Resources, item: BarItem): String = when {
+    item.type == BarItem.TYPE_EMOJI -> res.getString(R.string.bar_item_emoji)
+    item.type == BarItem.TYPE_CLIPBOARD -> res.getString(R.string.bar_item_clipboard)
+    item.isAction -> BarItem.ACTIONS[item.action]?.second ?: res.getString(R.string.bar_item_action)
+    item.isModifier -> res.getString(R.string.bar_item_modifier, item.mod)
+    item.isSnippet -> res.getString(R.string.bar_item_snippet, item.text)
+    else -> {
+        val keys = buildString {
+            if (item.mods.isNotEmpty()) append(item.mods.joinToString("+") { it.replaceFirstChar(Char::uppercase) }).append("+")
+            append(item.code)
+        }
+        val key = res.getString(R.string.bar_item_key, keys)
+        if (item.repeat) res.getString(R.string.bar_item_repeats, key) else key
     }
 }
 
@@ -430,46 +439,46 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Add bar item") },
-        confirmButton = { Button(onClick = { item?.let(onAdd) }, enabled = item != null) { Text("Add") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text(stringResource(R.string.bar_add_title)) },
+        confirmButton = { Button(onClick = { item?.let(onAdd) }, enabled = item != null) { Text(stringResource(R.string.bar_add)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) } },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((t, l) in listOf(BarItem.TYPE_KEY to "Key", BarItem.TYPE_MODIFIER to "Modifier", BarItem.TYPE_SNIPPET to "Snippet")) {
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
+                    for ((t, l) in listOf(BarItem.TYPE_KEY to R.string.bar_type_key, BarItem.TYPE_MODIFIER to R.string.bar_type_modifier, BarItem.TYPE_SNIPPET to R.string.bar_type_snippet)) {
+                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(stringResource(l)) })
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to "Emoji", BarItem.TYPE_CLIPBOARD to "Clipboard", BarItem.TYPE_ACTION to "Action")) {
-                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(l) })
+                    for ((t, l) in listOf(BarItem.TYPE_EMOJI to R.string.bar_type_emoji, BarItem.TYPE_CLIPBOARD to R.string.bar_type_clipboard, BarItem.TYPE_ACTION to R.string.bar_type_action)) {
+                        FilterChip(selected = type == t, onClick = { type = t }, label = { Text(stringResource(l)) })
                     }
                 }
-                OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text("Label (optional)") }, singleLine = true)
+                OutlinedTextField(value = label, onValueChange = { label = it }, label = { Text(stringResource(R.string.bar_label_optional)) }, singleLine = true)
                 when (type) {
                     BarItem.TYPE_KEY -> {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // Looks like the button it is: an outlined field-like button with a drop-down arrow.
                             androidx.compose.material3.OutlinedButton(onClick = { codeMenu = true }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Key: $code", modifier = Modifier.weight(1f))
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = "Choose a key")
+                                Text(stringResource(R.string.bar_item_key, code), modifier = Modifier.weight(1f))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = stringResource(R.string.bar_choose_key))
                             }
                             DropdownMenu(expanded = codeMenu, onDismissRequest = { codeMenu = false }) {
                                 for (name in KeyCodeNames.names) DropdownMenuItem(text = { Text(name) }, onClick = { code = name; codeMenu = false })
                             }
                         }
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilterChip(selected = ctrl, onClick = { ctrl = !ctrl }, label = { Text("Ctrl") })
-                            FilterChip(selected = alt, onClick = { alt = !alt }, label = { Text("Alt") })
-                            FilterChip(selected = shift, onClick = { shift = !shift }, label = { Text("Shift") })
-                            FilterChip(selected = repeat, onClick = { repeat = !repeat }, label = { Text("Repeat") })
+                            FilterChip(selected = ctrl, onClick = { ctrl = !ctrl }, label = { Text(stringResource(R.string.bar_ctrl)) })
+                            FilterChip(selected = alt, onClick = { alt = !alt }, label = { Text(stringResource(R.string.bar_alt)) })
+                            FilterChip(selected = shift, onClick = { shift = !shift }, label = { Text(stringResource(R.string.bar_shift)) })
+                            FilterChip(selected = repeat, onClick = { repeat = !repeat }, label = { Text(stringResource(R.string.bar_repeat)) })
                         }
                     }
                     BarItem.TYPE_MODIFIER -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         for (m in listOf("ctrl", "alt", "shift", "meta")) FilterChip(selected = mod == m, onClick = { mod = m }, label = { Text(m.replaceFirstChar(Char::uppercase)) })
                     }
-                    BarItem.TYPE_EMOJI -> Text("Opens the emoji panel in place of the keys.")
-                    BarItem.TYPE_CLIPBOARD -> Text("Opens your recent copies in place of the keys.")
+                    BarItem.TYPE_EMOJI -> Text(stringResource(R.string.bar_emoji_text))
+                    BarItem.TYPE_CLIPBOARD -> Text(stringResource(R.string.bar_clipboard_text))
                     BarItem.TYPE_ACTION -> Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         // Three to a row: the edits, then settings and one-handed mode.
                         for (row in BarItem.ACTIONS.keys.chunked(3)) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -477,7 +486,7 @@ private fun AddItemDialog(onDismiss: () -> Unit, onAdd: (BarItem) -> Unit) {
                         }
                         Text(BarItem.ACTIONS.getValue(action).second + ".")
                     }
-                    else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text("Text to insert") })
+                    else -> OutlinedTextField(value = text, onValueChange = { text = it }, label = { Text(stringResource(R.string.bar_text_to_insert)) })
                 }
                 Spacer(Modifier.width(1.dp))
             }
@@ -526,46 +535,46 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
             val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 runCatching { context.contentResolver.openOutputStream(uri)?.use { store.exportTo(it) } }.isSuccess
             }
-            Toast.makeText(context, if (ok) "Glides exported" else "Export failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, if (ok) R.string.record_exported else R.string.record_export_failed, Toast.LENGTH_SHORT).show()
         }
     }
 
     Scaffold(topBar = {
         TopAppBar(
-            title = { Text("Record glides") },
-            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") } },
+            title = { Text(stringResource(R.string.record_title)) },
+            navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back)) } },
             actions = {
-                TextButton(onClick = { exportLauncher.launch("devboard-glides.jsonl") }, enabled = count > 0) { Text("Export") }
-                IconButton(onClick = { confirmClear = true }, enabled = count > 0) { Icon(Icons.Default.Delete, contentDescription = "Delete all") }
+                TextButton(onClick = { exportLauncher.launch("devboard-glides.jsonl") }, enabled = count > 0) { Text(stringResource(R.string.record_export)) }
+                IconButton(onClick = { confirmClear = true }, enabled = count > 0) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.record_delete_all)) }
             },
         )
     }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             Text(
-                "Glide each word on the keyboard below. Nothing else is recorded, and samples stay on this phone until you export them.",
+                stringResource(R.string.record_note),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(16.dp),
             )
             Text(
-                prompt ?: "Loading words\u2026",
+                prompt ?: stringResource(R.string.record_loading),
                 style = MaterialTheme.typography.displaySmall,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Text(
-                "$count recorded",
+                pluralStringResource(R.plurals.record_count, count, count),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                TextButton(onClick = { index++ }, enabled = prompt != null) { Text("Skip") }
+                TextButton(onClick = { index++ }, enabled = prompt != null) { Text(stringResource(R.string.record_skip)) }
                 TextButton(onClick = {
                     scope.launch {
                         count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.removeLast(); store.count() }
                     }
-                }, enabled = count > 0) { Text("Undo last") }
+                }, enabled = count > 0) { Text(stringResource(R.string.record_undo)) }
             }
             Spacer(Modifier.weight(1f))
             androidx.compose.ui.viewinterop.AndroidView(
@@ -586,15 +595,15 @@ fun GlideRecorderScreen(settings: Settings, onBack: () -> Unit) {
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("Delete all recorded glides?") },
-            text = { Text("This removes the $count samples kept on this phone.") },
+            title = { Text(stringResource(R.string.record_delete_title)) },
+            text = { Text(pluralStringResource(R.plurals.record_delete_text, count, count)) },
             confirmButton = {
                 Button(onClick = {
                     confirmClear = false
                     scope.launch { count = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { store.clear(); 0 } }
-                }) { Text("Delete") }
+                }) { Text(stringResource(R.string.action_delete)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.action_cancel)) } },
         )
     }
 }

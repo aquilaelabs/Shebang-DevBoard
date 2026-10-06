@@ -10,10 +10,12 @@
 
 - Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
 - Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (880eaef)
+- The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (3603499)
 
 ### Fixed
 
 - Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)
+- The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
 
 ## 0.5.5: 2026-10-06
 

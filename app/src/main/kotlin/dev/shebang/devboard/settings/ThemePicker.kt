@@ -34,6 +34,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.shebang.devboard.view.KeyboardTheme
 import dev.shebang.devboard.view.Palettes
+import androidx.compose.ui.res.stringResource
+import dev.shebang.devboard.R
 
 /**
  * A row of swatches, one per theme: a tiny keyboard in the theme's own colours (keys with their keycap edge,
@@ -49,6 +51,7 @@ fun ThemePicker(selected: String, onSelect: (String) -> Unit) {
         LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(previews, key = { it.first }) { (id, name, t) ->
                 val isSelected = id == selected
+                val themeLabel = stringResource(R.string.theme_name, name)
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
@@ -57,7 +60,7 @@ fun ThemePicker(selected: String, onSelect: (String) -> Unit) {
                         .clickable(role = Role.RadioButton) { onSelect(id) }
                         .semantics {
                             this.selected = isSelected
-                            contentDescription = "$name theme"
+                            contentDescription = themeLabel
                         }
                         .padding(4.dp),
                 ) {
