@@ -1,6 +1,7 @@
 package dev.shebang.devboard.ime
 
 import android.view.inputmethod.InputConnection
+import dev.shebang.devboard.dict.Dictionary
 import dev.shebang.devboard.layout.FieldVariant
 import java.util.concurrent.Executor
 
@@ -23,26 +24,46 @@ internal class EmailOffers(private val background: Executor) {
      */
     private var fieldText: String? = null
 
+    /** The user swiped the addresses away: none are offered again until the next address is begun. */
+    private var dismissed = false
+
     fun isOffered(word: String) = word in offer
 
     fun clear() {
         offer = emptyList()
+        dismissed = false
+    }
+
+    /** The offered addresses were swiped away. */
+    fun dismiss() {
+        offer = emptyList()
+        dismissed = true
     }
 
     /**
-     * The remembered addresses that begin with what is being typed (the most used while nothing is), now the
-     * [offer]; null where none are offered at all: no memory, not an email field, no connection, a field that
-     * does not compose, or a selection. With [edited] (not when the field starts), what the field holds is kept
-     * for [remember]: only what the user typed there is remembered, not an address the field came with.
+     * The remembered addresses that begin with what is being typed, now the [offer]: every one of them (they
+     * scroll when they do not fit), and only once something is typed, so a field that just opened leaves its row
+     * to the password manager. While what is typed could still be a word of [words] ("sean" of "seance"), the
+     * strip's word suggestions keep it and nothing is offered. Null where none are offered at all: no memory,
+     * not an email field, no connection, a field that does not compose, or a selection. With [edited] (not when
+     * the field starts), what the field holds is kept for [remember]: only what the user typed there is
+     * remembered, not an address the field came with.
      */
-    fun refresh(field: FieldInfo, ic: InputConnection?, edited: Boolean): List<String>? {
+    fun refresh(field: FieldInfo, ic: InputConnection?, edited: Boolean, words: Dictionary? = null): List<String>? {
         offer = emptyList()
         val memory = memory ?: return null
         if (field.variant != FieldVariant.EMAIL || ic == null) return null
         if (edited) keep(field, ic)
         if (!field.allowsComposing || !ic.getSelectedText(0).isNullOrEmpty()) return null
         val typed = typed(ic) ?: return null
-        offer = memory.matching(typed)
+        if (typed.isEmpty()) {
+            // A new address begun: what was swiped away for the last one is offered again.
+            dismissed = false
+            return offer
+        }
+        if (dismissed) return offer
+        if (words != null && !words.prefixRange(typed).isEmpty()) return offer
+        offer = memory.matching(typed, MAX_OFFERED)
         return offer
     }
 
@@ -77,5 +98,7 @@ internal class EmailOffers(private val background: Executor) {
     private companion object {
         /** Text read around the cursor in an email field: a few addresses' worth. */
         const val MAX_EMAIL = 1000
+        /** Addresses offered at once, at most. */
+        const val MAX_OFFERED = 10
     }
 }

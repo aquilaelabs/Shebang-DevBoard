@@ -396,6 +396,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         applyTheme()
         barConfig?.let { s.bar.setConfig(it) }
         s.onChipsDismissed = { clipOffer?.let { clipChip.markHandled(it.stamp) }; clipOffer = null }
+        s.onEmailsDismissed = { text.dismissEmails() }
         s.mic.setOnClickListener {
             feedback.keyPress()
             if (voice.active) voice.stop() else voice.start()
@@ -1253,6 +1254,46 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun wordStarted() = retireClipOffer()
+
+    override fun showEmails(addresses: List<String>) {
+        val s = strip ?: return
+        val t = theme
+        if (addresses.isEmpty() || t == null) {
+            s.setEmails(emptyList())
+            return
+        }
+        val height = s.rowHeight - (8 * resources.displayMetrics.density).toInt()
+        s.setEmails(addresses.map { emailCard(it, t, height) })
+    }
+
+    /**
+     * A card for a remembered address, styled like the paste chip: the whole address at the strip's text size
+     * (the row scrolls rather than shrinking it); tapping it puts it in place of what was typed of it.
+     */
+    private fun emailCard(address: String, t: KeyboardTheme, height: Int): android.widget.TextView {
+        val density = resources.displayMetrics.density
+        return android.widget.TextView(this).apply {
+            text = address
+            setTextColor(t.stripText)
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 15f)
+            gravity = android.view.Gravity.CENTER
+            maxLines = 1
+            val pad = (12 * density).toInt()
+            setPadding(pad, 0, pad, 0)
+            minHeight = height
+            layoutParams = android.view.ViewGroup.LayoutParams(android.view.ViewGroup.LayoutParams.WRAP_CONTENT, height)
+            background = android.graphics.drawable.GradientDrawable().apply {
+                cornerRadius = 8 * density
+                setColor(t.keyFunctional)
+            }
+            contentDescription = getString(R.string.email_fill, address)
+            setOnClickListener {
+                feedback.keyPress()
+                this@DevBoardService.text.pickEmail(address)
+                afterEdit()
+            }
+        }
+    }
 
     /** Typing or gliding a word: the paste chip has had its chance and does not come back for this clip. */
     private fun retireClipOffer() {

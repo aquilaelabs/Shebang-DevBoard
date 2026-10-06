@@ -13,6 +13,8 @@
 - The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (3603499)
 - The keyboard's own text (what a screen reader says for keys, panels and bar items, the clipboard panel, word pack names and messages) also comes from string resources, ready for translation (4d80f89)
 - Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (ada9bbd)
+- Saved email addresses are offered as cards only once you start typing one, so a password manager's card is not covered when the field opens; every saved address that matches shows (scrolling sideways at full size), and only once what you type can no longer be an ordinary word (1087037)
+- Chips above the keys that scroll now stop at the end of the row; a second swipe from there puts them away (1087037)
 
 ### Fixed
 

@@ -30,6 +30,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
     private var autofillDismissed = false
     /** The chips were swiped away: the clipboard chip's clip counts as handled. */
     var onChipsDismissed: (() -> Unit)? = null
+    /** The address cards were swiped away (the other chips stay). */
+    var onEmailsDismissed: (() -> Unit)? = null
 
     init {
         orientation = HORIZONTAL
@@ -41,7 +43,14 @@ class TopStripView(context: Context) : LinearLayout(context) {
         // off); the listening disc, at its fullest, reaches only into the bar's end padding.
         addView(mic, LayoutParams(rowHeight, rowHeight).apply { marginStart = -(8 * resources.displayMetrics.density).toInt() })
         mic.visibility = View.GONE
-        autofill.onDismiss = {
+        autofill.onDismiss = dismiss@{
+            if (autofill.hasEmails) {
+                // Only the address cards go: the password manager's chips come back when the typing stops.
+                autofill.setEmails(emptyList())
+                apply()
+                onEmailsDismissed?.invoke()
+                return@dismiss
+            }
             autofillDismissed = true
             hasAutofill = false
             autofill.setClip(null)
@@ -90,6 +99,12 @@ class TopStripView(context: Context) : LinearLayout(context) {
         apply()
     }
 
+    /** Cards for remembered addresses (or removes them when [chips] is empty); they show while a word is typed. */
+    fun setEmails(chips: List<android.view.View>) {
+        autofill.setEmails(chips)
+        apply()
+    }
+
     /** A new field: its chips show even if the last field's were swiped away. */
     fun resetAutofill() {
         autofillDismissed = false
@@ -129,7 +144,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
         // Chips take the bar's row, or the suggestions' in Auto mode when no word is composed. Next-word
         // predictions are not a word: the chips stay over them.
         val wordInProgress = composing && !predicting
-        val showAutofill = (hasAutofill || autofill.hasClip) && !wordInProgress && (showBar || showSuggestions)
+        // Address cards are offered for what is being typed, so they show over a word in progress.
+        val showAutofill = (autofill.hasEmails || ((hasAutofill || autofill.hasClip) && !wordInProgress)) && (showBar || showSuggestions)
         autofill.visibility = if (showAutofill) VISIBLE else GONE
         bar.visibility = if (showBar && !showAutofill) VISIBLE else GONE
         suggestions.visibility = if (showSuggestions && !(showAutofill && !showBar)) VISIBLE else GONE
