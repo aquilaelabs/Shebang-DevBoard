@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.5: 2026-10-06
 
 ### Added
 
@@ -9,15 +9,15 @@
 
 ### Changed
 
-- The enter key shows what it will do: the return arrow for a new line, a magnifier in search boxes, and an arrow where it goes, sends or finishes; screen readers say the action (8dbc2cb)
+- The enter key shows what it will do: the return arrow for a new line, a magnifier in search boxes, and an arrow where it goes, sends or finishes; screen readers say the action (a6610d2)
 
 ### Fixed
 
-- Settings > About > Credits names every library the app ships, including the ones its libraries bring in, and says that five strokes from the FUTO swipe dataset are kept for tests (bf63adb)
-- Enter runs the search in search boxes that allow several lines, such as the Play Store's, instead of adding a second line (28f3de8)
-- The paste chip stays after you press space; it gives way when you start typing or gliding the next word, and does not come back for that copy (d30f02a)
-- A glide that starts on the edge of backspace or the space bar no longer selects and deletes text: their swipes now only work while your finger stays in the bottom row, and the space-bar slide selects only when you turned shift on yourself (69f2916)
-- Web terminals and other web pages that ask for no autocorrect (tmux or a shell in a browser) get exactly what you type: no autocorrect, no moved punctuation, and backspacing into a word no longer sends it again (d53f8d9)
+- Settings > About > Credits names every library the app ships, including the ones its libraries bring in, and says that five strokes from the FUTO swipe dataset are kept for tests (28f3de8)
+- Enter runs the search in search boxes that allow several lines, such as the Play Store's, instead of adding a second line (d30f02a)
+- The paste chip stays after you press space; it gives way when you start typing or gliding the next word, and does not come back for that copy (8dbc2cb)
+- A glide that starts on the edge of backspace or the space bar no longer selects and deletes text: their swipes now only work while your finger stays in the bottom row, and the space-bar slide selects only when you turned shift on yourself (d53f8d9)
+- Web terminals and other web pages that ask for no autocorrect (tmux or a shell in a browser) get exactly what you type: no autocorrect, no moved punctuation, and backspacing into a word no longer sends it again (7766f70)
 
 ## 0.5.4: 2026-10-05
 
