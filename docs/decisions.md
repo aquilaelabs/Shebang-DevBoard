@@ -727,7 +727,10 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   - The activity writes what its field holds to `files/fieldtest/state.json`, which the test reads.
   - The web page turns autocapitalize off; Chrome otherwise asks for sentence capitals.
   Putting the old Enter rule back makes the Compose search test fail, so it guards B14. It runs on an emulator
-  (`./gradlew :app:connectedDebugAndroidTest`), not in CI yet, and selects Shebang DevBoard as the keyboard.
+  (`./gradlew :app:connectedDebugAndroidTest`) and selects Shebang DevBoard as the keyboard. CI runs it too
+  (R38): the `device-tests` job boots an API 36 google_apis x86_64 emulator on the runner's KVM with
+  reactivecircus/android-emulator-runner. Both CI jobs name `ubuntu-24.04` rather than `ubuntu-latest`, which
+  moves to Ubuntu 26 from 19 Oct 2026; move it on purpose.
 - **Two words run together** (6 Oct, the owner's ask: "ataco" should offer "a taco"): when a typed word is not
   in the dictionary, `Suggester` tries every cut into two common words (tier 35 or better, or used by the user;
   a one-letter part only "a" or "i") and scores each as the first word after the words before times the second
