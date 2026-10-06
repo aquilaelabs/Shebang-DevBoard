@@ -99,15 +99,14 @@ class TextInputController(
     var settings: Settings = Settings()
     var suggester: Suggester? = null
 
+    /** Remembered addresses offered in email fields. */
+    private val emailOffers = EmailOffers(background)
     /** Addresses entered in email fields, offered there as they are typed again; null when not remembered. */
-    var emails: EmailMemory? = null
-    /** The addresses on the strip now: picking one fills in the address being typed. */
-    private var emailOffer: List<String> = emptyList()
-    /**
-     * What the email field held after the last edit, remembered when the field is left. Kept as it goes because
-     * an app may turn the field into another kind of input before the keyboard hears it is left.
-     */
-    private var emailFieldText: String? = null
+    var emails: EmailMemory?
+        get() = emailOffers.memory
+        set(value) {
+            emailOffers.memory = value
+        }
     /** The keyboard shows code mode: brackets and quotes pair (when the setting is on). */
     var codeMode = false
 
@@ -115,22 +114,26 @@ class TextInputController(
      * How well a glide's stroke fits the keys of any letters (mean distance in key pitches, lower is better),
      * for offering identifiers from the text; set by the service for the current key layout.
      */
-    var identifierScorer: ((stroke: FloatArray, letters: String) -> Float?)? = null
+    var identifierScorer: ((stroke: FloatArray, letters: String) -> Float?)?
+        get() = identifiers.scorer
+        set(value) {
+            identifiers.scorer = value
+        }
 
     /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
     var predictionModel: Pair<Dictionary, NgramModel>? = null
 
+    /** The strip's next-word predictions after a space. */
+    private val nextWords = NextWords(background, postToMain)
     /** The next-word model for the strip's predictions, this controller's own copy (used on [background]). */
-    var nextWordModel: dev.shebang.devboard.dict.NextWordModel? = null
-    /** Next words the strip offers now (after a space); empty when it offers something else. */
-    private var predictions: List<String> = emptyList()
-    /** The text before the cursor the [predictions] were made for: once it is not, they are stale. */
-    private var predictedBefore = ""
-    private var predictGeneration = 0
+    var nextWordModel: dev.shebang.devboard.dict.NextWordModel?
+        get() = nextWords.network
+        set(value) {
+            nextWords.network = value
+        }
 
-    /** Code-like identifiers in the text around the cursor, most used first, and when they were read. */
-    private var identifiers: List<String> = emptyList()
-    private var identifiersReadAt = Long.MIN_VALUE / 2
+    /** Code-like identifiers in the text around the cursor. */
+    private val identifiers = TextIdentifiers { clock() }
 
     /** Words glided one after another, while nothing else has been done; and the joins offered for them. */
     private var glideRun: List<String> = emptyList()
@@ -226,8 +229,7 @@ class TextInputController(
     }
 
     /** Whether [typed] begins a code-like identifier in the text around ("max" of "maxRetries"): not a slip. */
-    private fun startsAnIdentifier(typed: String): Boolean =
-        typed.isNotEmpty() && identifiers.any { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }
+    private fun startsAnIdentifier(typed: String): Boolean = identifiers.startedBy(typed)
 
     /** The two words before the composing word, for ranking its candidates; null without a language model. */
     private fun currentContext(ic: InputConnection): Suggester.Context? {
@@ -423,12 +425,11 @@ class TextInputController(
         lastAutocorrect = null
         keptAsTyped.clear()
         corrections.clear()
-        emailOffer = emptyList()
+        emailOffers.clear()
         reopenedCorrection = null
         reopened = null
         reopenedGlide = null
-        identifiers = emptyList()
-        identifiersReadAt = Long.MIN_VALUE / 2
+        identifiers.reset()
         glideRun = emptyList()
         joinOffer = null
         lastGlide = null
@@ -459,9 +460,9 @@ class TextInputController(
         // The app changed the text under the predictions (cleared it after sending, a hardware keyboard typed,
         // text was selected): they no longer follow from it, and the bar comes back. Checked against the text,
         // not the time, because an app may clear the field right after the keyboard's own edit.
-        if (predictions.isNotEmpty() && !isComposing) {
+        if (nextWords.offered.isNotEmpty() && !isComposing) {
             val now = connection()?.getTextBeforeCursor(CONTEXT_CHARS, 0)?.toString()
-            if (newSelStart != newSelEnd || now != predictedBefore) clearCandidates()
+            if (nextWords.stale(now, newSelStart != newSelEnd)) clearCandidates()
         }
         if (isComposing) {
             val insideComposing = newSelStart == newSelEnd && newSelStart == candidatesEnd && candidatesStart >= 0
@@ -631,7 +632,7 @@ class TextInputController(
         val glideBefore = lastGlide
         settle()
         lastGlide = null
-        if (glideBefore != null || predictions.isNotEmpty()) clearCandidates()
+        if (glideBefore != null || nextWords.offered.isNotEmpty()) clearCandidates()
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
@@ -646,7 +647,7 @@ class TextInputController(
                 ic.commitText(" ", 1)
             }
             if (word.isEmpty()) {
-                refreshIdentifiers(ic)
+                identifiers.refresh(ic)
                 resetTaps(0)
                 // Typing on at the end of a word that is not composing (the field dropped it, or the cursor was
                 // put there): the whole word is composed, so the underline and a strip pick cover all of it.
@@ -827,25 +828,11 @@ class TextInputController(
         if (!settings.nextWord || codeMode || !field.allowsComposing || field.isEmail || field.exact || isComposing || target != null) return
         val model = predictionModel ?: return
         val before = ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: return
-        val w1 = GlideText.contextWord(before)
-        val w2 = GlideText.contextWord2(before)
-        val sentence = sentenceBefore(ic)
-        val nextWord = nextWordModel
-        val gen = ++predictGeneration
-        background.execute {
-            val (dictionary, lm) = model
-            val c1 = GlideText.contextId(w1, dictionary, lm)
-            val c2 = if (w2.isEmpty()) NgramModel.UNKNOWN else GlideText.contextId(w2, dictionary, lm)
-            val start = w1 == GlideText.SENTENCE_START
-            val words = dev.shebang.devboard.dict.WordPredictions.predict(dictionary, lm, nextWord, sentence, c2, c1, 3)
-                .map { dictionary.words[it] }.map { if (start) it.replaceFirstChar { c -> c.uppercaseChar() } else it }
-            postToMain {
-                if (gen != predictGeneration || isComposing || words.isEmpty()) return@postToMain
-                predictions = words
-                predictedBefore = before.toString()
-                ui.showCandidates(arrangeBestMiddle(words))
-                ui.setPredicting()
-            }
+        nextWords.predict(model, before, sentenceBefore(ic), 3) { words ->
+            if (isComposing) return@predict false
+            ui.showCandidates(arrangeBestMiddle(words))
+            ui.setPredicting()
+            true
         }
     }
 
@@ -1398,11 +1385,7 @@ class TextInputController(
         return joiner in JOINERS && !prev.isWhitespace()
     }
 
-    private fun looksLikeCode(w: String): Boolean {
-        if (w.any { it.isDigit() || it == '_' }) return true
-        val inner = w.drop(1)
-        return inner.any { it.isUpperCase() } && inner.any { it.isLowerCase() }
-    }
+    private fun looksLikeCode(w: String) = TextIdentifiers.looksLikeCode(w)
 
     /** Whether [w] stands as a whole word elsewhere in the text around the cursor (one read each side). */
     private fun appearsInText(ic: InputConnection, w: String): Boolean {
@@ -1491,27 +1474,14 @@ class TextInputController(
 
     // ---- Suggestions ---------------------------------------------------------------------------------
 
-    /** What is being typed in an email field: the text before the cursor back to a space, comma or semicolon. */
-    private fun emailTyped(ic: InputConnection): String? {
-        val before = ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: return null
-        return before.split(EmailMemory.SEPARATORS).last()
-    }
-
     /**
      * In an email field, offers the remembered addresses that begin with what is being typed (the most used
      * while nothing is), in place of word suggestions. Call after each edit, and with [edited] false when the
      * field starts: only what the user typed there is remembered, not an address the field came with.
      */
     fun refreshEmails(edited: Boolean = true) {
-        val offered = emailOffer.isNotEmpty()
-        emailOffer = emptyList()
-        val memory = emails ?: return
-        if (field.variant != FieldVariant.EMAIL) return
-        val ic = connection() ?: return
-        if (edited) keepEmailFieldText(ic)
-        if (!field.allowsComposing || !ic.getSelectedText(0).isNullOrEmpty()) return
-        val typed = emailTyped(ic) ?: return
-        val matches = memory.matching(typed)
+        val offered = emailOffers.offer.isNotEmpty()
+        val matches = emailOffers.refresh(field, connection(), edited) ?: return
         if (matches.isEmpty()) {
             // Addresses offered a moment ago no longer match: the strip gives way to the bar again.
             if (offered && !isComposing) {
@@ -1520,28 +1490,16 @@ class TextInputController(
             }
             return
         }
-        emailOffer = matches
         // Word suggestions still being worked out for this edit would cover the addresses.
         suggestGeneration++
-        predictGeneration++
+        nextWords.cancel()
         ui.showCandidates(arrangeBestMiddle(matches))
         // Shown also with no word being typed (an empty field, or just after the @), as predictions are.
         ui.setComposing(true)
     }
 
-    /** Keeps what an email field holds, for [rememberEmails] (not where the app asks for no learning). */
-    private fun keepEmailFieldText(ic: InputConnection) {
-        if (field.variant != FieldVariant.EMAIL || field.isPassword || field.noPersonalizedLearning) return
-        emailFieldText = (ic.getTextBeforeCursor(MAX_EMAIL, 0)?.toString() ?: "") + (ic.getTextAfterCursor(MAX_EMAIL, 0)?.toString() ?: "")
-    }
-
     /** Leaving an email field (or the keyboard closing): the addresses it last held are remembered. */
-    fun rememberEmails() {
-        val text = emailFieldText ?: return
-        emailFieldText = null
-        val memory = emails ?: return
-        if (text.isNotBlank()) background.execute { memory.record(text) }
-    }
+    fun rememberEmails() = emailOffers.remember()
 
     /** An offered address picked: it replaces what was typed of it. */
     private fun pickEmail(ic: InputConnection, address: String) {
@@ -1553,20 +1511,16 @@ class TextInputController(
             reopened = null
             reopenedCorrection = null
         }
-        val typed = emailTyped(ic).orEmpty()
-        ic.deleteSurroundingText(typed.length, 0)
-        ic.commitText(address, 1)
+        emailOffers.fill(ic, address)
         ic.endBatchEdit()
-        keepEmailFieldText(ic)
-        emailOffer = emptyList()
+        emailOffers.keep(field, ic)
         clearCandidates()
     }
 
     private fun clearCandidates() {
         candidates = emptyList()
         suggestGeneration++
-        predictGeneration++
-        predictions = emptyList()
+        nextWords.clear()
         ui.showCandidates(emptyList())
         ui.setComposing(isComposing)
     }
@@ -1597,7 +1551,7 @@ class TextInputController(
                     return@postToMain
                 }
                 // An identifier from the text that starts with what was typed leads.
-                val ids = identifiers.filter { it.length > typed.length && it.startsWith(typed, ignoreCase = true) }.take(1)
+                val ids = listOfNotNull(identifiers.completing(typed))
                 val ranked = (ids + result.map { it.word }).distinctBy { it.lowercase() }.take(3)
                 ui.showCandidates(arrangeForStrip(typed, ranked))
             }
@@ -1607,7 +1561,7 @@ class TextInputController(
     /** Picks a strip word: replaces the targeted word, the composing word, or the last glide's last word. */
     fun pickCandidate(chosen: String) {
         val ic = connection() ?: return
-        if (chosen in emailOffer) {
+        if (emailOffers.isOffered(chosen)) {
             pickEmail(ic, chosen)
             return
         }
@@ -1632,7 +1586,7 @@ class TextInputController(
             return
         }
         ownEdit()
-        if (!isComposing && lastGlide == null && chosen in predictions) {
+        if (!isComposing && lastGlide == null && nextWords.isOffered(chosen)) {
             // A predicted word goes in with a space, and the next ones are offered.
             val context = learningContext(ic)
             ic.commitText("$chosen ", 1)
@@ -1846,7 +1800,7 @@ class TextInputController(
         val ic = connection() ?: return
         dictionaryInUse = dictionary
         val previousGlide = lastGlide
-        refreshIdentifiers(ic)
+        identifiers.refresh(ic)
         lastAutocorrect = null
         if (isComposing) {
             if (target != null && reopenedUnchanged) {
@@ -1905,14 +1859,14 @@ class TextInputController(
         glideRun = (if (chained) glideRun else emptyList()) + fresh.map { it.text }
         var strip = arrangeBestMiddle(alternatives)
         joinOffer = null
-        if (glideRun.size >= 2 && identifiers.isNotEmpty() && after.isEmpty()) {
+        if (glideRun.size >= 2 && !identifiers.isEmpty() && after.isEmpty()) {
             val parts = glideRun.map { it.lowercase() }
             val camel = parts[0] + parts.drop(1).joinToString("") { p -> p.replaceFirstChar { it.uppercaseChar() } }
             val snake = parts.joinToString("_")
             joinOffer = JoinOffer(glideRun.joinToString(" "), camel, snake, glide)
             strip = listOf(camel, fresh.last().text, snake)
         } else if (fresh.size == 1) {
-            identifierAlternative(result, fresh.last().text)?.let { id -> strip = listOf(id) + strip.drop(1) }
+            identifiers.alternative(result, fresh.last().text)?.let { id -> strip = listOf(id) + strip.drop(1) }
         }
         ui.showCandidates(strip)
         ui.setComposing(true)
@@ -1952,44 +1906,6 @@ class TextInputController(
         }
     }
 
-    /**
-     * An identifier from the text that fits the glide's stroke about as well as the word chosen (within
-     * [IDENTIFIER_MARGIN] of a key on average), for the strip; null when none does or no scorer is set.
-     */
-    private fun identifierAlternative(result: GlideResult, chosen: String): String? {
-        val score = identifierScorer ?: return null
-        val stroke = result.strokes.lastOrNull() ?: return null
-        if (identifiers.isEmpty()) return null
-        val own = score(stroke, chosen) ?: return null
-        var best: String? = null
-        var bestCost = own + IDENTIFIER_MARGIN
-        for (id in identifiers.take(MAX_IDENTIFIERS_SCORED)) {
-            val letters = id.filter { it.isLetter() }
-            if (letters.equals(chosen, ignoreCase = true)) continue
-            if (letters.length < chosen.length * 0.6 || letters.length > chosen.length * 1.8 + 2) continue
-            val c = score(stroke, letters) ?: continue
-            if (c < bestCost) {
-                bestCost = c
-                best = id
-            }
-        }
-        return best
-    }
-
-    /** Reads the code-like identifiers around the cursor, at most every few seconds. */
-    private fun refreshIdentifiers(ic: InputConnection) {
-        val now = clock()
-        if (now - identifiersReadAt < IDENTIFIERS_TTL_MS) return
-        identifiersReadAt = now
-        val text = (ic.getTextBeforeCursor(AROUND_CHARS, 0)?.toString() ?: "") + " " + (ic.getTextAfterCursor(AROUND_CHARS / 4, 0)?.toString() ?: "")
-        val counts = HashMap<String, Int>()
-        for (m in IDENTIFIER.findAll(text)) {
-            val t = m.value
-            if (looksLikeCode(t) && t.any { it.isLetter() }) counts[t] = (counts[t] ?: 0) + 1
-        }
-        identifiers = counts.entries.sortedByDescending { it.value }.map { it.key }.take(MAX_IDENTIFIERS)
-    }
-
     private fun remember(words: List<GlidedWord>) {
         for (w in words) {
             recent.addLast(w)
@@ -2025,13 +1941,6 @@ class TextInputController(
 
     companion object {
         private const val DOUBLE_SPACE_MS = 600L
-        /** Identifiers: letters, digits and underscores, starting with a letter or underscore. */
-        private val IDENTIFIER = Regex("[A-Za-z_][A-Za-z0-9_]{2,}")
-        private const val MAX_IDENTIFIERS = 200
-        private const val MAX_IDENTIFIERS_SCORED = 60
-        private const val IDENTIFIERS_TTL_MS = 3000L
-        /** How much worse (mean key pitches) an identifier may fit a glide than the word chosen and still be offered. */
-        private const val IDENTIFIER_MARGIN = 0.1f
         /** Code mode's pairs: opening to closing. */
         private val PAIRS = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'', '`' to '`')
         private const val CLOSERS = ")]}"
@@ -2058,8 +1967,6 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
-        /** Text read around the cursor in an email field: a few addresses' worth. */
-        private const val MAX_EMAIL = 1000
         /** Characters before a corrected word that find it again: enough to tell two of the same word apart. */
         private const val CORRECTION_CONTEXT = 32
         /** Corrections remembered per field for backspace to take back. */
