@@ -70,6 +70,47 @@ class CodePairingTest {
         assertEquals("x = |", field())
     }
 
+    /** Puts [text] in the field with the cursor at its end, as if typed earlier without the keyboard's pairs. */
+    private fun given(text: String) {
+        ic.text.append(text)
+        ic.cursor = ic.text.length
+    }
+
+    @Test
+    fun aQuoteTheParagraphOpenedIsClosedWithOne() {
+        // The paragraph began with a quote whose partner is gone: the next quote closes it, after a full stop too.
+        given("\"See you tomorrow.")
+        type("\"")
+        assertEquals("\"See you tomorrow.\"|", field())
+    }
+
+    @Test
+    fun aQuoteAfterASpaceClosesAnOpenOne() {
+        given("echo \"hello ")
+        type("\"")
+        assertEquals("echo \"hello \"|", field())
+    }
+
+    @Test
+    fun aQuoteInANewParagraphStillPairs() {
+        // An open quote in an earlier paragraph says nothing about this one.
+        given("\"one\n")
+        type("\"")
+        assertEquals("\"one\n\"|\"", field())
+    }
+
+    @Test
+    fun closedQuotesEscapedQuotesAndApostrophesDoNotCount() {
+        given("say \"hi\" and \"a \\\" b\" ")
+        type("\"")
+        assertEquals("say \"hi\" and \"a \\\" b\" \"|\"", field())
+        ic.text.setLength(0)
+        ic.cursor = 0
+        given("don't stop, it's ")
+        type("'")
+        assertEquals("don't stop, it's '|'", field())
+    }
+
     @Test
     fun noPairsOutsideCodeModeOrWhenOff() {
         controller.codeMode = false

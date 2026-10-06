@@ -722,6 +722,8 @@ class TextInputController(
             if (prev != null && (prev.isLetterOrDigit() || prev == '_')) return false
             // Before a word the quote is an opening one without a partner.
             if (next != null && (next.isLetterOrDigit() || next == '_')) return false
+            // A quote the paragraph already opened is closed by this one, after a space or a full stop too.
+            if (opensInParagraph(ic.getTextBeforeCursor(PARAGRAPH_CHARS, 0) ?: "", c)) return false
         }
         val closing = close ?: return false
         ic.beginBatchEdit()
@@ -729,6 +731,24 @@ class TextInputController(
         ic.commitText(closing.toString(), 0)
         ic.endBatchEdit()
         return true
+    }
+
+    /**
+     * Whether [before] (the text before the cursor) leaves a [quote] open in its last paragraph: an odd number of
+     * them since the last line break, not counting escaped ones (\") or apostrophes inside or after a word
+     * ("don't", "James'").
+     */
+    private fun opensInParagraph(before: CharSequence, quote: Char): Boolean {
+        val start = before.lastIndexOf('\n') + 1
+        var open = false
+        for (i in start until before.length) {
+            if (before[i] != quote) continue
+            val prev = if (i > start) before[i - 1] else null
+            if (prev == '\\') continue
+            if (quote == '\'' && prev != null && prev.isLetterOrDigit()) continue
+            open = !open
+        }
+        return open
     }
 
     private fun isWordChar(text: String): Boolean {
@@ -1840,6 +1860,8 @@ class TextInputController(
         private val PAIRS = mapOf('(' to ')', '[' to ']', '{' to '}', '"' to '"', '\'' to '\'', '`' to '`')
         private const val CLOSERS = ")]}"
         private const val QUOTES = "\"'`"
+        /** Text read back to find the paragraph's open quotes. */
+        private const val PARAGRAPH_CHARS = 2000
         /** Punctuation that takes the place of the space after a word ([swapWithSpace]). Quotes are left out: one may open a quotation. */
         private const val SWAPS_WITH_SPACE = ".,!?;:)"
         /** In a web-address field, punctuation a glided word attaches to without a space. */
