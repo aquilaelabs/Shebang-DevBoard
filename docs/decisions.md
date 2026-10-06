@@ -872,3 +872,12 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   signed on the node with `bb sign`, from those same unsigned builds, so a published APK is its tag's build
   plus a signature, which `apksigcopier compare` checks. No build cache and no cached model in the workflow,
   so a run does not depend on an earlier one.
+- **Touch logic and the controller's concerns as their own classes** (R26, R27; 6 Oct). What a touch means
+  (taps, holds, alternates and backing out of them, swipes from backspace and along the space bar, a glide's
+  start and phrase-gliding dips, B16's leaving the row, shift taps and holds, space for a letter above the
+  bar) moved from KeyboardView into KeyTouch, plain Kotlin fed touches and timers, so it has unit tests
+  (KeyTouchTest, 21); the View only feeds it and draws. Turning B16's row check off fails two of them.
+  TextInputController's separable concerns became collaborators it coordinates: EmailOffers, NextWords,
+  TextIdentifiers, Corrections and GlideLearning. Typing, the targeted word and glide commits stay in the
+  controller for now: they share the composing word, the strip and the selection reports, and splitting them
+  needs a design of who owns that state. Behaviour is unchanged; all unit tests pass before and after.
