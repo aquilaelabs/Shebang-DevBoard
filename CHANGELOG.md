@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)
+
 ## 0.5.5: 2026-10-06
 
 ### Added

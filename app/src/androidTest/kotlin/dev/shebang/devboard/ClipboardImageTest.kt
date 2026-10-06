@@ -9,7 +9,6 @@ import android.graphics.Paint
 import androidx.core.content.FileProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
@@ -22,7 +21,9 @@ import java.io.File
 class ClipboardImageTest {
     @Test
     fun copyAPicture() {
-        assumeTrue(InstrumentationRegistry.getArguments().getString("clipimage") != null)
+        // Only when asked: otherwise a quiet pass. (An assumption would read as a failure in the test runner's
+        // results, which CI turns into annotations.)
+        if (InstrumentationRegistry.getArguments().getString("clipimage") == null) return
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val dir = File(context.filesDir, "clip_images").apply { mkdirs() }
         val file = File(dir, "test_card.png")

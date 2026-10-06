@@ -798,12 +798,15 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   - writes a glide, a paste, a snippet and dictation as a finished composition (`commitWhole`): committed
     outright, Chrome leaves the cursor at the start of xterm.js's textarea, so the next backspace deleted nothing
     and the next word landed in front;
-  - deletes one character at a time, each its own edit (backspace after a glide, word deletes, a strip pick
-    replacing a glided word). The backspace swipe shows no highlight there, since it could not be seen;
+  - deletes with backspace key presses, one per character (backspace, backspace after a glide, word deletes,
+    a strip pick replacing a glided word). At first these were text deletions one character at a time, but
+    xterm.js notices deleted text only by diffing its textarea on a zero-delay timer, and GitHub's slower
+    emulator lost one of two backspaces ("catr" for "car", B18); a key press it acts on at once. The backspace
+    swipe shows no highlight there, since it could not be seen;
   - shows no next-word suggestions, which would take the terminal bar's row after every space.
-  Suggestions for the word being typed and glide stay. Deletions stay on the text path, so the keyboard's
-  reading of the field stays right; at a person's pace they arrive, but xterm.js can drop one when the next word
-  starts before its timer fires (seen once at 80 ms a key on a busy emulator), whatever the keyboard.
+  Suggestions for the word being typed and glide stay. Nothing the keyboard does in an exact field depends on
+  reading back what is before the cursor, so text the page keeps differently from what it was sent (xterm.js
+  handles key presses itself and leaves its textarea as it was) does no harm.
   Checked in Firefox with real taps: eight typing cases and the bar's Ctrl+B, Esc, Tab and Ctrl+C arrive as
   meant. FieldCompatibilityTest runs xterm.js (bundled in the debug build's assets only) in a WebView for the
   Chromium side: four tests, the first two failing without the rule ("the." and "cat car"). Not compared with

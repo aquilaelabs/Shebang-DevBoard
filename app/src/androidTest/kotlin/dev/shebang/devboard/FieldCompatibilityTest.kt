@@ -13,7 +13,6 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
-import org.junit.Assert.fail
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -174,12 +173,10 @@ class FieldCompatibilityTest {
     @Test
     fun backspacingIntoAWordInABrowserTerminalDoesNotSendItAgain() {
         open(FieldTestActivity.WEB_TERMINAL, needsLanguage = true)
-        // cat, space, two backspaces, r: the shell must hold "car", not "cacar". The backspaces at a person's
-        // pace: xterm.js reports a deletion from a timer and drops the report if the next word has begun, so at
-        // the test's speed on a busy emulator one can go missing whatever the keyboard does.
-        type("cat ")
-        type("\b\b", gap = 350)
-        type("r\n")
+        // cat, space, two backspaces, r: the shell must hold "car", not "cacar" (B17) or "catr" (B18: a deletion
+        // xterm.js only noticed on a timer, missed on GitHub's slower emulator). At full test speed: backspace
+        // goes as a key press, which the terminal acts on at once.
+        type("cat \b\br\n")
         assertShellGot("car")
     }
 
@@ -194,8 +191,7 @@ class FieldCompatibilityTest {
         stroke(*"hello".map { key(it)!!.let { k -> k.centerX to k.centerY } }.toTypedArray())
         waitFor(4_000) { currentText().isNotEmpty() }
         assertTrue("the glided word reached the terminal", currentText().isNotEmpty())
-        type("\b", gap = 350)
-        type("ok\n")
+        type("\bok\n")
         assertShellGot("ok")
     }
 
@@ -366,7 +362,7 @@ class FieldCompatibilityTest {
     /** Taps the keys for [s], one at a time, letting each tap's work settle as a person's pace would. */
     private fun type(s: String, settle: Boolean = true, gap: Long = 80) {
         for (c in s) {
-            val k = key(c) ?: fail("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}") as Nothing
+            val k = key(c) ?: throw AssertionError("no key for '$c' in ${service().keysForTest.map { it.def.text ?: it.action }}")
             instrumentation.runOnMainSync { service().tapForTest(k) }
             instrumentation.waitForIdleSync()
             SystemClock.sleep(gap)
