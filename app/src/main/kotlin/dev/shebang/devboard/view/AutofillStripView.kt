@@ -14,8 +14,8 @@ import kotlin.math.abs
  * service drew in the keyboard's style, after a chip for pasting what was just copied, centred in the strip (scrolling when there are more than fit). The
  * keyboard only places them: what they say and what tapping one fills in are the service's, and nothing
  * about them is read or learned. A sideways swipe carries them along with the finger, and past a third of
- * the strip (or flung) they slide off and go ([onDismiss]); when they scroll, only a swipe on past the end
- * of the row does.
+ * the strip (or flung) they slide off and go ([onDismiss]); when they scroll, a swipe scrolls them to the end
+ * first, and only a new swipe that begins there, outwards, carries them off.
  */
 class AutofillStripView(context: Context) : HorizontalScrollView(context) {
     var onDismiss: (() -> Unit)? = null
@@ -28,6 +28,9 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
     private val gap = (6 * density).toInt()
     private var downX = 0f
     private var downY = 0f
+    /** Where the row stood when the finger came down: at its start (nothing to its left) and at its end. */
+    private var downAtStart = true
+    private var downAtEnd = true
 
     init {
         isHorizontalScrollBarEnabled = false
@@ -40,6 +43,7 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
 
     private var autofillChips: List<View> = emptyList()
     private var clipChip: View? = null
+    private var emailChips: List<View> = emptyList()
 
     /** The autofill service's chips (after the clipboard chip, when there is one). */
     fun show(chips: List<View>) {
@@ -55,9 +59,21 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
 
     val hasClip: Boolean get() = clipChip != null
 
+    /**
+     * Cards for the remembered addresses that begin with the address being typed; while there are any, they are
+     * the row (the other chips wait for the typing to stop). Empty removes them.
+     */
+    fun setEmails(chips: List<View>) {
+        emailChips = chips
+        rebuild()
+    }
+
+    val hasEmails: Boolean get() = emailChips.isNotEmpty()
+
     private fun rebuild() {
         row.removeAllViews()
-        for (c in listOfNotNull(clipChip) + autofillChips) {
+        val chips = emailChips.ifEmpty { listOfNotNull(clipChip) + autofillChips }
+        for (c in chips) {
             // The platform sizes each chip to what the service drew; a chip has no content size of its own to wrap.
             val lp = c.layoutParams?.let { LinearLayout.LayoutParams(it.width, it.height) }
                 ?: LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -79,17 +95,22 @@ class AutofillStripView(context: Context) : HorizontalScrollView(context) {
     private var swiping = false
     private var velocity: android.view.VelocityTracker? = null
 
-    /** A sideways drag carries the chips along when the row cannot scroll any further that way. */
+    /**
+     * A sideways drag carries the chips along when the row was already at its end that way when the finger came
+     * down: a drag that scrolls the row to its end stops there, and the next one takes the chips off.
+     */
     private fun startsSwipe(ev: MotionEvent): Boolean {
         val dx = ev.x - downX
         val dy = ev.y - downY
-        // A finger moving right shows what lies to the left (direction -1), and the reverse.
-        return abs(dx) > slop && abs(dx) > abs(dy) && !canScrollHorizontally(if (dx > 0) -1 else 1)
+        // A finger moving right shows what lies to the left, so it swipes off from the row's start, and the reverse.
+        return abs(dx) > slop && abs(dx) > abs(dy) && (if (dx > 0) downAtStart else downAtEnd)
     }
 
     private fun begin(ev: MotionEvent) {
         downX = ev.x
         downY = ev.y
+        downAtStart = !canScrollHorizontally(-1)
+        downAtEnd = !canScrollHorizontally(1)
         swiping = false
         row.animate().cancel()
         velocity?.recycle()

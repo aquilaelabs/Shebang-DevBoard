@@ -887,3 +887,13 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   now typed alone when the paragraph before the cursor has an odd number of that quote (escaped ones and
   apostrophes after a letter not counted). Counted per paragraph, since an unclosed quote in an earlier one
   (a code comment, a list) says nothing about this one.
+- **Saved addresses as cards, only once typed** (owner's ask, 6 Oct). Remembered addresses showed on the
+  strip as soon as an email field opened, covering a password manager's card. They are now cards in the
+  chip row (the paste chip's style, full text size, scrolling when they do not fit), offered only once
+  something is typed, every matching address at once (sean.bowman@gmail.com and sean.bowman@live.com both
+  for "sean."), and held back while what is typed could still begin a dictionary word, so "sean" gets word
+  suggestions and "sean." the cards. The chip row now decides a swipe-away when the finger comes down: a
+  swipe that scrolls the row to its end stops there, and a new one from the end carries the chips off
+  (for the password manager's chips too). Swiped-away cards stay away until the next address in the field.
+  Seen on the API 36 emulator: no card on opening, words for "sea", both cards for "sean.", scroll then
+  dismiss, and a tapped card filling in its address.

@@ -63,6 +63,8 @@ class TextInputController(
          * correction marked as the one that will go in, and [other].
          */
         fun showCorrection(typed: String, fix: String, other: String?) = showCandidates(listOfNotNull(typed, fix, other))
+        /** Remembered addresses to offer as cards for the address being typed; empty removes them. */
+        fun showEmails(addresses: List<String>) = Unit
         /** How likely each letter a..z is to be typed next ([LetterPrior]), or null for no opinion. */
         fun setLetterPrior(prior: FloatArray?) = Unit
         /** Whether a letter tap just above the space bar may be taken as a space (plain text fields only). */
@@ -386,6 +388,7 @@ class TextInputController(
         lastAutocorrect = null
         corrections.clear()
         emailOffers.clear()
+        ui.showEmails(emptyList())
         reopenedCorrection = null
         reopened = null
         reopenedGlide = null
@@ -1328,21 +1331,24 @@ class TextInputController(
      */
     fun refreshEmails(edited: Boolean = true) {
         val offered = emailOffers.offer.isNotEmpty()
-        val matches = emailOffers.refresh(field, connection(), edited) ?: return
-        if (matches.isEmpty()) {
-            // Addresses offered a moment ago no longer match: the strip gives way to the bar again.
-            if (offered && !isComposing) {
-                ui.showCandidates(emptyList())
-                ui.setComposing(false)
-            }
+        val matches = emailOffers.refresh(field, connection(), edited, predictionModel?.first)
+        if (matches == null) {
+            if (offered) ui.showEmails(emptyList())
             return
         }
-        // Word suggestions still being worked out for this edit would cover the addresses.
-        suggestGeneration++
-        nextWords.cancel()
-        ui.showCandidates(arrangeBestMiddle(matches))
-        // Shown also with no word being typed (an empty field, or just after the @), as predictions are.
-        ui.setComposing(true)
+        if (matches.isNotEmpty() || offered) ui.showEmails(matches)
+    }
+
+    /** An offered address card was tapped: it replaces what was typed of it. */
+    fun pickEmail(address: String) {
+        val ic = connection() ?: return
+        if (emailOffers.isOffered(address)) pickEmail(ic, address)
+    }
+
+    /** The address cards were swiped away: none come back until the next address is begun. */
+    fun dismissEmails() {
+        emailOffers.dismiss()
+        ui.showEmails(emptyList())
     }
 
     /** Leaving an email field (or the keyboard closing): the addresses it last held are remembered. */
@@ -1361,6 +1367,7 @@ class TextInputController(
         emailOffers.fill(ic, address)
         ic.endBatchEdit()
         emailOffers.keep(field, ic)
+        ui.showEmails(emptyList())
         clearCandidates()
     }
 

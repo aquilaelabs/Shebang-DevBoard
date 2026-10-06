@@ -64,6 +64,8 @@ class EmailMemoryTest {
 
     private val ic = FakeInputConnection()
     private var shown: List<String> = emptyList()
+    /** The address cards on the strip now. */
+    private var cards: List<String> = emptyList()
 
     private fun controller(inputType: Int) = TextInputController(
         { ic },
@@ -72,6 +74,9 @@ class EmailMemoryTest {
                 shown = words
             }
             override fun setComposing(composing: Boolean) = Unit
+            override fun showEmails(addresses: List<String>) {
+                cards = addresses
+            }
         },
         Executor { it.run() },
         Handler(Looper.getMainLooper()),
@@ -88,17 +93,65 @@ class EmailMemoryTest {
 
     private val emailField = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
 
+    private fun type(c: TextInputController, s: String) {
+        for (ch in s) {
+            c.typeText(ch.toString())
+            c.refreshEmails()
+        }
+    }
+
     @Test
-    fun anEmailFieldOffersTheAddressBeingTyped() {
+    fun anEmailFieldOffersTheAddressBeingTypedAsACard() {
         memory.record("sean@example.com")
         val c = controller(emailField)
-        c.refreshEmails()
-        assertTrue("sean@example.com" in shown)
-        for (ch in "se") c.typeText(ch.toString())
-        c.refreshEmails()
-        assertTrue("sean@example.com" in shown)
-        c.pickCandidate("sean@example.com")
+        // Nothing offered when the field opens: its row is the password manager's.
+        c.refreshEmails(edited = false)
+        assertEquals(emptyList<String>(), cards)
+        type(c, "se")
+        assertEquals(listOf("sean@example.com"), cards)
+        // Cards, not words on the strip.
+        assertFalse("sean@example.com" in shown)
+        c.pickEmail("sean@example.com")
         assertEquals("sean@example.com", ic.toString())
+        assertEquals(emptyList<String>(), cards)
+    }
+
+    @Test
+    fun everyAddressThatBeginsTheSameIsOffered() {
+        memory.record("sean.bowman@gmail.com")
+        memory.record("sean.bowman@live.com")
+        memory.record("someone@else.org")
+        val c = controller(emailField)
+        type(c, "sean.b")
+        assertEquals(setOf("sean.bowman@gmail.com", "sean.bowman@live.com"), cards.toSet())
+        type(c, "owman@l")
+        assertEquals(listOf("sean.bowman@live.com"), cards)
+    }
+
+    @Test
+    fun noCardsWhileWhatIsTypedCouldStillBeAWord() {
+        memory.record("sean.bowman@gmail.com")
+        val c = controller(emailField)
+        c.predictionModel = dev.shebang.devboard.dict.NgramModelTest.dictionary to dev.shebang.devboard.dict.NgramModelTest.lm
+        type(c, "sea")
+        assertEquals(emptyList<String>(), cards)
+        type(c, "n.")
+        assertEquals(listOf("sean.bowman@gmail.com"), cards)
+    }
+
+    @Test
+    fun swipedAwayCardsStayAwayUntilTheNextAddress() {
+        memory.record("sean.bowman@gmail.com")
+        memory.record("ana@example.org")
+        val c = controller(emailField)
+        type(c, "sean.")
+        assertEquals(listOf("sean.bowman@gmail.com"), cards)
+        c.dismissEmails()
+        type(c, "b")
+        assertEquals(emptyList<String>(), cards)
+        // The next address in the field gets its cards.
+        type(c, " an")
+        assertEquals(listOf("ana@example.org"), cards)
     }
 
     @Test
@@ -115,15 +168,18 @@ class EmailMemoryTest {
     fun otherFieldsNeitherOfferNorRemember() {
         memory.record("sean@example.com")
         val c = controller(InputType.TYPE_CLASS_TEXT)
-        c.refreshEmails()
-        assertFalse("sean@example.com" in shown)
+        type(c, "se")
+        assertEquals(emptyList<String>(), cards)
         for (ch in "ana@example.org") c.typeText(ch.toString())
         c.refreshEmails()
         c.rememberEmails()
         assertEquals(emptyList<String>(), memory.matching("an"))
         // Nor a field that asks for no suggestions, even for email.
+        ic.finishComposingText()
+        ic.text.setLength(0)
+        ic.cursor = 0
         val quiet = controller(emailField or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS)
-        quiet.refreshEmails()
-        assertFalse("sean@example.com" in shown)
+        type(quiet, "se")
+        assertEquals(emptyList<String>(), cards)
     }
 }
