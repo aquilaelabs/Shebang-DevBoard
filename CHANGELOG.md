@@ -22,6 +22,7 @@
 - The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
 - In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (0c79a33)
 - Dictionaries settings: the word counts keep their space before each pack's description again (1a8d59f)
+- Punctuation typed right after picking a word from the strip takes the place of the word's space even when the app is slow to report the cursor (1a2e11e)
 
 ## 0.5.5: 2026-10-06
 

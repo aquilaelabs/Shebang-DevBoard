@@ -302,6 +302,17 @@ class TextInputController(
      * that space back in front of it, so "the" space "." "next" reads "the. next".
      */
     private var spaceAfterPunctuation = false
+    /**
+     * The text before the cursor right after the keyboard wrote a word's space, or swapped it for punctuation: a
+     * cursor report that finds it unchanged is that edit's own report arriving late (a slow app), not the user
+     * moving the cursor, so the space can still give way to punctuation, and the space owed after the
+     * punctuation still goes in front of the next word.
+     */
+    private var spaceTail: String? = null
+
+    private fun rememberSpaceTail(ic: InputConnection) {
+        spaceTail = ic.getTextBeforeCursor(SPACE_TAIL_CHARS, 0)?.toString()
+    }
 
     /** The most recent glide, while it is the last thing typed: backspace removes it, the strip swaps its last word. */
     private class GlideCommit(
@@ -438,6 +449,10 @@ class TextInputController(
         }
         if (clock() - lastOwnEdit < OWN_EDIT_MS) return
         if (newSelStart == oldSelStart && newSelEnd == oldSelEnd) return
+        if ((lastActionWasSpace || spaceAfterPunctuation) && newSelStart == newSelEnd) {
+            val tail = spaceTail
+            if (tail != null && connection()?.getTextBeforeCursor(tail.length, 0)?.toString() == tail) return
+        }
         // The cursor moved away: a space or punctuation typed now does not follow the last word.
         lastActionWasSpace = false
         spaceAfterPunctuation = false
@@ -618,6 +633,7 @@ class TextInputController(
         ic.commitText(text, 1)
         ic.endBatchEdit()
         spaceAfterPunctuation = !field.isUrl
+        rememberSpaceTail(ic)
         return true
     }
 
@@ -700,6 +716,7 @@ class TextInputController(
             lastAutocorrect = null
             ic.commitText(" ", 1)
             lastActionWasSpace = true
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             return
         }
@@ -721,6 +738,7 @@ class TextInputController(
             typeOutsideWord(ic, " ")
         }
         lastActionWasSpace = true
+        rememberSpaceTail(ic)
         lastSpaceTime = now
         showPredictions(ic)
     }
@@ -1447,6 +1465,7 @@ class TextInputController(
             learnAs(chosen, context)
             clearCandidates()
             lastActionWasSpace = true
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             showPredictions(ic)
             return
@@ -1510,6 +1529,7 @@ class TextInputController(
             word.setLength(0)
             clearCandidates()
             lastActionWasSpace = !field.isEmail
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             showPredictions(ic)
         }
@@ -1802,6 +1822,8 @@ class TextInputController(
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
+        /** Text kept from before the cursor to recognise a late report of the keyboard's own space ([spaceTail]). */
+        private const val SPACE_TAIL_CHARS = 48
         /** Characters read before the cursor for deleting words by swiping from backspace. */
         private const val DELETE_CHARS = 2000
         private const val MAX_DELETE_WORDS = 40
