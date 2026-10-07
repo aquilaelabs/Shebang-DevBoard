@@ -692,7 +692,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         if (k.shiftState == ShiftState.LOCKED) return
         val caps = ic?.getCursorCapsMode(field.inputType) ?: 0
-        if (caps != 0) {
+        // "Hello." with its space still owed is a sentence's end too, though the field sees no space yet.
+        val capsField = field.inputType and (android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0
+        if (caps != 0 || (capsField && text.sentenceStartOwed)) {
             if (k.shiftState == ShiftState.OFF) {
                 autoShifted = true
                 k.setShift(ShiftState.ON, notify = false)

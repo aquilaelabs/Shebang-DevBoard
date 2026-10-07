@@ -15,6 +15,7 @@
 - Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (ada9bbd)
 - Saved email addresses are offered as cards only once you start typing one, so a password manager's card is not covered when the field opens; every saved address that matches shows (scrolling sideways at full size), and only once what you type can no longer be an ordinary word (1087037)
 - Chips above the keys that scroll now stop at the end of the row; a second swipe from there puts them away (1087037)
+- Commas, exclamation and question marks, colons and semicolons typed straight onto a word put a space in front of the next letter you type (a space you type yourself is the only one), and the letter after a sentence's end is capitalised even before its space appears (067b283)
 
 ### Fixed
 

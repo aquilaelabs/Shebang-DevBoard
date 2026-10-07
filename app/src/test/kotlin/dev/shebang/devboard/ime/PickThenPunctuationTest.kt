@@ -92,6 +92,118 @@ class PickThenPunctuationTest {
         assertEquals(".hello ", ic.toString())
     }
 
+    private fun idx(w: String) = dictionary.indexOfLower(w)
+
+    private fun glide(w: String) {
+        val r = dev.shebang.devboard.glide.GlideResult(
+            intArrayOf(idx(w)), listOf(null), listOf(null),
+            listOf(dev.shebang.devboard.glide.GlideWord(idx(w), intArrayOf(idx(w)), floatArrayOf(0f))),
+            intArrayOf(idx(w)), IntArray(0), -1, 5,
+        )
+        controller.commitGlide(r, dictionary, false, false)
+    }
+
+    @Test
+    fun spaceAfterThePunctuationGivesOneSpace() {
+        type("hel")
+        controller.pickCandidate("hello")
+        type(". w")
+        assertEquals("hello. w", ic.toString())
+    }
+
+    @Test
+    fun aGlideAfterThePunctuationGetsOneSpace() {
+        type("hel")
+        controller.pickCandidate("hello")
+        type(".")
+        glide("world")
+        assertEquals("hello. world", ic.toString().trimEnd())
+    }
+
+    private fun reset(inputType: Int = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT) {
+        ic.finishComposingText(); ic.text.setLength(0); ic.cursor = 0
+        controller.startInput(FieldInfo.from(inputType, 0))
+    }
+
+    @Test
+    fun punctuationTypedStraightOntoAWordOwesTheSpaceToTheNextLetter() {
+        assertEquals(listOf("hi, t", "yes! s", "fine? n", "note: t", "so; i"), listOf("hi,t", "yes!s", "fine?n", "note:t", "so;i").map {
+            reset()
+            type(it)
+            ic.toString()
+        })
+    }
+
+    @Test
+    fun aFullStopTypedOntoAWordIsASentenceEndWhenTheNextWordIsAnEverydayOne() {
+        type("hello.world ")
+        assertEquals("hello. world ", ic.toString())
+        // Where sentences begin with a capital, it gets one.
+        reset(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+        type("hello.world ")
+        assertEquals("hello. World ", ic.toString())
+    }
+
+    @Test
+    fun namesWithAFullStopStayAsTyped() {
+        for (name in listOf("node.js", "config.json", "e.g.", "v1.2", "3.5")) {
+            reset()
+            type("$name ")
+            assertEquals("$name ", ic.toString())
+        }
+    }
+
+    @Test
+    fun backspaceRightAfterTakesTheFullStopsSpaceBack() {
+        type("hello.world ")
+        controller.backspace()
+        assertEquals("hello.world", ic.toString())
+    }
+
+    @Test
+    fun aSpaceTypedAfterThePunctuationIsTheOnlyOne() {
+        type("hello, w")
+        assertEquals("hello, w", ic.toString())
+        reset()
+        type("hello. w")
+        assertEquals("hello. w", ic.toString())
+    }
+
+    @Test
+    fun aGlideAfterPunctuationTypedOntoAWordGetsOneSpace() {
+        type("hello.")
+        glide("world")
+        assertEquals("hello. world", ic.toString().trimEnd())
+    }
+
+    @Test
+    fun noSpaceOwedInCodeModeOrAnEmailField() {
+        controller.codeMode = true
+        type("a,b")
+        assertEquals("a,b", ic.toString())
+        controller.codeMode = false
+        reset(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS)
+        type("sean.bowman ")
+        assertEquals("sean.bowman", ic.toString().trimEnd())
+    }
+
+    @Test
+    fun aSentenceEndWithItsSpaceOwedStartsASentence() {
+        type("hello!")
+        assertEquals(true, controller.sentenceStartOwed)
+        type("w")
+        assertEquals(false, controller.sentenceStartOwed)
+        reset()
+        type("well,")
+        assertEquals(false, controller.sentenceStartOwed)
+        // After a picked word, the full stop takes its space and owes it: a sentence starts next.
+        reset()
+        type("hel")
+        controller.pickCandidate("hello")
+        type(".")
+        assertEquals(true, controller.sentenceStartOwed)
+    }
+
     @Test
     fun aPredictedWordPickedThenAComma() {
         type("thank ")

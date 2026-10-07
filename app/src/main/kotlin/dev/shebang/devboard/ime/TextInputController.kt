@@ -577,12 +577,60 @@ class TextInputController(
             }
             // Sentence punctuation ends a word as space does; anything else (a digit, a symbol) just follows it.
             endWord(ic, text, correct = text.length == 1 && text[0] in SENTENCE_PUNCTUATION, deferOk = true)
+            oweSpaceAfter(ic, text)
             return
         }
         if (pairing && text.length == 1 && typePaired(ic, text[0])) return
         if (spaceBefore && swapWithSpace(ic, text)) return
         typeOutsideWord(ic, text)
+        oweSpaceAfter(ic, text)
     }
+
+    /**
+     * Punctuation that just went onto the end of a word ("hello" then ",") owes the space after it: it goes in
+     * front of the next letter typed (a glide adds its own), and a space typed instead is the only one. A full
+     * stop owes nothing yet: it may be part of a name ("node.js"), so the word after it decides
+     * ([sentenceAfterFullStop]). Not in code mode, nor in web-address, email and exact fields.
+     */
+    private fun oweSpaceAfter(ic: InputConnection, text: String) {
+        if (text.length != 1 || text[0] !in OWES_SPACE || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return
+        val before = ic.getTextBeforeCursor(2, 0) ?: return
+        if (before.length < 2 || before.last() != text[0] || !before[0].isLetterOrDigit()) return
+        spaceAfterPunctuation = true
+        rememberSpaceTail(ic)
+    }
+
+    /**
+     * Whether [typed], the word just finished, follows a full stop typed straight onto a word ("hello.world")
+     * that ends a sentence: the word before has two letters or more and nothing but letters back to the last
+     * space (not "e.g", "v1.2", "www.example"), and [typed] is an everyday word or begins with a capital.
+     * Anything else ("node.js", "config.json") is a name, left as typed.
+     */
+    private fun sentenceAfterFullStop(ic: InputConnection, typed: String): Boolean {
+        if (typed.isEmpty() || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return false
+        val before = ic.getTextBeforeCursor(typed.length + MAX_WORD + 1, 0)?.toString() ?: return false
+        if (!before.endsWith(typed)) return false
+        val rest = before.dropLast(typed.length)
+        if (!rest.endsWith(".")) return false
+        val prev = rest.dropLast(1).takeLastWhile { !it.isWhitespace() }
+        if (prev.length < 2 || !prev.all { it.isLetter() || it == '\'' || it == '’' }) return false
+        if (typed[0].isUpperCase()) return true
+        val dictionary = predictionModel?.first ?: return false
+        val i = dictionary.indexOfLower(typed.lowercase())
+        return i >= 0 && dictionary.packs[i].toInt() == dev.shebang.devboard.dict.WordPacks.REGULAR
+    }
+
+    /** Whether the field starts sentences with a capital, and the keyboard is to give it one. */
+    private fun capitalisesSentences(): Boolean =
+        settings.autoCaps && field.allowsAutoCaps && (field.inputType and android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0
+
+    /** A sentence just ended with a space owed after it: the next letter begins a sentence (for auto-capitals). */
+    val sentenceStartOwed: Boolean
+        get() {
+            if (!spaceAfterPunctuation) return false
+            val last = connection()?.getTextBeforeCursor(1, 0)?.firstOrNull() ?: return false
+            return last in SENTENCE_ENDS
+        }
 
     /**
      * A character typed outside a word. In an [FieldInfo.exact] field it goes as the key press for it, where the
@@ -1182,6 +1230,11 @@ class TextInputController(
             }
         }
         if (!field.noAutocorrect) commit = pronounCase(commit)
+        // A full stop typed onto the word before ("hello.world"): a sentence's end when this word is an everyday
+        // one or typed with a capital, so the space goes in (and the capital, where the field starts sentences
+        // with one); a name like "node.js" stays as typed.
+        val lead = if (sentenceAfterFullStop(ic, typed)) " " else ""
+        if (lead.isNotEmpty() && capitalisesSentences()) commit = commit.replaceFirstChar { it.uppercaseChar() }
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
         if (field.exact && commit == typed) {
@@ -1192,15 +1245,16 @@ class TextInputController(
             if (after.isNotEmpty()) ic.commitText(typed + after, 1) else ic.finishComposingText()
         } else {
             ic.beginBatchEdit()
-            ic.commitText(commit, 1)
+            ic.commitText(lead + commit, 1)
             if (after.isNotEmpty()) ic.commitText(after, 1)
             ic.endBatchEdit()
         }
         word.setLength(0)
         clearCandidates()
-        if (commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
-            lastAutocorrect = Autocorrected(typed, commit, after)
-            corrections.remember(ic, typed, commit, after.length, other)
+        if (lead.isNotEmpty() || commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
+            // Backspace right after puts back what was typed, the full stop's space included.
+            lastAutocorrect = Autocorrected(typed, lead + commit, after)
+            corrections.remember(ic, typed, lead + commit, after.length, other)
         }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
@@ -1813,6 +1867,10 @@ class TextInputController(
         private const val PARAGRAPH_CHARS = 2000
         /** Punctuation that takes the place of the space after a word ([swapWithSpace]). Quotes are left out: one may open a quotation. */
         private const val SWAPS_WITH_SPACE = ".,!?;:)"
+        /** Punctuation that, typed onto the end of a word, owes the space after it ([oweSpaceAfter]); a full stop decides later. */
+        private const val OWES_SPACE = ",!?;:"
+        /** Punctuation that ends a sentence. */
+        private const val SENTENCE_ENDS = ".!?"
         /** In a web-address field, punctuation a glided word attaches to without a space. */
         private const val URL_JOINERS = "./:@-_#?=&~"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
