@@ -15,6 +15,8 @@
 - Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (ada9bbd)
 - Saved email addresses are offered as cards only once you start typing one, so a password manager's card is not covered when the field opens; every saved address that matches shows (scrolling sideways at full size), and only once what you type can no longer be an ordinary word (1087037)
 - Chips above the keys that scroll now stop at the end of the row; a second swipe from there puts them away (1087037)
+- Commas, exclamation and question marks, colons and semicolons typed straight onto a word put a space in front of the next letter you type (a space you type yourself is the only one), and the letter after a sentence's end is capitalised even before its space appears (067b283)
+- A full stop typed straight onto a word gets its space when the next word ends, unless the two joined are a name the word lists know (node.js, e.g., example.com, notes.txt) or one you kept joined: backspace right after the space goes in puts it back and remembers the name in your personal words (d8030a4)
 
 ### Fixed
 
@@ -22,6 +24,7 @@
 - The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
 - In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (0c79a33)
 - Dictionaries settings: the word counts keep their space before each pack's description again (1a8d59f)
+- Punctuation typed right after picking a word from the strip takes the place of the word's space even when the app is slow to report the cursor (1a2e11e)
 
 ## 0.5.5: 2026-10-06
 

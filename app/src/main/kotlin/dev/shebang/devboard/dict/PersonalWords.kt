@@ -287,6 +287,13 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         countsVersion++
     }
 
+    /** Whether [lower] is a personal word the keyboard knows (added by hand, kept joined, or used enough). */
+    @Synchronized
+    fun knows(lower: String): Boolean {
+        load()
+        return words[lower]?.known == true
+    }
+
     /** Learned words, most used first. */
     @Synchronized
     fun list(): List<PersonalWord> {
@@ -334,7 +341,7 @@ class PersonalWords(private val file: File?, private val today: () -> Int = { (S
         fun isLearnable(word: String): Boolean {
             if (word.length !in 2..32) return false
             if (!word.first().isLetter() || !word.last().isLetter()) return false
-            return word.all { it.isLetter() || it == '\'' || it == '-' || it == '_' }
+            return word.all { it.isLetter() || it == '\'' || it == '-' || it == '_' || it == '.' }
         }
 
         /**

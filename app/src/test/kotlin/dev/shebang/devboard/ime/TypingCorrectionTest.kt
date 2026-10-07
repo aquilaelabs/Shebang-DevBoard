@@ -122,6 +122,8 @@ class TypingCorrectionTest {
 
     @Test
     fun aWordJoinedByPunctuationIsLeftAlone() {
+        // A known name (this test's word list has no packs, where node.js is): not split at its full stop.
+        controller.knowsPersonalWord = { it == "node.js" }
         type("f-droid ")
         assertEquals("f-droid ", ic.toString())
         type("node.js ")

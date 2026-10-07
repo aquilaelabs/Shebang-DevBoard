@@ -1,5 +1,6 @@
 a	10
 A	40
+a.m.	40
 AAA	50
 aardvark	20
 aardvarks	50
@@ -17137,6 +17138,7 @@ détente	40
 E	35
 e	40
 e'er	50
+e.g.	40
 each	10
 eager	20
 eagerer	35
@@ -26714,6 +26716,7 @@ I'd	40
 I'll	40
 I'm	35
 I've	40
+i.e.	40
 iamb	50
 iambic	50
 iambics	50
@@ -38150,6 +38153,7 @@ oysters	35
 ozone	20
 P	35
 p	40
+p.m.	40
 pa	35
 PAC	50
 pace	20
@@ -39741,6 +39745,7 @@ peyote	50
 PFC	50
 PGP	50
 pH	50
+Ph.D.	40
 phalanges	50
 phalanx	50
 phalanxes	50
@@ -57798,6 +57803,9 @@ tyro	50
 tyros	50
 U	35
 u	40
+U.K.	40
+U.S.	40
+U.S.A.	40
 UAW	50
 ubiquitous	35
 ubiquitously	50

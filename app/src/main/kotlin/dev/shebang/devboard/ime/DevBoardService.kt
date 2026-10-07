@@ -198,6 +198,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         text = TextInputController({ currentInputConnection }, this, background, main, this)
         // Identifiers from the text are scored against a glide on the current key layout.
         text.identifierScorer = { stroke, letters -> geometry?.let { PathMatch.cost(glideModelFor(it), stroke, letters) } }
+        // Names the user kept joined at a full stop ("n.m") stay joined.
+        text.knowsPersonalWord = { personal.knows(it) }
         settingsJob = scope.launch {
             SettingsRepository.get(this@DevBoardService).settings.collectLatest { applySettings(it) }
         }
@@ -299,6 +301,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                 start = false
             }
         }
+    }
+
+    override fun keepJoined(word: String) {
+        if (!settings.learnWords) return
+        background.execute { personal.add(word) }
     }
 
     override fun learnTaps(observations: FloatArray) {
@@ -692,7 +699,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         if (k.shiftState == ShiftState.LOCKED) return
         val caps = ic?.getCursorCapsMode(field.inputType) ?: 0
-        if (caps != 0) {
+        // "Hello." with its space still owed is a sentence's end too, though the field sees no space yet.
+        val capsField = field.inputType and (android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS) != 0
+        if (caps != 0 || (capsField && text.sentenceStartOwed)) {
             if (k.shiftState == ShiftState.OFF) {
                 autoShifted = true
                 k.setShift(ShiftState.ON, notify = false)

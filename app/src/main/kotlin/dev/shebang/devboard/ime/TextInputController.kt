@@ -84,6 +84,8 @@ class TextInputController(
         fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary)
         /** Where a word typed right was tapped: triples (letter, du, dv) from [TapModel.observation]. */
         fun learnTaps(observations: FloatArray) = Unit
+        /** The user kept [word] joined at a full stop ("n.m"): a personal word from now on, not split there. */
+        fun keepJoined(word: String) = Unit
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
         fun glideOutcome(outcome: Int, letters: Int) = Unit
 
@@ -121,6 +123,9 @@ class TextInputController(
         set(value) {
             identifiers.scorer = value
         }
+
+    /** Whether the user's personal words hold [lower] (a word written with a full stop, "n.m"); set by the service. */
+    var knowsPersonalWord: (lower: String) -> Boolean = { false }
 
     /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
     var predictionModel: Pair<Dictionary, NgramModel>? = null
@@ -302,6 +307,17 @@ class TextInputController(
      * that space back in front of it, so "the" space "." "next" reads "the. next".
      */
     private var spaceAfterPunctuation = false
+    /**
+     * The text before the cursor right after the keyboard wrote a word's space, or swapped it for punctuation: a
+     * cursor report that finds it unchanged is that edit's own report arriving late (a slow app), not the user
+     * moving the cursor, so the space can still give way to punctuation, and the space owed after the
+     * punctuation still goes in front of the next word.
+     */
+    private var spaceTail: String? = null
+
+    private fun rememberSpaceTail(ic: InputConnection) {
+        spaceTail = ic.getTextBeforeCursor(SPACE_TAIL_CHARS, 0)?.toString()
+    }
 
     /** The most recent glide, while it is the last thing typed: backspace removes it, the strip swaps its last word. */
     private class GlideCommit(
@@ -438,6 +454,10 @@ class TextInputController(
         }
         if (clock() - lastOwnEdit < OWN_EDIT_MS) return
         if (newSelStart == oldSelStart && newSelEnd == oldSelEnd) return
+        if ((lastActionWasSpace || spaceAfterPunctuation) && newSelStart == newSelEnd) {
+            val tail = spaceTail
+            if (tail != null && connection()?.getTextBeforeCursor(tail.length, 0)?.toString() == tail) return
+        }
         // The cursor moved away: a space or punctuation typed now does not follow the last word.
         lastActionWasSpace = false
         spaceAfterPunctuation = false
@@ -562,12 +582,84 @@ class TextInputController(
             }
             // Sentence punctuation ends a word as space does; anything else (a digit, a symbol) just follows it.
             endWord(ic, text, correct = text.length == 1 && text[0] in SENTENCE_PUNCTUATION, deferOk = true)
+            oweSpaceAfter(ic, text)
             return
         }
         if (pairing && text.length == 1 && typePaired(ic, text[0])) return
         if (spaceBefore && swapWithSpace(ic, text)) return
         typeOutsideWord(ic, text)
+        oweSpaceAfter(ic, text)
     }
+
+    /**
+     * Punctuation that just went onto the end of a word ("hello" then ",") owes the space after it: it goes in
+     * front of the next letter typed (a glide adds its own), and a space typed instead is the only one. A full
+     * stop owes nothing yet: it may be part of a name ("node.js"), so the word after it decides
+     * ([sentenceAfterFullStop]). Not in code mode, nor in web-address, email and exact fields.
+     */
+    private fun oweSpaceAfter(ic: InputConnection, text: String) {
+        if (text.length != 1 || text[0] !in OWES_SPACE || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return
+        val before = ic.getTextBeforeCursor(2, 0) ?: return
+        if (before.length < 2 || before.last() != text[0] || !before[0].isLetterOrDigit()) return
+        spaceAfterPunctuation = true
+        rememberSpaceTail(ic)
+    }
+
+    /**
+     * Whether [typed], the word just finished, follows a full stop typed straight onto a word ("hello.world")
+     * that ends a sentence: the word before is a word the keyboard knows, in a word list or the user's personal
+     * words ("hello", not "n" of "n.m" or "www"; of single letters only "a" and "I" count), and the two joined
+     * are not a known name ([knownJoined]: "node.js", "example.com", or one the user kept joined).
+     */
+    private fun sentenceAfterFullStop(ic: InputConnection, typed: String): Boolean {
+        if (typed.isEmpty() || !typed[0].isLetter() || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return false
+        val before = ic.getTextBeforeCursor(typed.length + MAX_WORD + 1, 0)?.toString() ?: return false
+        if (!before.endsWith(typed)) return false
+        val rest = before.dropLast(typed.length)
+        if (!rest.endsWith(".")) return false
+        val prev = rest.dropLast(1).takeLastWhile { !it.isWhitespace() }
+        if (prev.isEmpty() || !prev.all { it.isLetter() || it == '\'' || it == '’' }) return false
+        if (!knownWord(prev)) return false
+        return !knownJoined(prev, typed)
+    }
+
+    /** Whether [w] is a word: in a word list or the user's personal words; of single letters only "a" and "I". */
+    private fun knownWord(w: String): Boolean {
+        val lower = w.lowercase()
+        if (lower.length == 1 && lower != "a" && lower != "i") return false
+        if (knowsPersonalWord(lower)) return true
+        val dictionary = predictionModel?.first ?: return false
+        return dictionary.indexOfLower(lower) >= 0
+    }
+
+    /**
+     * Whether [prev] "." [typed] is a name a dictionary knows: written so in a word list or the user's personal
+     * words ("node.js", "e.g." for "e.g"), or with a known ending or lead-in ("example.com", "notes.txt",
+     * "www.example": the lists hold ".com", ".txt" and "www.").
+     */
+    private fun knownJoined(prev: String, typed: String): Boolean {
+        val joined = "$prev.$typed".lowercase()
+        if (knowsPersonalWord(joined)) return true
+        val dictionary = predictionModel?.first ?: return false
+        for (i in dictionary.prefixRange(joined)) {
+            val w = dictionary.lower[i]
+            if (w == joined || w.startsWith("$joined.")) return true
+        }
+        // A known ending (".com") or lead-in ("www.") makes it a name too.
+        return dictionary.indexOfLower(".${typed.lowercase()}") >= 0 || dictionary.indexOfLower("${prev.lowercase()}.") >= 0
+    }
+
+    /** Whether the field starts sentences with a capital, and the keyboard is to give it one. */
+    private fun capitalisesSentences(): Boolean =
+        settings.autoCaps && field.allowsAutoCaps && (field.inputType and android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0
+
+    /** A sentence just ended with a space owed after it: the next letter begins a sentence (for auto-capitals). */
+    val sentenceStartOwed: Boolean
+        get() {
+            if (!spaceAfterPunctuation) return false
+            val last = connection()?.getTextBeforeCursor(1, 0)?.firstOrNull() ?: return false
+            return last in SENTENCE_ENDS
+        }
 
     /**
      * A character typed outside a word. In an [FieldInfo.exact] field it goes as the key press for it, where the
@@ -618,6 +710,7 @@ class TextInputController(
         ic.commitText(text, 1)
         ic.endBatchEdit()
         spaceAfterPunctuation = !field.isUrl
+        rememberSpaceTail(ic)
         return true
     }
 
@@ -700,6 +793,7 @@ class TextInputController(
             lastAutocorrect = null
             ic.commitText(" ", 1)
             lastActionWasSpace = true
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             return
         }
@@ -721,6 +815,7 @@ class TextInputController(
             typeOutsideWord(ic, " ")
         }
         lastActionWasSpace = true
+        rememberSpaceTail(ic)
         lastSpaceTime = now
         showPredictions(ic)
     }
@@ -834,6 +929,11 @@ class TextInputController(
             ic.endBatchEdit()
             corrections.keepAsTyped(ac.typed)
             corrections.forget(ac.typed, ac.corrected)
+            // A full stop's space taken back: the joined name ("n.m") is the user's, kept joined from now on.
+            if (ac.corrected.startsWith(" ") && field.allowsLearning) {
+                val joined = ic.getTextBeforeCursor(MAX_WORD * 2, 0)?.toString()?.takeLastWhile { !it.isWhitespace() }.orEmpty()
+                if ('.' in joined) learner.keepJoined(joined.trimEnd('.'))
+            }
             return
         }
         val glide = lastGlide
@@ -1163,7 +1263,14 @@ class TextInputController(
                 defer = false
             }
         }
-        if (!field.noAutocorrect) commit = pronounCase(commit)
+        // A full stop typed onto the word before ("hello.world"): a sentence's end unless the two joined are a known
+        // name, so the space goes in (and the capital, where the field starts sentences with one); a name like
+        // "node.js" stays as typed.
+        val lead = if (sentenceAfterFullStop(ic, typed)) " " else ""
+        // The pronoun I, but not the "i" of a name joined by punctuation ("n.m.i").
+        val pronounCased = !field.noAutocorrect && (lead.isNotEmpty() || !gluedToPrevious(ic, typed))
+        if (pronounCased) commit = pronounCase(commit)
+        if (lead.isNotEmpty() && capitalisesSentences()) commit = commit.replaceFirstChar { it.uppercaseChar() }
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
         if (field.exact && commit == typed) {
@@ -1174,15 +1281,16 @@ class TextInputController(
             if (after.isNotEmpty()) ic.commitText(typed + after, 1) else ic.finishComposingText()
         } else {
             ic.beginBatchEdit()
-            ic.commitText(commit, 1)
+            ic.commitText(lead + commit, 1)
             if (after.isNotEmpty()) ic.commitText(after, 1)
             ic.endBatchEdit()
         }
         word.setLength(0)
         clearCandidates()
-        if (commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
-            lastAutocorrect = Autocorrected(typed, commit, after)
-            corrections.remember(ic, typed, commit, after.length, other)
+        if (lead.isNotEmpty() || commit != (if (pronounCased) pronounCase(typed) else typed)) {
+            // Backspace right after puts back what was typed, the full stop's space included.
+            lastAutocorrect = Autocorrected(typed, lead + commit, after)
+            corrections.remember(ic, typed, lead + commit, after.length, other)
         }
         if (!defer) {
             if (!untouched) learnAs(commit, context)
@@ -1447,6 +1555,7 @@ class TextInputController(
             learnAs(chosen, context)
             clearCandidates()
             lastActionWasSpace = true
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             showPredictions(ic)
             return
@@ -1510,6 +1619,7 @@ class TextInputController(
             word.setLength(0)
             clearCandidates()
             lastActionWasSpace = !field.isEmail
+            rememberSpaceTail(ic)
             lastSpaceTime = clock()
             showPredictions(ic)
         }
@@ -1793,6 +1903,10 @@ class TextInputController(
         private const val PARAGRAPH_CHARS = 2000
         /** Punctuation that takes the place of the space after a word ([swapWithSpace]). Quotes are left out: one may open a quotation. */
         private const val SWAPS_WITH_SPACE = ".,!?;:)"
+        /** Punctuation that, typed onto the end of a word, owes the space after it ([oweSpaceAfter]); a full stop decides later. */
+        private const val OWES_SPACE = ",!?;:"
+        /** Punctuation that ends a sentence. */
+        private const val SENTENCE_ENDS = ".!?"
         /** In a web-address field, punctuation a glided word attaches to without a space. */
         private const val URL_JOINERS = "./:@-_#?=&~"
         /** Punctuation that ends a word the way space does, so autocorrect applies before it. */
@@ -1802,6 +1916,8 @@ class TextInputController(
         private val PRONOUN_I = setOf("i", "i'm", "i'd", "i'll", "i've")
         /** Selection reports this soon after the keyboard's own edit are taken as its own. */
         const val OWN_EDIT_MS = 600L
+        /** Text kept from before the cursor to recognise a late report of the keyboard's own space ([spaceTail]). */
+        private const val SPACE_TAIL_CHARS = 48
         /** Characters read before the cursor for deleting words by swiping from backspace. */
         private const val DELETE_CHARS = 2000
         private const val MAX_DELETE_WORDS = 40
