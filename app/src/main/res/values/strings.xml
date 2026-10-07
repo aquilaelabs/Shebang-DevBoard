@@ -113,7 +113,7 @@
     <string name="personal_reset_text">Gliding and autocorrect go back to the keyboard\'s defaults and start learning your swipes and taps again.</string>
     <string name="personal_reset">Reset</string>
     <string name="personal_word_label">Word</string>
-    <string name="personal_word_invalid">2 to 32 letters; \' - and _ may go between them. No digits or spaces.</string>
+    <string name="personal_word_invalid">2 to 32 letters; \' - _ and . may go between them. No digits or spaces.</string>
     <string name="personal_word_hint">Written as you type it here: GitHub keeps its capitals.</string>
     <string name="personal_add">Add</string>
     <string name="day_today">Today</string>

@@ -55,3 +55,13 @@ uploads	35
 downloads	35
 online	35
 dropdowns	40
+
+# Abbreviations written with full stops inside: "e.g." is not a sentence ending at "e.".
+e.g.	40
+i.e.	40
+a.m.	40
+p.m.	40
+Ph.D.	40
+U.S.	40
+U.K.	40
+U.S.A.	40

@@ -11,8 +11,15 @@ import java.util.concurrent.Executor
 
 /** A word picked from the strip goes in with a space; punctuation typed next takes that space's place. */
 class PickThenPunctuationTest {
-    private val dictionary = NgramModelTest.dictionary
-    private val lm = NgramModelTest.lm
+    companion object {
+        /** The word lists with every pack, as the keyboard has them by default, and the word model over them. */
+        val packs by lazy { dev.shebang.devboard.dict.BuiltInWords.all() }
+        val packsLm by lazy { java.io.File("src/main/assets/dict/en_ngrams.bin").inputStream().use { dev.shebang.devboard.dict.NgramModel.load(it, packs) } }
+    }
+    private val dictionary = packs
+    private val lm = packsLm
+    /** Names the user kept joined at a full stop. */
+    private val kept = mutableSetOf<String>()
     private val ic = FakeInputConnection()
     private var strip: List<String> = emptyList()
     private val controller = TextInputController(
@@ -23,8 +30,15 @@ class PickThenPunctuationTest {
         },
         Executor { it.run() },
         Handler(Looper.getMainLooper()),
+        object : TextInputController.Learner {
+            override fun learnWord(word: String, previous: String?, sentenceStart: Boolean) = Unit
+            override fun learnGlide(observations: FloatArray) = Unit
+            override fun correction(stroke: FloatArray?, word: Int, dictionary: dev.shebang.devboard.dict.Dictionary) = Unit
+            override fun keepJoined(word: String) { kept += word.lowercase() }
+        },
         postToMain = { it.run() },
     ).also {
+        it.knowsPersonalWord = { w -> w in kept }
         it.startInput(FieldInfo.from(InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_AUTO_CORRECT, 0))
         it.suggester = Suggester(dictionary, null, FloatArray(dictionary.size) { i -> kotlin.math.exp(-lm.unigramCost(i).toDouble()).toFloat() }, lm)
         it.predictionModel = dictionary to lm
@@ -146,7 +160,7 @@ class PickThenPunctuationTest {
 
     @Test
     fun namesWithAFullStopStayAsTyped() {
-        for (name in listOf("node.js", "config.json", "e.g.", "v1.2", "3.5")) {
+        for (name in listOf("node.js", "Socket.io", "config.json", "example.com", "e.g.", "a.m.", "v1.2", "3.5")) {
             reset()
             type("$name ")
             assertEquals("$name ", ic.toString())
@@ -158,6 +172,28 @@ class PickThenPunctuationTest {
         type("hello.world ")
         controller.backspace()
         assertEquals("hello.world", ic.toString())
+    }
+
+    @Test
+    fun abbreviationsWithFullStopsAreNeverAutocorrectedTo() {
+        type("pm ")
+        assertEquals("pm ", ic.toString())
+        reset()
+        type("ie ")
+        assertEquals("ie ", ic.toString())
+    }
+
+    @Test
+    fun anAcronymNoListKnowsIsSplitUntilKeptJoinedOnce() {
+        type("n.m ")
+        assertEquals("n. m ", ic.toString())
+        // Backspace right after takes the space back, and the name is the user's from now on.
+        controller.backspace()
+        assertEquals("n.m", ic.toString())
+        assertEquals(setOf("n.m"), kept)
+        reset()
+        type("n.m.i ")
+        assertEquals("n.m.i ", ic.toString())
     }
 
     @Test

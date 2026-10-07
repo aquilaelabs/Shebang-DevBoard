@@ -84,6 +84,8 @@ class TextInputController(
         fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary)
         /** Where a word typed right was tapped: triples (letter, du, dv) from [TapModel.observation]. */
         fun learnTaps(observations: FloatArray) = Unit
+        /** The user kept [word] joined at a full stop ("n.m"): a personal word from now on, not split there. */
+        fun keepJoined(word: String) = Unit
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
         fun glideOutcome(outcome: Int, letters: Int) = Unit
 
@@ -121,6 +123,9 @@ class TextInputController(
         set(value) {
             identifiers.scorer = value
         }
+
+    /** Whether the user's personal words hold [lower] (a word written with a full stop, "n.m"); set by the service. */
+    var knowsPersonalWord: (lower: String) -> Boolean = { false }
 
     /** The dictionary and model for next-word suggestions; set by the service when the language is ready. */
     var predictionModel: Pair<Dictionary, NgramModel>? = null
@@ -602,22 +607,35 @@ class TextInputController(
 
     /**
      * Whether [typed], the word just finished, follows a full stop typed straight onto a word ("hello.world")
-     * that ends a sentence: the word before has two letters or more and nothing but letters back to the last
-     * space (not "e.g", "v1.2", "www.example"), and [typed] is an everyday word or begins with a capital.
-     * Anything else ("node.js", "config.json") is a name, left as typed.
+     * that ends a sentence: the word before is letters back to the last space (not "v1.2", "docker-compose"),
+     * and the two joined are not a known name ([knownJoined]: "node.js", "e.g", "example.com", or one the user
+     * kept joined).
      */
     private fun sentenceAfterFullStop(ic: InputConnection, typed: String): Boolean {
-        if (typed.isEmpty() || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return false
+        if (typed.isEmpty() || !typed[0].isLetter() || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return false
         val before = ic.getTextBeforeCursor(typed.length + MAX_WORD + 1, 0)?.toString() ?: return false
         if (!before.endsWith(typed)) return false
         val rest = before.dropLast(typed.length)
         if (!rest.endsWith(".")) return false
         val prev = rest.dropLast(1).takeLastWhile { !it.isWhitespace() }
-        if (prev.length < 2 || !prev.all { it.isLetter() || it == '\'' || it == '’' }) return false
-        if (typed[0].isUpperCase()) return true
+        if (prev.isEmpty() || !prev.all { it.isLetter() || it == '\'' || it == '’' }) return false
+        return !knownJoined(prev, typed)
+    }
+
+    /**
+     * Whether [prev] "." [typed] is a name a dictionary knows: written so in a word list or the user's personal
+     * words ("node.js", "e.g." for "e.g"), or ending in a known ending ("example.com", "notes.txt": the lists hold
+     * ".com" and ".txt").
+     */
+    private fun knownJoined(prev: String, typed: String): Boolean {
+        val joined = "$prev.$typed".lowercase()
+        if (knowsPersonalWord(joined)) return true
         val dictionary = predictionModel?.first ?: return false
-        val i = dictionary.indexOfLower(typed.lowercase())
-        return i >= 0 && dictionary.packs[i].toInt() == dev.shebang.devboard.dict.WordPacks.REGULAR
+        for (i in dictionary.prefixRange(joined)) {
+            val w = dictionary.lower[i]
+            if (w == joined || w.startsWith("$joined.")) return true
+        }
+        return dictionary.indexOfLower(".${typed.lowercase()}") >= 0
     }
 
     /** Whether the field starts sentences with a capital, and the keyboard is to give it one. */
@@ -900,6 +918,11 @@ class TextInputController(
             ic.endBatchEdit()
             corrections.keepAsTyped(ac.typed)
             corrections.forget(ac.typed, ac.corrected)
+            // A full stop's space taken back: the joined name ("n.m") is the user's, kept joined from now on.
+            if (ac.corrected.startsWith(" ") && field.allowsLearning) {
+                val joined = ic.getTextBeforeCursor(MAX_WORD * 2, 0)?.toString()?.takeLastWhile { !it.isWhitespace() }.orEmpty()
+                if ('.' in joined) learner.keepJoined(joined.trimEnd('.'))
+            }
             return
         }
         val glide = lastGlide
@@ -1229,11 +1252,13 @@ class TextInputController(
                 defer = false
             }
         }
-        if (!field.noAutocorrect) commit = pronounCase(commit)
-        // A full stop typed onto the word before ("hello.world"): a sentence's end when this word is an everyday
-        // one or typed with a capital, so the space goes in (and the capital, where the field starts sentences
-        // with one); a name like "node.js" stays as typed.
+        // A full stop typed onto the word before ("hello.world"): a sentence's end unless the two joined are a known
+        // name, so the space goes in (and the capital, where the field starts sentences with one); a name like
+        // "node.js" stays as typed.
         val lead = if (sentenceAfterFullStop(ic, typed)) " " else ""
+        // The pronoun I, but not the "i" of a name joined by punctuation ("n.m.i").
+        val pronounCased = !field.noAutocorrect && (lead.isNotEmpty() || !gluedToPrevious(ic, typed))
+        if (pronounCased) commit = pronounCase(commit)
         if (lead.isNotEmpty() && capitalisesSentences()) commit = commit.replaceFirstChar { it.uppercaseChar() }
         // The strip's third word beside the correction, kept with it before the suggestions are cleared.
         val other = otherSuggestion(typed, commit, if (candidatesFor == typed) candidates else emptyList())
@@ -1251,7 +1276,7 @@ class TextInputController(
         }
         word.setLength(0)
         clearCandidates()
-        if (lead.isNotEmpty() || commit != (if (field.noAutocorrect) typed else pronounCase(typed))) {
+        if (lead.isNotEmpty() || commit != (if (pronounCased) pronounCase(typed) else typed)) {
             // Backspace right after puts back what was typed, the full stop's space included.
             lastAutocorrect = Autocorrected(typed, lead + commit, after)
             corrections.remember(ic, typed, lead + commit, after.length, other)

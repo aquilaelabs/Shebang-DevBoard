@@ -198,6 +198,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         text = TextInputController({ currentInputConnection }, this, background, main, this)
         // Identifiers from the text are scored against a glide on the current key layout.
         text.identifierScorer = { stroke, letters -> geometry?.let { PathMatch.cost(glideModelFor(it), stroke, letters) } }
+        // Names the user kept joined at a full stop ("n.m") stay joined.
+        text.knowsPersonalWord = { personal.knows(it) }
         settingsJob = scope.launch {
             SettingsRepository.get(this@DevBoardService).settings.collectLatest { applySettings(it) }
         }
@@ -299,6 +301,11 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
                 start = false
             }
         }
+    }
+
+    override fun keepJoined(word: String) {
+        if (!settings.learnWords) return
+        background.execute { personal.add(word) }
     }
 
     override fun learnTaps(observations: FloatArray) {
