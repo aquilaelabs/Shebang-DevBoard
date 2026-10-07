@@ -184,16 +184,26 @@ class PickThenPunctuationTest {
     }
 
     @Test
-    fun anAcronymNoListKnowsIsSplitUntilKeptJoinedOnce() {
-        type("n.m ")
-        assertEquals("n. m ", ic.toString())
+    fun noSpaceWhenTheWordBeforeIsNotAWord() {
+        for (name in listOf("n.m.i", "xyz.abc", "www.example")) {
+            reset()
+            type("$name ")
+            // ("www" takes the computer terms' capitals, as "usb" does.)
+            assertEquals("$name ", ic.toString().lowercase())
+        }
+    }
+
+    @Test
+    fun aJoinNoListKnowsIsSplitUntilKeptJoinedOnce() {
+        type("hello.world ")
+        assertEquals("hello. world ", ic.toString())
         // Backspace right after takes the space back, and the name is the user's from now on.
         controller.backspace()
-        assertEquals("n.m", ic.toString())
-        assertEquals(setOf("n.m"), kept)
+        assertEquals("hello.world", ic.toString())
+        assertEquals(setOf("hello.world"), kept)
         reset()
-        type("n.m.i ")
-        assertEquals("n.m.i ", ic.toString())
+        type("hello.world ")
+        assertEquals("hello.world ", ic.toString())
     }
 
     @Test

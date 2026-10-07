@@ -164,7 +164,8 @@ UX	40
 GUI	40
 GUIs	40
 
-# Web address endings: "example.com" is one name, not a sentence ending at "example.".
+# Web address endings and lead-ins: "www.example.com" is one name, not sentences ending at "www." and "example.".
+www.	40
 .com	40
 .org	40
 .net	40

@@ -607,9 +607,9 @@ class TextInputController(
 
     /**
      * Whether [typed], the word just finished, follows a full stop typed straight onto a word ("hello.world")
-     * that ends a sentence: the word before is letters back to the last space (not "v1.2", "docker-compose"),
-     * and the two joined are not a known name ([knownJoined]: "node.js", "e.g", "example.com", or one the user
-     * kept joined).
+     * that ends a sentence: the word before is a word the keyboard knows, in a word list or the user's personal
+     * words ("hello", not "n" of "n.m" or "www"; of single letters only "a" and "I" count), and the two joined
+     * are not a known name ([knownJoined]: "node.js", "example.com", or one the user kept joined).
      */
     private fun sentenceAfterFullStop(ic: InputConnection, typed: String): Boolean {
         if (typed.isEmpty() || !typed[0].isLetter() || codeMode || !field.allowsComposing || field.exact || field.isEmail || field.isUrl) return false
@@ -619,13 +619,23 @@ class TextInputController(
         if (!rest.endsWith(".")) return false
         val prev = rest.dropLast(1).takeLastWhile { !it.isWhitespace() }
         if (prev.isEmpty() || !prev.all { it.isLetter() || it == '\'' || it == '’' }) return false
+        if (!knownWord(prev)) return false
         return !knownJoined(prev, typed)
+    }
+
+    /** Whether [w] is a word: in a word list or the user's personal words; of single letters only "a" and "I". */
+    private fun knownWord(w: String): Boolean {
+        val lower = w.lowercase()
+        if (lower.length == 1 && lower != "a" && lower != "i") return false
+        if (knowsPersonalWord(lower)) return true
+        val dictionary = predictionModel?.first ?: return false
+        return dictionary.indexOfLower(lower) >= 0
     }
 
     /**
      * Whether [prev] "." [typed] is a name a dictionary knows: written so in a word list or the user's personal
-     * words ("node.js", "e.g." for "e.g"), or ending in a known ending ("example.com", "notes.txt": the lists hold
-     * ".com" and ".txt").
+     * words ("node.js", "e.g." for "e.g"), or with a known ending or lead-in ("example.com", "notes.txt",
+     * "www.example": the lists hold ".com", ".txt" and "www.").
      */
     private fun knownJoined(prev: String, typed: String): Boolean {
         val joined = "$prev.$typed".lowercase()
@@ -635,7 +645,8 @@ class TextInputController(
             val w = dictionary.lower[i]
             if (w == joined || w.startsWith("$joined.")) return true
         }
-        return dictionary.indexOfLower(".${typed.lowercase()}") >= 0
+        // A known ending (".com") or lead-in ("www.") makes it a name too.
+        return dictionary.indexOfLower(".${typed.lowercase()}") >= 0 || dictionary.indexOfLower("${prev.lowercase()}.") >= 0
     }
 
     /** Whether the field starts sentences with a capital, and the keyboard is to give it one. */

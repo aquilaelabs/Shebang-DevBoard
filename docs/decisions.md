@@ -897,3 +897,16 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   (for the password manager's chips too). Swiped-away cards stay away until the next address in the field.
   Seen on the API 36 emulator: no card on opening, words for "sea", both cards for "sean.", scroll then
   dismiss, and a tapped card filling in its address.
+- **Spaces after punctuation** (owner's asks, 7 Oct). Commas, ! ? ; and : typed straight onto a word owe the
+  space after them: it goes in front of the next letter (a glide adds its own), and a space typed instead is
+  the only one. A sentence end with its space still owed counts as a sentence start for auto-capitals (B19).
+  A full stop typed onto a word decides when the next word ends: the space goes in (with a capital where the
+  field starts sentences with one) when the word before is a word the keyboard knows (a word list or the
+  personal words; of single letters only "a" and "I") and the two joined are not a known name. Known names
+  are word-list entries: dotted names in the development pack (Node.js, Socket.io, package.json),
+  abbreviations in the regular words (e.g., a.m., Ph.D.), and web and file endings and lead-ins in the packs
+  (.com, .io, .json, .txt, www.), so addresses and filenames stay whole; a run that already has a digit, "/",
+  ":", "@" or another full stop never splits. Backspace right after the space goes in takes it back and adds
+  the joined name to the personal words, which now accept a full stop inside a word. Considered and not
+  done: a space at every full stop (it broke node.js and every filename), and deciding at the letter after
+  the full stop (one letter cannot tell "node.js" from a missed space).
