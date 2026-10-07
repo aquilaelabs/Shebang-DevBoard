@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The keyboard no longer crashes when you switch to another keyboard while it is open, and keeps what it learned in that last field (5e0a333)
+
 ## 0.6.0: 2026-10-06
 
 ### Added

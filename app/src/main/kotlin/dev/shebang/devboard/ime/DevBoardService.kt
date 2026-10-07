@@ -208,10 +208,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onDestroy() {
         if (running === this) running = null
         settingsJob?.cancel()
+        // The system's own teardown finishes the input view, which saves what was learned on the background
+        // thread: it goes first, and the thread is then let finish that save rather than stopped mid-way (the
+        // other order threw RejectedExecutionException and lost the field's learning).
+        super.onDestroy()
         scope.cancel()
         glideSession.release()
-        background.shutdownNow()
-        super.onDestroy()
+        background.shutdown()
     }
 
     // ---- Settings ------------------------------------------------------------------------------------
