@@ -138,6 +138,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     private var glideId = -1
     private var glideCapitalize = false
     private var glideTrailingSpace = false
+    /** When the glide being decoded came down and lifted, for its duration in the diagnostics. */
+    private var glideDownAt = 0L
+    private var glideUpAt = 0L
     private var autoShifted = false
 
     /** Voice typing through the Shebang Voice add-on, when it is installed. */
@@ -316,8 +319,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         background.execute { tapAdaptation.learn(observations) }
     }
 
-    override fun glideOutcome(outcome: Int, letters: Int) {
-        glideOutcomes.add(outcome, letters)
+    override fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) {
+        glideOutcomes.add(outcome, letters, reach, durationMs)
     }
 
     override fun learnGlide(observations: FloatArray) {
@@ -846,6 +849,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideTrailingSpace = false
         val offsets = if (settings.adaptGlide) adaptation.offsets() else null
         glideId = glideSession.start(glideModelFor(g), context, times[0], settings.phraseGlide, offsets)
+        glideDownAt = times[0]
         for (i in 0 until count) glideSession.point(points[2 * i], points[2 * i + 1], times[i])
         background.execute { adaptation.recordGlide() }
         retireClipOffer()
@@ -864,6 +868,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onGlideEnd(x: Float, y: Float, t: Long, trailingSpace: Boolean) {
         if (glideId < 0) return
         glideTrailingSpace = trailingSpace
+        glideUpAt = t
         // Lifting inside the space bar after a dip: that point belongs to no word.
         if (trailingSpace) glideSession.end(Float.NaN, Float.NaN, t) else glideSession.end(x, y, t)
     }
@@ -894,7 +899,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             return
         }
         // The words index the dictionary they were decoded with.
-        text.commitGlide(result, language.dictionary, glideCapitalize, glideTrailingSpace)
+        val duration = if (glideDownAt > 0L && glideUpAt >= glideDownAt) glideUpAt - glideDownAt else -1L
+        text.commitGlide(result, language.dictionary, glideCapitalize, glideTrailingSpace, duration)
         if (language !== glideLanguage) text.onLanguageChanged()
         keyboard?.releaseOneShotShift()
         if (autoShifted) autoShifted = false

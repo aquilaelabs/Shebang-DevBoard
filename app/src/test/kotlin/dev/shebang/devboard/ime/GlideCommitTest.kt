@@ -32,6 +32,8 @@ class GlideCommitTest {
     private val glidesLearned = ArrayList<FloatArray>()
     private val corrections = ArrayList<Pair<FloatArray?, Int>>()
     private val outcomes = ArrayList<Int>()
+    /** Each outcome's stroke reach and duration, in order. */
+    private val outcomeStrokes = ArrayList<Pair<Float, Long>>()
 
     private val controller = TextInputController(
         { ic },
@@ -53,8 +55,9 @@ class GlideCommitTest {
             override fun correction(stroke: FloatArray?, word: Int, dictionary: Dictionary) {
                 corrections += stroke to word
             }
-            override fun glideOutcome(outcome: Int, letters: Int) {
+            override fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) {
                 outcomes += outcome
+                outcomeStrokes += reach to durationMs
             }
         },
     ).also {
@@ -83,10 +86,10 @@ class GlideCommitTest {
     )
 
     /** Glides [words] the way the service does: context first, then the result. */
-    private fun glide(vararg words: String, capitalize: Boolean = false, trailingSpace: Boolean = false, runnersUp: List<String> = emptyList()) {
+    private fun glide(vararg words: String, capitalize: Boolean = false, trailingSpace: Boolean = false, runnersUp: List<String> = emptyList(), durationMs: Long = -1L) {
         // The decoder's result keeps any word before as it stands (FixPreviousGlideTest covers fixing it).
         controller.glideContext(dictionary, lm)
-        controller.commitGlide(result(words.toList(), runnersUp), dictionary, capitalize, trailingSpace)
+        controller.commitGlide(result(words.toList(), runnersUp), dictionary, capitalize, trailingSpace, durationMs)
     }
 
     private fun type(s: String) {
@@ -643,6 +646,16 @@ class GlideCommitTest {
         assertTrue(outcomes.isEmpty())
         leaveField()
         assertEquals(listOf(GlideOutcomes.KEPT, GlideOutcomes.KEPT), outcomes)
+    }
+
+    @Test
+    fun anOutcomeCarriesHowFarAndHowLongItsStrokeWent() {
+        // Out to 5 key pitches from where the finger came down (3,4 from 0,0), then back.
+        strokes["hello"] = floatArrayOf(0f, 0f, 3f, 4f, 1f, 0f)
+        glide("hello", durationMs = 420L)
+        glide("world")
+        leaveField()
+        assertEquals(listOf(5f to 420L, 0f to -1L), outcomeStrokes)
     }
 
     @Test

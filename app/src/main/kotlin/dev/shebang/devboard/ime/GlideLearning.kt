@@ -16,6 +16,8 @@ internal class GlidedWord(
     val stroke: FloatArray?,
     /** How this word ends up if it is kept from now on: as glided, or fixed from the strip or by the next glide. */
     var fixedBy: Int = GlideOutcomes.KEPT,
+    /** How long the stroke it came from took, touch-down to lift (shared by a phrase glide's words); -1 when not known. */
+    val durationMs: Long = -1L,
 )
 
 /**
@@ -112,7 +114,7 @@ internal class GlideLearning(
 
     /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */
     private fun outcome(w: GlidedWord, how: Int) {
-        if (!field().noPersonalizedLearning) learner.glideOutcome(how, w.text.length)
+        if (!field().noPersonalizedLearning) learner.glideOutcome(how, w.text.length, GlideOutcomes.reach(w.stroke), w.durationMs)
     }
 
     /** A glided word is final: learn it, and where its stroke passed its letters. */
