@@ -1,14 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.6.1: 2026-10-08
 
 ### Changed
 
-- Exported diagnostics now say, for recent glides, how far each stroke went and how long it took (in coarse bands, never the stroke or the word), with one- and two-letter words counted apart, to tell a glide made on purpose from a tap that slid (1b7a531)
+- Exported diagnostics now say, for recent glides, how far each stroke went and how long it took (in coarse bands, never the stroke or the word), with one- and two-letter words counted apart, to tell a glide made on purpose from a tap that slid (7c3b169)
 
 ### Fixed
 
-- The keyboard no longer crashes when you switch to another keyboard while it is open, and keeps what it learned in that last field (5e0a333)
+- The keyboard no longer crashes when you switch to another keyboard while it is open, and keeps what it learned in that last field (1b7a531)
 
 ## 0.6.0: 2026-10-06
 
