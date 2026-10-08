@@ -1,30 +1,40 @@
 # Changelog
 
-## Unreleased
-
-### Added
-
-- A Slang and abbreviations dictionary (lol, idk, tbh, brb and more), offered after every other word until you use them, and kept as you type them; turn it off in Settings > Dictionaries (4033d59)
+## 0.6.1: 2026-10-08
 
 ### Changed
 
-- Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (4033d59)
-- Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (880eaef)
-- The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (3603499)
-- The keyboard's own text (what a screen reader says for keys, panels and bar items, the clipboard panel, word pack names and messages) also comes from string resources, ready for translation (4d80f89)
-- Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (ada9bbd)
-- Saved email addresses are offered as cards only once you start typing one, so a password manager's card is not covered when the field opens; every saved address that matches shows (scrolling sideways at full size), and only once what you type can no longer be an ordinary word (1087037)
-- Chips above the keys that scroll now stop at the end of the row; a second swipe from there puts them away (1087037)
-- Commas, exclamation and question marks, colons and semicolons typed straight onto a word put a space in front of the next letter you type (a space you type yourself is the only one), and the letter after a sentence's end is capitalised even before its space appears (067b283)
-- A full stop typed straight onto a word gets its space when the next word ends, unless the two joined are a name the word lists know (node.js, e.g., example.com, notes.txt) or one you kept joined: backspace right after the space goes in puts it back and remembers the name in your personal words (d8030a4)
+- Exported diagnostics now say, for recent glides, how far each stroke went and how long it took (in coarse bands, never the stroke or the word), with one- and two-letter words counted apart, to tell a glide made on purpose from a tap that slid (7c3b169)
 
 ### Fixed
 
-- Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (8fbfd4a)
-- The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (3603499)
-- In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (0c79a33)
-- Dictionaries settings: the word counts keep their space before each pack's description again (1a8d59f)
-- Punctuation typed right after picking a word from the strip takes the place of the word's space even when the app is slow to report the cursor (1a2e11e)
+- The keyboard no longer crashes when you switch to another keyboard while it is open, and keeps what it learned in that last field (1b7a531)
+
+## 0.6.0: 2026-10-06
+
+### Added
+
+- A Slang and abbreviations dictionary (lol, idk, tbh, brb and more), offered after every other word until you use them, and kept as you type them; turn it off in Settings > Dictionaries (3f355b5)
+
+### Changed
+
+- Words are ranked by how common they are, whichever dictionary they come from, and move up as you use them; your imported word lists start with the rarest everyday words, or by their frequency column if the file has one ('word,1234') (3f355b5)
+- Release APKs are built reproducibly from their version tag: two clean builds of the same tag give the same bytes, and the release workflow publishes their checksums, so a downloaded APK can be checked against the source (df46b89)
+- The settings screens' text now comes from string resources, so the app can be translated; counts read correctly in the singular (1 sample, 1 pack) (4d80f89)
+- The keyboard's own text (what a screen reader says for keys, panels and bar items, the clipboard panel, word pack names and messages) also comes from string resources, ready for translation (0c79a33)
+- Built for Android 17 (API 37), with the current Compose, core, lifecycle and activity libraries (c75d7dd)
+- Saved email addresses are offered as cards only once you start typing one, so a password manager's card is not covered when the field opens; every saved address that matches shows (scrolling sideways at full size), and only once what you type can no longer be an ordinary word (1a2e11e)
+- Chips above the keys that scroll now stop at the end of the row; a second swipe from there puts them away (1a2e11e)
+- Commas, exclamation and question marks, colons and semicolons typed straight onto a word put a space in front of the next letter you type (a space you type yourself is the only one), and the letter after a sentence's end is capitalised even before its space appears (d8030a4)
+- A full stop typed straight onto a word gets its space when the next word ends, unless the two joined are a name the word lists know (node.js, e.g., example.com, notes.txt) or one you kept joined: backspace right after the space goes in puts it back and remembers the name in your personal words (57a3ad3)
+
+### Fixed
+
+- Backspace in a web terminal (tmux or a shell in a browser) no longer sometimes goes missing on slower phones: it is sent as a key press (43cd22c)
+- The setup screen and the settings pages no longer leave a blank band between their content and the keyboard (4d80f89)
+- In code mode with bracket pairing on, a quote that closes one the paragraph already opened goes in alone, after a space or a full stop too, instead of starting a new pair (1069894)
+- Dictionaries settings: the word counts keep their space before each pack's description again (2033157)
+- Punctuation typed right after picking a word from the strip takes the place of the word's space even when the app is slow to report the cursor (067b283)
 
 ## 0.5.5: 2026-10-06
 

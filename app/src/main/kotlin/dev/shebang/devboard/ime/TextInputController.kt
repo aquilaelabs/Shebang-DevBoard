@@ -87,7 +87,7 @@ class TextInputController(
         /** The user kept [word] joined at a full stop ("n.m"): a personal word from now on, not split there. */
         fun keepJoined(word: String) = Unit
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
-        fun glideOutcome(outcome: Int, letters: Int) = Unit
+        fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -1737,12 +1737,12 @@ class TextInputController(
         return sb.toString()
     }
 
-    private fun newWords(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, previous: Pair<String?, Boolean>): List<GlidedWord> {
+    private fun newWords(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, previous: Pair<String?, Boolean>, durationMs: Long): List<GlidedWord> {
         var prev = previous.first
         var sentenceStart = previous.second
         return result.words.mapIndexed { i, w ->
             val text = caseNew(dictionary.words[w], i == 0 && capitalize)
-            GlidedWord(text, result.entries[i], prev, sentenceStart, result.observations.getOrNull(i), result.strokes.getOrNull(i)).also {
+            GlidedWord(text, result.entries[i], prev, sentenceStart, result.observations.getOrNull(i), result.strokes.getOrNull(i), durationMs = durationMs).also {
                 prev = text.lowercase()
                 sentenceStart = false
             }
@@ -1757,9 +1757,10 @@ class TextInputController(
 
     /**
      * Takes a decoded glide: it replaces the targeted word (a correction), or goes in at the cursor with a
-     * space before it after a word, and a space after it before one.
+     * space before it after a word, and a space after it before one. [durationMs] is the stroke's, touch-down to
+     * lift, for the diagnostics; -1 when not known.
      */
-    fun commitGlide(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean) {
+    fun commitGlide(result: GlideResult, dictionary: Dictionary, capitalize: Boolean, trailingSpace: Boolean, durationMs: Long = -1L) {
         if (result.words.isEmpty()) return
         val ic = connection() ?: return
         dictionaryInUse = dictionary
@@ -1784,7 +1785,7 @@ class TextInputController(
         ownEdit()
         val t = target
         if (t != null) {
-            val fresh = newWords(result, dictionary, false, previousOf(textBeforeTarget(ic)))
+            val fresh = newWords(result, dictionary, false, previousOf(textBeforeTarget(ic)), durationMs)
             fresh.first().text = caseFor(t, fresh.first().text)
             val text = fresh.joinToString(" ") { it.text }
             if (replaceTarget(t, text)) {
@@ -1800,7 +1801,7 @@ class TextInputController(
                 return
             }
         }
-        val fresh = newWords(result, dictionary, capitalize, previousOf(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: ""))
+        val fresh = newWords(result, dictionary, capitalize, previousOf(ic.getTextBeforeCursor(CONTEXT_CHARS, 0) ?: ""), durationMs)
         // Gliding in front of a word keeps them apart; a dip into the space bar adds one anyway. Letters the app
         // completed after the last glide are about to go, so no space is kept for them.
         val after = if (trailingSpace || (needsTrailingSpace(ic) && !appCompletedAfterGlide(ic))) " " else ""
