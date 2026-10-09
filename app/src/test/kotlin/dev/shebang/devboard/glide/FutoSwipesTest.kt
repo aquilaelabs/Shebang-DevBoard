@@ -90,6 +90,50 @@ class FutoSwipesTest {
         return s
     }
 
+    /**
+     * Two-letter words on real swipes, split by how far the stroke reached from where it came down (in key widths,
+     * as the keyboard's diagnostics count it) and by how far apart the word's two keys are: whether neighbouring
+     * pairs ("as", "we") and short strokes lose more, and what they are read as (R23).
+     */
+    @Test
+    fun futoTwoLetterWords() {
+        val loaded = load()
+        assumeTrue("FUTO_SWIPES not set or not a file", loaded != null)
+        val swipes = loaded!!.first.filter { it.word.length == 2 }
+        val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams())
+        val byReach = sortedMapOf<Int, Score>()
+        val byApart = sortedMapOf<Int, Score>()
+        val confusions = HashMap<String, Int>()
+        for (sw in swipes) {
+            decoder.begin(sw.layout, GlideContext(sw.context, context2 = sw.context2, sentence = GlideText.sentenceWords(sw.before)), sw.t[0])
+            for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
+            val r = decoder.finish()?.alternatives?.map { dictionary.lower[it] }.orEmpty()
+            val kw = sw.layout.keyWidth
+            var reach = 0f
+            for (i in sw.x.indices) reach = maxOf(reach, kotlin.math.hypot(sw.x[i] - sw.x[0], sw.y[i] - sw.y[0]))
+            val a = sw.word[0]
+            val b = sw.word[1]
+            val apart = if (sw.layout.hasLetter(a) && sw.layout.hasLetter(b)) kotlin.math.hypot(sw.layout.x(a) - sw.layout.x(b), sw.layout.y(a) - sw.layout.y(b)) / kw else -1f
+            val reachBand = when { reach < kw -> 0; reach < 2 * kw -> 1; reach < 4 * kw -> 2; else -> 3 }
+            val apartBand = when { apart < 0f -> -1; apart < 0.01f -> 0; apart < 1.6f -> 1; apart < 3f -> 2; else -> 3 }
+            val right = r.firstOrNull() == sw.word
+            for ((map, band) in listOf(byReach to reachBand, byApart to apartBand)) {
+                val sc = map.getOrPut(band) { Score() }
+                sc.n++
+                if (right) sc.top1++
+                if (sw.word in r.take(3)) sc.top3++
+            }
+            if (!right && r.isNotEmpty()) confusions.merge("${sw.word} -> ${r[0]}", 1, Int::plus)
+        }
+        val pct = GlideBenchmarkTest::pct
+        val reachNames = listOf("under 1 key", "1-2 keys", "2-4 keys", "4+ keys")
+        val apartNames = mapOf(-1 to "no key", 0 to "same key", 1 to "neighbours", 2 to "1.6-3 keys", 3 to "3+ keys")
+        println("FUTO2 two-letter swipes: ${swipes.size}")
+        for ((band, sc) in byReach) println("FUTO2   reach ${reachNames[band].padEnd(12)} ${sc.n} swipes, top-1 ${pct(sc.top1, sc.n)}  top-3 ${pct(sc.top3, sc.n)}")
+        for ((band, sc) in byApart) println("FUTO2   keys ${apartNames[band]!!.padEnd(12)} ${sc.n} swipes, top-1 ${pct(sc.top1, sc.n)}  top-3 ${pct(sc.top3, sc.n)}")
+        for ((k, v) in confusions.entries.sortedByDescending { it.value }.take(25)) println("FUTO2   %4d  %s".format(v, k))
+    }
+
     @Test
     fun futoSwipes() {
         val loaded = load()
