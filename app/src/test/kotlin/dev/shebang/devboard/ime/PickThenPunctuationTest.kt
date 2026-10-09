@@ -108,13 +108,13 @@ class PickThenPunctuationTest {
 
     private fun idx(w: String) = dictionary.indexOfLower(w)
 
-    private fun glide(w: String) {
+    private fun glide(w: String, capitalize: Boolean = false) {
         val r = dev.shebang.devboard.glide.GlideResult(
             intArrayOf(idx(w)), listOf(null), listOf(null),
             listOf(dev.shebang.devboard.glide.GlideWord(idx(w), intArrayOf(idx(w)), floatArrayOf(0f))),
             intArrayOf(idx(w)), IntArray(0), -1, 5,
         )
-        controller.commitGlide(r, dictionary, false, false)
+        controller.commitGlide(r, dictionary, capitalize, false)
     }
 
     @Test
@@ -220,6 +220,34 @@ class PickThenPunctuationTest {
         type("hello.")
         glide("world")
         assertEquals("hello. world", ic.toString().trimEnd())
+    }
+
+    @Test
+    fun aSecondFullStopMakesTypedPartsADottedName() {
+        type("test.neat.fish ")
+        assertEquals("test.neat.fish ", ic.toString())
+    }
+
+    @Test
+    fun aSecondFullStopJoinsAGlidedPartBackOnAndTheNextGlideFollowsIt() {
+        // B21: a host name glided part by part in a plain text field (Cloudflare's DNS target).
+        type("test.")
+        glide("neat", capitalize = true)
+        assertEquals("test. Neat", ic.toString().trimEnd())
+        type(".")
+        assertEquals("test.neat.", ic.toString())
+        glide("fish")
+        assertEquals("test.neat.fish", ic.toString().trimEnd())
+    }
+
+    @Test
+    fun aGlideAfterAnAbbreviationStillGetsItsSpace() {
+        for (abbreviation in listOf("e.g.", "a.m.", "Ph.D.")) {
+            reset()
+            ic.commitText(abbreviation, 1)
+            glide("the")
+            assertEquals("$abbreviation the", ic.toString().trimEnd())
+        }
     }
 
     @Test

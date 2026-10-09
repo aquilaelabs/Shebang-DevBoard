@@ -329,6 +329,11 @@ class TextInputController(
         val words: Int,
         /** Text after the last word that belongs to the glide (a space), which a strip swap keeps. */
         val after: String,
+        /**
+         * A glide split off as a new sentence after a full stop typed straight onto a word: the text as it stands
+         * ("test. Neat") and as it was joined ("test.neat"), put back if a full stop follows ([joinAtSecondFullStop]).
+         */
+        val dotSplit: Pair<String, String>? = null,
     )
     private var lastGlide: GlideCommit? = null
 
@@ -540,6 +545,7 @@ class TextInputController(
         settle()
         lastGlide = null
         if (glideBefore != null || nextWords.offered.isNotEmpty()) clearCandidates()
+        if (text == "." && word.isEmpty() && joinAtSecondFullStop(ic, glideBefore)) return
         if (field.allowsComposing && isWordChar(text)) {
             // A letter right after a glide starts a new word, as a glide right after typing does (when the glide
             // still stands right before the cursor and nothing is selected).
@@ -1266,7 +1272,8 @@ class TextInputController(
         // A full stop typed onto the word before ("hello.world"): a sentence's end unless the two joined are a known
         // name, so the space goes in (and the capital, where the field starts sentences with one); a name like
         // "node.js" stays as typed.
-        val lead = if (sentenceAfterFullStop(ic, typed)) " " else ""
+        // A full stop typed straight onto this word too ("test.neat.") makes the two parts of a dotted name.
+        val lead = if (after != "." && sentenceAfterFullStop(ic, typed)) " " else ""
         // The pronoun I, but not the "i" of a name joined by punctuation ("n.m.i").
         val pronounCased = !field.noAutocorrect && (lead.isNotEmpty() || !gluedToPrevious(ic, typed))
         if (pronounCased) commit = pronounCase(commit)
@@ -1815,7 +1822,8 @@ class TextInputController(
         lastActionWasSpace = trailingSpace
         glides.add(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
-        val glide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after)
+        val dotSplit = if (sb.startsWith(" ") && fresh.size == 1 && after.isEmpty()) dotSplitBefore(ic, sb.length, dictionary.words[result.words[0]]) else null
+        val glide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after, dotSplit)
         lastGlide = glide
         // Words glided one after another make a run, which in code-like text can be joined into one name.
         val chained = previousGlide != null && previousGlide.after.isEmpty() && sb.startsWith(" ")
@@ -1884,7 +1892,52 @@ class TextInputController(
         if (before.isNullOrEmpty()) return false
         // In a web-address field a glide right after an address's punctuation is part of it ("github." "com").
         if (field.isUrl && before[0] in URL_JOINERS) return false
+        // After a dotted name's full stop ("test.neat.") the glide is its next part.
+        if (before[0] == '.' && afterDottedName(ic)) return false
         return !GlideText.atWordStart(before, 1)
+    }
+
+    /**
+     * The glide just written ([length] characters, its space first) went in after a full stop typed straight onto a
+     * word ("test." then "neat"): the text as it now stands and as it reads joined, with the glided word as the
+     * dictionary writes it ([word]) rather than with a sentence's capital. Null when what is before is not that.
+     */
+    private fun dotSplitBefore(ic: InputConnection, length: Int, word: String): Pair<String, String>? {
+        val before = ic.getTextBeforeCursor(length + MAX_WORD + 1, 0)?.toString() ?: return null
+        if (before.length <= length) return null
+        val written = before.takeLast(length)
+        val rest = before.dropLast(length)
+        if (!rest.endsWith(".")) return null
+        val prev = rest.dropLast(1).takeLastWhile { !it.isWhitespace() }
+        if (prev.isEmpty() || !prev.all { it.isLetterOrDigit() }) return null
+        return "$prev.$written" to "$prev.$word"
+    }
+
+    /**
+     * A full stop typed straight onto a glided word that was split off after a full stop ("test. Neat" then "."):
+     * the two are parts of a dotted name, a host name like "test.neat.fish", so they go back together with this
+     * full stop after them. Backspace right after a split did this before; a second full stop now does it too.
+     */
+    private fun joinAtSecondFullStop(ic: InputConnection, glide: GlideCommit?): Boolean {
+        val (tail, joined) = glide?.dotSplit ?: return false
+        val before = ic.getTextBeforeCursor(tail.length + 1, 0)?.toString() ?: return false
+        if (!before.endsWith(tail) || (before.length > tail.length && !before[0].isWhitespace())) return false
+        ic.beginBatchEdit()
+        ic.deleteSurroundingText(tail.length, 0)
+        ic.commitText("$joined.", 1)
+        ic.endBatchEdit()
+        return true
+    }
+
+    /**
+     * Whether the text before the cursor ends in a dotted name and its full stop ("test.neat."): two or more parts
+     * of at least two letters or digits, so abbreviations ("e.g.", "a.m.", "Ph.D.") and numbers ("3.5.") are not.
+     */
+    private fun afterDottedName(ic: InputConnection): Boolean {
+        val token = ic.getTextBeforeCursor(2 * MAX_WORD, 0)?.takeLastWhile { !it.isWhitespace() }?.toString() ?: return false
+        if (!token.endsWith(".")) return false
+        val parts = token.dropLast(1).split('.')
+        return parts.size >= 2 && parts.all { p -> p.length >= 2 && p.all { it.isLetterOrDigit() || it == '-' } }
     }
 
     /** A space after the glide when a word follows the cursor directly. */
