@@ -33,6 +33,22 @@ class GlideOutcomesTest {
     }
 
     @Test
+    fun replacementsAfterADeleteAreCountedByLengthAndKeptAcrossRestarts() {
+        val o = GlideOutcomes(file)
+        o.addReplacement(GlideOutcomes.REPLACED_OFFERED, 2)
+        o.addReplacement(GlideOutcomes.REPLACED_OTHER, 2)
+        o.addReplacement(GlideOutcomes.REPLACED_SAME, 5)
+        o.save()
+        val r = GlideOutcomes(file).summary()["replacedAfterDelete"]!!.jsonObject
+        fun n(group: String, key: String) = r[group]!!.jsonObject[key]!!.jsonPrimitive.int
+        assertEquals(3, n("all", "deleted"))
+        assertEquals(1, n("oneOrTwoLetters", "byAWordTheStripOffered"))
+        assertEquals(1, n("oneOrTwoLetters", "byAnotherWord"))
+        assertEquals(1, n("threeOrMoreLetters", "bySameWord"))
+        assertEquals(0, n("threeOrMoreLetters", "byAnotherWord"))
+    }
+
+    @Test
     fun strokesAreCountedInBandsOfReachAndDuration() {
         val o = GlideOutcomes(file)
         // A tap that slid: one letter, under a key, quick; deleted.

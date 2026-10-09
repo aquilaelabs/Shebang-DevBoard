@@ -22,7 +22,7 @@ class FutoSwipesTest {
     private val lm get() = GlideBenchmarkTest.lm
 
     /** Swipes from [path] whose word is in the dictionary, and how many were skipped as out of vocabulary. */
-    fun load(path: String? = System.getenv("FUTO_SWIPES"), limit: Int = System.getenv("FUTO_LIMIT")?.toIntOrNull() ?: 5000): Pair<List<ReplayGlide>, Int>? {
+    fun load(path: String? = System.getenv("FUTO_SWIPES"), limit: Int = System.getenv("FUTO_LIMIT")?.toIntOrNull() ?: 5000, sessions: MutableList<String>? = null): Pair<List<ReplayGlide>, Int>? {
         if (path == null) return null
         val file = File(path)
         if (!file.isFile) return null
@@ -41,6 +41,7 @@ class FutoSwipesTest {
                 continue
             }
             out += ReplayGlide(r.word, contextOf(r), context2Of(r), r.layout, r.x, r.y, r.t, if (r.sentence.isEmpty() || r.wordIdx < 0) "" else beforeOf(r))
+            sessions?.add(r.session)
         }
         return out to outOfVocabulary
     }
@@ -88,6 +89,111 @@ class FutoSwipesTest {
             if (sw.word in r.take(3)) s.top3++
         }
         return s
+    }
+
+    /**
+     * Two-letter words on real swipes, split by how far the stroke reached from where it came down (in key widths,
+     * as the keyboard's diagnostics count it) and by how far apart the word's two keys are: whether neighbouring
+     * pairs ("as", "we") and short strokes lose more, and what they are read as (R23).
+     */
+    @Test
+    fun futoTwoLetterWords() {
+        val loaded = load()
+        assumeTrue("FUTO_SWIPES not set or not a file", loaded != null)
+        val swipes = loaded!!.first.filter { it.word.length == 2 }
+        val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams())
+        val byReach = sortedMapOf<Int, Score>()
+        val byApart = sortedMapOf<Int, Score>()
+        val confusions = HashMap<String, Int>()
+        for (sw in swipes) {
+            decoder.begin(sw.layout, GlideContext(sw.context, context2 = sw.context2, sentence = GlideText.sentenceWords(sw.before)), sw.t[0])
+            for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
+            val r = decoder.finish()?.alternatives?.map { dictionary.lower[it] }.orEmpty()
+            val kw = sw.layout.keyWidth
+            var reach = 0f
+            for (i in sw.x.indices) reach = maxOf(reach, kotlin.math.hypot(sw.x[i] - sw.x[0], sw.y[i] - sw.y[0]))
+            val a = sw.word[0]
+            val b = sw.word[1]
+            val apart = if (sw.layout.hasLetter(a) && sw.layout.hasLetter(b)) kotlin.math.hypot(sw.layout.x(a) - sw.layout.x(b), sw.layout.y(a) - sw.layout.y(b)) / kw else -1f
+            val reachBand = when { reach < kw -> 0; reach < 2 * kw -> 1; reach < 4 * kw -> 2; else -> 3 }
+            val apartBand = when { apart < 0f -> -1; apart < 0.01f -> 0; apart < 1.6f -> 1; apart < 3f -> 2; else -> 3 }
+            val right = r.firstOrNull() == sw.word
+            for ((map, band) in listOf(byReach to reachBand, byApart to apartBand)) {
+                val sc = map.getOrPut(band) { Score() }
+                sc.n++
+                if (right) sc.top1++
+                if (sw.word in r.take(3)) sc.top3++
+            }
+            if (!right && r.isNotEmpty()) confusions.merge("${sw.word} -> ${r[0]}", 1, Int::plus)
+        }
+        val pct = GlideBenchmarkTest::pct
+        val reachNames = listOf("under 1 key", "1-2 keys", "2-4 keys", "4+ keys")
+        val apartNames = mapOf(-1 to "no key", 0 to "same key", 1 to "neighbours", 2 to "1.6-3 keys", 3 to "3+ keys")
+        println("FUTO2 two-letter swipes: ${swipes.size}")
+        for ((band, sc) in byReach) println("FUTO2   reach ${reachNames[band].padEnd(12)} ${sc.n} swipes, top-1 ${pct(sc.top1, sc.n)}  top-3 ${pct(sc.top3, sc.n)}")
+        for ((band, sc) in byApart) println("FUTO2   keys ${apartNames[band]!!.padEnd(12)} ${sc.n} swipes, top-1 ${pct(sc.top1, sc.n)}  top-3 ${pct(sc.top3, sc.n)}")
+        for ((k, v) in confusions.entries.sortedByDescending { it.value }.take(25)) println("FUTO2   %4d  %s".format(v, k))
+    }
+
+    /**
+     * The personal glide adaptation on real swipers: each FUTO session replayed in order with its own adaptation,
+     * learning as the keyboard does (a glide read right teaches where its letters were touched; one read wrong is
+     * corrected, its stroke re-aligned to the word meant), a day passing every 60 glides. Top-1 with and without
+     * the adaptation on each session's later half, by word length: whether adapting costs short words (R23).
+     */
+    @Test
+    fun futoAdaptationByLength() {
+        val sessions = ArrayList<String>()
+        val loaded = load(sessions = sessions)
+        assumeTrue("FUTO_SWIPES not set or not a file", loaded != null)
+        val swipes = loaded!!.first
+        val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams())
+        fun read(sw: ReplayGlide, offsets: FloatArray?): GlideResult? {
+            decoder.begin(sw.layout, GlideContext(sw.context, context2 = sw.context2, sentence = GlideText.sentenceWords(sw.before)), sw.t[0], offsets = offsets)
+            for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
+            return decoder.finish()
+        }
+        val plain = sortedMapOf<String, Score>()
+        val adapted = sortedMapOf<String, Score>()
+        fun bucket(w: String) = when (w.length) { 2 -> "2"; 3 -> "3"; 4 -> "4"; in 5..7 -> "5-7"; else -> "8+" }
+        var sessionCount = 0
+        for ((_, idx) in swipes.indices.groupBy { sessions[it] }) {
+            if (idx.size < 40) continue
+            sessionCount++
+            val day = intArrayOf(0)
+            val a = GlideAdaptation(null) { day[0] }
+            for ((k, i) in idx.withIndex()) {
+                if (k % 60 == 0) day[0]++
+                val sw = swipes[i]
+                val target = dictionary.indexOfLower(sw.word)
+                val r = read(sw, a.offsets())
+                val right = r != null && r.words.lastOrNull() == target
+                if (k >= idx.size / 2) {
+                    val p = read(sw, null)
+                    for ((map, ok) in listOf(plain to (p != null && p.words.lastOrNull() == target), adapted to right)) {
+                        val sc = map.getOrPut(bucket(sw.word)) { Score() }
+                        sc.n++
+                        if (ok) sc.top1++
+                        val all = map.getOrPut("all") { Score() }
+                        all.n++
+                        if (ok) all.top1++
+                    }
+                }
+                if (r == null) continue
+                if (right) {
+                    r.observations.lastOrNull()?.let { a.learn(it) }
+                } else {
+                    val stroke = r.strokes.lastOrNull() ?: continue
+                    decoder.observeWord(sw.layout, a.offsets(), stroke, target)?.let { a.learnCorrection(it) }
+                }
+            }
+        }
+        val pct = GlideBenchmarkTest::pct
+        println("FUTOADAPT sessions of 40+ swipes: $sessionCount, scored on each one's later half")
+        for ((k, p) in plain) {
+            val q = adapted[k]!!
+            println("FUTOADAPT   ${k.padEnd(4)} ${p.n} swipes  top-1 ${pct(p.top1, p.n)} without, ${pct(q.top1, q.n)} adapted")
+        }
     }
 
     @Test

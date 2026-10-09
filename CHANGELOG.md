@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.2: 2026-10-09
+
+### Changed
+
+- Export diagnostics also counts, for a glided word deleted on its own, whether the next word written was the same word, one the strip offered for it, or another word (counts only, never the words) (319ed44)
+
+### Fixed
+
+- A host name typed in a plain text box (test.neat.fish in a DNS form) is no longer split into sentences: a second full stop typed straight onto the part after a split puts the parts back together, and a glide after a dotted name's full stop continues it (298b3d8)
+
 ## 0.6.1: 2026-10-08
 
 ### Changed

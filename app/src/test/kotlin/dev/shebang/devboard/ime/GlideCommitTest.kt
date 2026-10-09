@@ -34,6 +34,8 @@ class GlideCommitTest {
     private val outcomes = ArrayList<Int>()
     /** Each outcome's stroke reach and duration, in order. */
     private val outcomeStrokes = ArrayList<Pair<Float, Long>>()
+    /** Deleted glided words' replacements: (how, letters). */
+    private val replacements = ArrayList<Pair<Int, Int>>()
 
     private val controller = TextInputController(
         { ic },
@@ -58,6 +60,9 @@ class GlideCommitTest {
             override fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) {
                 outcomes += outcome
                 outcomeStrokes += reach to durationMs
+            }
+            override fun glideReplaced(how: Int, letters: Int) {
+                replacements += how to letters
             }
         },
     ).also {
@@ -656,6 +661,36 @@ class GlideCommitTest {
         glide("world")
         leaveField()
         assertEquals(listOf(5f to 420L, 0f to -1L), outcomeStrokes)
+    }
+
+    @Test
+    fun aDeletedGlideReplacedByAWordTheStripOfferedIsCountedSo() {
+        glide("as", runnersUp = listOf("we", "ad"))
+        controller.backspace()
+        type("we ")
+        assertEquals(listOf(GlideOutcomes.REPLACED_OFFERED to 2), replacements)
+    }
+
+    @Test
+    fun aDeletedGlideReplacedBySomethingElseOrItselfAgain() {
+        glide("as", runnersUp = listOf("we", "ad"))
+        controller.backspace()
+        glide("hello")
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        glide("as")
+        assertEquals(listOf(GlideOutcomes.REPLACED_OTHER to 2, GlideOutcomes.REPLACED_SAME to 2), replacements)
+    }
+
+    @Test
+    fun onlyAGlideDeletedOnItsOwnHasItsReplacementCounted() {
+        glide("hello", "world")
+        controller.backspace()
+        type("we ")
+        // A kept glide is followed by words too; nothing to count.
+        glide("as", runnersUp = listOf("we"))
+        type(" we ")
+        assertEquals(emptyList<Pair<Int, Int>>(), replacements)
     }
 
     @Test

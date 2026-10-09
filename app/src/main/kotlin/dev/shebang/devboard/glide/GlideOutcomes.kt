@@ -15,14 +15,17 @@ import kotlin.math.hypot
  * field changes): kept as glided, fixed from the strip, glided again, edited (typed or backspaced into),
  * deleted, or fixed by the next glide. Only the outcome, the word's length, and how far and how long the stroke
  * went (each as a coarse band) are kept, never the word or the stroke; the last [MAX] glides. The bands tell a
- * glide made on purpose from a tap that slid (R40). What the keyboard cannot see is not counted: a word fixed later, after leaving the field,
+ * glide made on purpose from a tap that slid (R40). For a glided word deleted on its own, also whether the next word
+ * written was the same word, one the strip offered for it, or another (counts only; R23). What the keyboard cannot see is not counted: a word fixed later, after leaving the field,
  * or a wrong word never noticed counts as kept. Thread-safe.
  */
 class GlideOutcomes(private val file: File?) {
     @Serializable
-    private data class Stored(val codes: List<Int> = emptyList())
+    private data class Stored(val codes: List<Int> = emptyList(), val replaced: List<Int> = emptyList())
 
     private val codes = ArrayDeque<Int>()
+    /** Deleted glided words and what replaced them: how * 32 + letters, the last [MAX]. */
+    private val replaced = ArrayDeque<Int>()
     private var loaded = false
     private var dirty = false
 
@@ -30,7 +33,10 @@ class GlideOutcomes(private val file: File?) {
     private fun load() {
         if (loaded) return
         loaded = true
-        file?.let { JsonFile(it).read(Stored.serializer(), json) }?.let { codes.addAll(it.codes.takeLast(MAX)) }
+        file?.let { JsonFile(it).read(Stored.serializer(), json) }?.let {
+            codes.addAll(it.codes.takeLast(MAX))
+            replaced.addAll(it.replaced.takeLast(MAX))
+        }
     }
 
     /**
@@ -50,12 +56,21 @@ class GlideOutcomes(private val file: File?) {
         dirty = true
     }
 
+    /** A glided word of [letters] letters deleted on its own, and what the next word written was ([how]). */
+    @Synchronized
+    fun addReplacement(how: Int, letters: Int) {
+        load()
+        replaced.addLast(how * 32 + letters.coerceIn(0, 31))
+        while (replaced.size > MAX) replaced.removeFirst()
+        dirty = true
+    }
+
     /** Writes the outcomes if they changed. Off the main thread. */
     @Synchronized
     fun save() {
         val f = file ?: return
         if (!dirty) return
-        runCatching { JsonFile(f).write(Stored.serializer(), json, Stored(codes.toList())) }
+        runCatching { JsonFile(f).write(Stored.serializer(), json, Stored(codes.toList(), replaced.toList())) }
         dirty = false
     }
 
@@ -63,6 +78,7 @@ class GlideOutcomes(private val file: File?) {
     fun reset() {
         load()
         codes.clear()
+        replaced.clear()
         dirty = true
         save()
         file?.let { JsonFile(it).discardUnreadable() }
@@ -93,6 +109,17 @@ class GlideOutcomes(private val file: File?) {
             put("byDuration", banded(DURATION_LABELS, DURATION_UNIT, known))
             // The words a slid tap would make: how far their strokes went.
             put("oneOrTwoLettersByReach", banded(REACH_LABELS, REACH_UNIT, known.filter { it % 32 in 1..2 }))
+            // A glided word deleted on its own, and the next word written: was the fix one the strip offered?
+            fun replacements(of: List<Int>) = buildJsonObject {
+                put("deleted", JsonPrimitive(of.size))
+                for ((i, name) in REPLACED_NAMES.withIndex()) put(name, JsonPrimitive(of.count { it / 32 == i }))
+            }
+            val r = replaced.toList()
+            put("replacedAfterDelete", buildJsonObject {
+                put("all", replacements(r))
+                put("oneOrTwoLetters", replacements(r.filter { it % 32 in 1..2 }))
+                put("threeOrMoreLetters", replacements(r.filter { it % 32 >= 3 }))
+            })
         }
     }
 
@@ -105,6 +132,11 @@ class GlideOutcomes(private val file: File?) {
         const val EDITED = 3
         const val DELETED = 4
         const val NEXT_GLIDE = 5
+        /** What replaced a deleted glided word: itself again, a word the strip offered for it, another word. */
+        const val REPLACED_SAME = 0
+        const val REPLACED_OFFERED = 1
+        const val REPLACED_OTHER = 2
+        private val REPLACED_NAMES = listOf("bySameWord", "byAWordTheStripOffered", "byAnotherWord")
         private val NAMES = listOf("kept", "fixedFromStrip", "glidedAgain", "edited", "deleted", "fixedByNextGlide")
         private val LENGTHS = listOf("1" to 0..1, "2" to 2..2, "3" to 3..3, "4" to 4..4, "5" to 5..5, "6-7" to 6..7, "8+" to 8..31)
         /** Bits above the length (5) and the outcome (3): reach band, duration band, and whether they are known. */
