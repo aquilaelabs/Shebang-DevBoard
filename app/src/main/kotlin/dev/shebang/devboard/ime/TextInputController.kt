@@ -88,6 +88,8 @@ class TextInputController(
         fun keepJoined(word: String) = Unit
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
         fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) = Unit
+        /** A deleted glided word of [letters] letters was replaced by the next word written: how ([GlideOutcomes] REPLACED_ constant). */
+        fun glideReplaced(how: Int, letters: Int) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -1299,6 +1301,7 @@ class TextInputController(
             lastAutocorrect = Autocorrected(typed, lead + commit, after)
             corrections.remember(ic, typed, lead + commit, after.length, other)
         }
+        glides.replacedBy(commit)
         if (!defer) {
             if (!untouched) learnAs(commit, context)
             // A word the dictionary knows, typed and kept as it is, shows where this user's taps land.
@@ -1817,11 +1820,14 @@ class TextInputController(
         if (needsLeadingSpace(ic)) sb.append(' ')
         sb.append(ownText)
         commitWhole(ic, sb)
+        glides.replacedBy(fresh.first().text)
         lastOwnTail = ownText
         // A phrase glide that lifted in the space bar ended its word with a space, as the space key does.
         lastActionWasSpace = trailingSpace
         glides.add(fresh)
         val alternatives = result.alternatives.map { caseNew(dictionary.words[it], fresh.size == 1 && capitalize) }
+        // What the strip offers for a one-word glide, to tell later whether a deleted word's fix was there.
+        if (fresh.size == 1) fresh[0].offered = alternatives.take(STRIP_WORDS)
         val dotSplit = if (sb.startsWith(" ") && fresh.size == 1 && after.isEmpty()) dotSplitBefore(ic, sb.length, dictionary.words[result.words[0]]) else null
         val glide = GlideCommit(ownText, fresh.last().text, alternatives, result.alternatives, fresh.size, after, dotSplit)
         lastGlide = glide
@@ -1983,6 +1989,8 @@ class TextInputController(
         private const val SENTENCE_CHARS = 200
         /** Longest word looked at around the cursor. */
         private const val MAX_WORD = 48
+        /** Words the strip shows for a glide ([arrangeBestMiddle]). */
+        private const val STRIP_WORDS = 3
 
         /** Strip order for glide alternatives: runner-up left, best in the middle, third right. */
         fun arrangeBestMiddle(ranked: List<String>): List<String> = when (ranked.size) {

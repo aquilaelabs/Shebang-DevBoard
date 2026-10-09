@@ -18,7 +18,10 @@ internal class GlidedWord(
     var fixedBy: Int = GlideOutcomes.KEPT,
     /** How long the stroke it came from took, touch-down to lift (shared by a phrase glide's words); -1 when not known. */
     val durationMs: Long = -1L,
-)
+) {
+    /** The words the strip offered for it (itself first) when it was glided alone; empty otherwise. */
+    var offered: List<String> = emptyList()
+}
 
 /**
  * When glided words are learned, and which never are. The last glide's words are pending (backspace can still
@@ -42,6 +45,9 @@ internal class GlideLearning(
     private val recent = ArrayDeque<GlidedWord>()
 
     val pendingCount: Int get() = pending.size
+
+    /** The glided word just deleted on its own, until the next word written shows what replaced it. */
+    private var deleted: GlidedWord? = null
 
     /** The last glide's last word, while it is still open. */
     fun lastPending(): GlidedWord? = pending.lastOrNull()
@@ -79,6 +85,7 @@ internal class GlideLearning(
 
     /** Everything open is final now (the field is left, or the language changed): learned. */
     fun finish() {
+        deleted = null
         settle()
         while (held.isNotEmpty()) retire(held.removeFirst())
     }
@@ -103,13 +110,35 @@ internal class GlideLearning(
             val w = pending.removeAt(pending.size - 1)
             recent.remove(w)
             outcome(w, GlideOutcomes.DELETED)
+            deleted = if (n == 1) w else null
         }
         return count
     }
 
     /** Up to [n] held words, newest first, were deleted: unlearned. */
     fun deleteHeld(n: Int) {
-        repeat(minOf(n, held.size)) { abandon(held.last(), GlideOutcomes.DELETED) }
+        repeat(minOf(n, held.size)) {
+            val w = held.last()
+            abandon(w, GlideOutcomes.DELETED)
+            deleted = if (n == 1) w else null
+        }
+    }
+
+    /**
+     * The next word written after a glided word was deleted on its own: the same word again (deleted to
+     * rephrase, or the glide was right), one the strip offered for it, or another word. Counts only, for the
+     * diagnostics: whether a wrong short word's fix was a tap away (R23).
+     */
+    fun replacedBy(text: String) {
+        val d = deleted ?: return
+        deleted = null
+        if (text.isEmpty() || d.offered.isEmpty() || field().noPersonalizedLearning) return
+        val how = when {
+            text.equals(d.text, ignoreCase = true) -> GlideOutcomes.REPLACED_SAME
+            d.offered.any { it.equals(text, ignoreCase = true) } -> GlideOutcomes.REPLACED_OFFERED
+            else -> GlideOutcomes.REPLACED_OTHER
+        }
+        learner.glideReplaced(how, d.text.length)
     }
 
     /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */
