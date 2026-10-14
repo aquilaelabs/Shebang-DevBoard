@@ -724,6 +724,26 @@ class GlideCommitTest {
     }
 
     @Test
+    fun aSentenceWipedByHoldingBackspaceIsNotCountedAsMisread() {
+        glide("hello")
+        glide("world")
+        glide("again")
+        // Held: the last glide goes whole, then a word per tick.
+        controller.backspace()
+        controller.backspaceWord()
+        controller.backspaceWord()
+        type("so ")
+        leaveField()
+        assertEquals(emptyList<Int>(), outcomes)
+        // One glided word deleted, then something else written: misread.
+        glide("hello")
+        controller.backspaceWord()
+        type("so ")
+        leaveField()
+        assertEquals(listOf(GlideOutcomes.DELETED), outcomes)
+    }
+
+    @Test
     fun aStripSwapCountsAsFixedFromTheStrip() {
         glide("form", runnersUp = listOf("from"))
         controller.pickCandidate("from")
