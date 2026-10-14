@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Switching between letters and symbols morphs: the keys slide and reshape into their new places; emoji and the clipboard grow out of their button and shrink back into it (de3bd5c)
+- Switching to symbols, emoji or the clipboard grows out of the button you tapped: it lifts off, becomes a circle in the middle and widens into the new screen, and going back flies home into the button (87ac489)
 
 ### Fixed
 
