@@ -48,6 +48,8 @@ internal class GlideLearning(
 
     /** The glided word just deleted on its own, until the next word written shows what replaced it. */
     private var deleted: GlidedWord? = null
+    /** Deletions since the last word written: a glided word deleted on its own is the first and the last. */
+    private var deletions = 0
 
     /** The last glide's last word, while it is still open. */
     fun lastPending(): GlidedWord? = pending.lastOrNull()
@@ -86,6 +88,7 @@ internal class GlideLearning(
     /** Everything open is final now (the field is left, or the language changed): learned. */
     fun finish() {
         deleted = null
+        deletions = 0
         settle()
         while (held.isNotEmpty()) retire(held.removeFirst())
     }
@@ -110,7 +113,7 @@ internal class GlideLearning(
             val w = pending.removeAt(pending.size - 1)
             recent.remove(w)
             outcome(w, GlideOutcomes.DELETED)
-            deleted = if (n == 1) w else null
+            deleted = if (n == 1 && deletions == 0) w else null
         }
         return count
     }
@@ -120,8 +123,16 @@ internal class GlideLearning(
         repeat(minOf(n, held.size)) {
             val w = held.last()
             abandon(w, GlideOutcomes.DELETED)
-            deleted = if (n == 1) w else null
+            deleted = if (n == 1 && deletions == 0) w else null
         }
+    }
+
+    /**
+     * Text was deleted, after any glided words in it were let go: a glided word deleted and then more after it
+     * (backing up further, or holding backspace through a sentence) was not replaced on its own.
+     */
+    fun textDeleted() {
+        if (++deletions > 1) deleted = null
     }
 
     /**
@@ -130,6 +141,7 @@ internal class GlideLearning(
      * diagnostics: whether a wrong short word's fix was a tap away (R23).
      */
     fun replacedBy(text: String) {
+        deletions = 0
         val d = deleted ?: return
         deleted = null
         if (text.isEmpty() || d.offered.isEmpty() || field().noPersonalizedLearning) return
