@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.3: 2026-10-14
+
+### Changed
+
+- The keyboard opens on letters every time it comes up, instead of the symbols you left it on; terminals still remember code mode (0204675)
+- Switching between letters, symbols, emoji and the clipboard fades quickly instead of jumping (instant when Android's animations are off) (3ef6527)
+
+### Fixed
+
+- The keyboard no longer crashes when something is copied after you switch to another keyboard (d7f8471)
+- Diagnostics no longer count a sentence deleted by holding backspace as glides read wrong, nor what you write after it as a replacement (d7f8471)
+
 ## 0.6.2: 2026-10-09
 
 ### Changed
