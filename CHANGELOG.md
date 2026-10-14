@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.4: 2026-10-14
+
+### Changed
+
+- Switching between letters and symbols morphs: the keys slide and reshape into their new places; emoji and the clipboard grow out of their button and shrink back into it (de3bd5c)
+
+### Fixed
+
+- The microphone stays in the bar in symbols mode, and switching to symbols no longer stops dictation (de3bd5c)
+
 ## 0.6.3: 2026-10-14
 
 ### Changed
