@@ -2,9 +2,7 @@ package dev.shebang.devboard.view
 
 import dev.shebang.devboard.glide.TapModel
 import android.content.Context
-import android.animation.ValueAnimator
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
@@ -14,8 +12,6 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
-import android.view.animation.PathInterpolator
-import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import dev.shebang.devboard.layout.Key
 import dev.shebang.devboard.layout.KeyAction
@@ -250,28 +246,7 @@ class KeyboardView(context: Context) : View(context) {
         cursorPaint.strokeWidth = 2.5f * density
     }
 
-    /** The next [setGeometry] (a switch between letters and code mode) morphs from the keys showing now. */
-    fun morphToNext() {
-        morphNext = ValueAnimator.areAnimatorsEnabled()
-    }
-
     fun setGeometry(g: KeyboardGeometry) {
-        val old = geometry
-        morphAnimator?.cancel()
-        morph = if (morphNext && old != null && old.keys.isNotEmpty()) Morph(old, g.keys.map { sourceFor(it, old.keys) }) else null
-        morphNext = false
-        morph?.let { m ->
-            morphAnimator = ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = MORPH_MS
-                interpolator = PathInterpolator(0.2f, 0f, 0f, 1f)
-                addUpdateListener {
-                    m.t = it.animatedValue as Float
-                    if (it.animatedFraction >= 1f && morph === m) morph = null
-                    invalidate()
-                }
-                start()
-            }
-        }
         geometry = g
         accessibility.invalidateRoot()
         radius = (g.rowHeightPx * 0.16f).coerceIn(4 * density, 12 * density)
@@ -289,6 +264,13 @@ class KeyboardView(context: Context) : View(context) {
         touch.geometry = g
         invalidate()
     }
+
+    /** The face of the key doing [action], in this view's coordinates, or null when the layout has none. */
+    fun keyFace(action: KeyAction): RectF? =
+        geometry?.keys?.firstOrNull { it.action == action }?.let { RectF(it.left, it.top, it.right, it.bottom - lip) }
+
+    /** A key face's corner radius. */
+    val keyRadius: Float get() = radius
 
     fun setShift(state: ShiftState, notify: Boolean = true) {
         if (shiftState == state) return
@@ -324,73 +306,37 @@ class KeyboardView(context: Context) : View(context) {
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), bgPaint)
         val keys = g.keys
         val shifted = shiftState != ShiftState.OFF
-        val m = morph
-        if (m != null) {
-            for (i in keys.indices) drawMorphing(canvas, keys[i], m.sources[i], m, shifted)
-            return
-        }
         for (i in keys.indices) drawKey(canvas, keys[i], shifted)
         if (touch.gliding && glideTrailEnabled && touch.glideCount > 1) drawTrail(canvas)
     }
 
     private fun drawKey(canvas: Canvas, key: Key, shifted: Boolean) {
         val pressed = touch.isPressed(key) || (touch.spaceArmed && key === touch.spaceKey)
-        val accentKey = isAccent(key)
+        val action = key.action
+        val accentKey = action == KeyAction.ENTER || (action == KeyAction.SHIFT && shiftState == ShiftState.LOCKED)
+        keyPaint.color = when {
+            pressed -> theme.keyPressed
+            accentKey -> theme.accent
+            key.def.functional -> theme.keyFunctional
+            else -> theme.key
+        }
         // A keycap: the edge underneath, the face raised above it; a pressed key sinks onto its edge.
         rect.set(key.left, key.top, key.right, key.bottom)
-        drawCap(canvas, if (pressed) theme.keyPressed else faceColor(key), edgeColor(key), pressed)
-        val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
-        drawContent(canvas, key, shifted, fg, geometry?.layout?.mode == "code", 255)
-    }
-
-    /**
-     * A key mid-morph: its cap moves and reshapes from [from]'s (the key it replaces) to its own, the colours
-     * blending, while [from]'s label fades out and its own fades in.
-     */
-    private fun drawMorphing(canvas: Canvas, key: Key, from: Key, m: Morph, shifted: Boolean) {
-        val e = m.t
-        rect.set(lerp(from.left, key.left, e), lerp(from.top, key.top, e), lerp(from.right, key.right, e), lerp(from.bottom, key.bottom, e))
-        drawCap(canvas, ColorUtils.blendARGB(faceColor(from), faceColor(key), e), ColorUtils.blendARGB(edgeColor(from), edgeColor(key), e), false)
-        val fromFg = if (isAccent(from)) theme.onAccent else theme.keyText
-        val fg = if (isAccent(key)) theme.onAccent else theme.keyText
-        // The old label is gone by halfway, the new one comes in over the second half: never two at once.
-        val out = ((1f - 2f * e).coerceIn(0f, 1f) * 255).toInt()
-        val inn = ((2f * e - 1f).coerceIn(0f, 1f) * 255).toInt()
-        if (out > 0) drawContent(canvas, from, shifted, fromFg, m.from.layout?.mode == "code", out)
-        if (inn > 0) drawContent(canvas, key, shifted, fg, geometry?.layout?.mode == "code", inn)
-    }
-
-    private fun isAccent(key: Key) = key.action == KeyAction.ENTER || (key.action == KeyAction.SHIFT && shiftState == ShiftState.LOCKED)
-
-    private fun faceColor(key: Key) = when {
-        isAccent(key) -> theme.accent
-        key.def.functional -> theme.keyFunctional
-        else -> theme.key
-    }
-
-    private fun edgeColor(key: Key) = when {
-        isAccent(key) -> theme.accentEdge
-        key.def.functional -> theme.keyFunctionalEdge
-        else -> theme.keyEdge
-    }
-
-    /** The cap in [rect]: the edge underneath and the face raised above it, or sunk onto it when [pressed]; [rect] ends as the face. */
-    private fun drawCap(canvas: Canvas, face: Int, edge: Int, pressed: Boolean) {
         if (!pressed) {
-            edgePaint.color = edge
+            edgePaint.color = when {
+                accentKey -> theme.accentEdge
+                key.def.functional -> theme.keyFunctionalEdge
+                else -> theme.keyEdge
+            }
             canvas.drawRoundRect(rect, radius, radius, edgePaint)
             rect.bottom -= lip
         } else {
             rect.top += lip
         }
-        keyPaint.color = face
         canvas.drawRoundRect(rect, radius, radius, keyPaint)
-    }
 
-    /** What a key wears on its face in [rect], at [alpha] (0-255). [code]: the layout is code mode's. */
-    private fun drawContent(canvas: Canvas, key: Key, shifted: Boolean, color: Int, code: Boolean, alpha: Int) {
-        val fg = faded(color, alpha)
-        when (key.action) {
+        val fg = if (accentKey && !pressed) theme.onAccent else theme.keyText
+        when (action) {
             KeyAction.BACKSPACE -> drawIcon(canvas, KeyIcons.backspace, fg, false)
             // A glyph for what Enter does here (return, search, or Go/Send/Done), never a word: the user's choice.
             KeyAction.ENTER -> drawIcon(canvas, KeyIcons.enterFor(enterKind), fg, false)
@@ -405,7 +351,7 @@ class KeyboardView(context: Context) : View(context) {
                 // A cursor mark on the space bar.
                 val w = minOf(rect.width() * 0.08f, 16 * density)
                 val y = rect.centerY() + labelSize * 0.28f
-                cursorPaint.color = faded(theme.keyTextSecondary, alpha)
+                cursorPaint.color = theme.keyTextSecondary
                 canvas.drawLine(rect.centerX() - w / 2, y, rect.centerX() + w / 2, y, cursorPaint)
             }
             else -> {
@@ -413,48 +359,13 @@ class KeyboardView(context: Context) : View(context) {
                 val scale = if (label.length > 1) 0.7f else 1f
                 drawLabel(canvas, label, fg, scale)
                 // Letters show their first alternate; so do code mode's keys (5 holds %, 6 holds ^).
-                if (key.alternates.isNotEmpty() && (key.letter != 0.toChar() || code)) {
-                    hintPaint.color = faded(theme.keyTextSecondary, alpha)
+                if (key.alternates.isNotEmpty() && (key.letter != 0.toChar() || geometry?.layout?.mode == "code")) {
+                    hintPaint.color = theme.keyTextSecondary
                     canvas.drawText(key.alternates[0], rect.right - 5 * density, rect.top + hintSize + 3 * density, hintPaint)
                 }
             }
         }
     }
-
-    private fun faded(color: Int, alpha: Int) =
-        if (alpha >= 255) color else ColorUtils.setAlphaComponent(color, Color.alpha(color) * alpha / 255)
-
-    private fun lerp(a: Float, b: Float, t: Float) = a + (b - a) * t
-
-    /**
-     * The key a new key grows out of in a morph: the same key where both layouts have it (space, enter,
-     * backspace, comma, full stop; the #! and ABC keys stand in for each other), else the old key nearest
-     * its place, so every new key comes from where something was.
-     */
-    private fun sourceFor(key: Key, old: List<Key>): Key {
-        val twin = old.firstOrNull { o ->
-            when (key.action) {
-                KeyAction.NONE -> o.action == KeyAction.NONE && o.letter == 0.toChar() && key.letter == 0.toChar() && o.label == key.label && o.label.isNotEmpty()
-                KeyAction.MODE_CODE, KeyAction.MODE_TEXT -> o.action == KeyAction.MODE_CODE || o.action == KeyAction.MODE_TEXT
-                else -> o.action == key.action
-            }
-        }
-        if (twin != null) return twin
-        return old.minBy { o ->
-            val dx = o.centerX - key.centerX
-            val dy = o.centerY - key.centerY
-            dx * dx + dy * dy
-        }
-    }
-
-    /** A morph from [from]'s keys: [sources] has, for each new key, the old key it grows out of; [t] runs 0 to 1. */
-    private class Morph(val from: KeyboardGeometry, val sources: List<Key>) {
-        var t = 0f
-    }
-
-    private var morph: Morph? = null
-    private var morphNext = false
-    private var morphAnimator: ValueAnimator? = null
 
     /** A label centred on the key face in [rect]. */
     private fun drawLabel(canvas: Canvas, label: String, color: Int, scale: Float) {
@@ -527,16 +438,12 @@ class KeyboardView(context: Context) : View(context) {
     fun cancelAllTouches() = touch.cancel()
 
     override fun onDetachedFromWindow() {
-        morphAnimator?.cancel()
-        morph = null
         cancelAllTouches()
         super.onDetachedFromWindow()
     }
 
     companion object {
         private const val TRAIL_SEGMENTS = 60
-        /** How long a switch between letters and code mode takes to morph. */
-        const val MORPH_MS = 220L
         /** How long backspace is held before it deletes whole words. */
         const val WORDS_AFTER_MS = KeyTouch.WORDS_AFTER_MS
     }

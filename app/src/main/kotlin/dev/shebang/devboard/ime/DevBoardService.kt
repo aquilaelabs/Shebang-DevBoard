@@ -390,14 +390,15 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         e.visibility = View.GONE
         column.addView(e, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         emojiPanel = e
-        emojiGroups?.let { e.setEmoji(it) }
+        // Read ahead, so the panel has its emoji as it grows out of its button the first time.
+        loadEmoji(e)
         val cp = dev.shebang.devboard.view.ClipboardPanelView(this)
         cp.listener = this
         cp.imageFile = { clipHistory.imageFile(it) }
         cp.visibility = View.GONE
         column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         clipPanel = cp
-        panelMorph = dev.shebang.devboard.view.PanelMorph(column)
+        buttonMorph = dev.shebang.devboard.view.ButtonMorph(column)
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
         val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
@@ -508,7 +509,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (!restarting) {
-            panelMorph?.finish()
+            buttonMorph?.finish()
             closePanels()
         }
         field = FieldInfo.from(info)
@@ -624,7 +625,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        panelMorph?.finish()
+        buttonMorph?.finish()
         closePanels()
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
@@ -971,12 +972,23 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private fun switchMode(m: Mode) {
         if (mode == m) return
+        // Code mode comes out of the #! key and goes back into it (ABC stands where #! does).
+        val k = keyboard
+        val face = k?.keyFace(if (m == Mode.CODE) KeyAction.MODE_CODE else KeyAction.MODE_TEXT)?.let { inColumn(k, it) }
+        val t = theme
+        if (t != null && k != null) {
+            buttonMorph?.run(keysRow, face, k.keyRadius, t.accent, t.background, opening = m == Mode.CODE) { applyMode(m) }
+        } else {
+            applyMode(m)
+        }
+    }
+
+    private fun applyMode(m: Mode) {
         text.finishComposing()
         mode = m
         appProfiles.setMode(currentApp, if (m == Mode.CODE) AppProfiles.CODE else AppProfiles.TEXT)
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
-        keyboard?.morphToNext()
         rebuildGeometry()
         updateAutoCaps()
         updateMic()
@@ -1117,16 +1129,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val k = keyboard ?: return
         val e = emojiPanel ?: return
         text.finishComposing()
-        val groups = emojiGroups
-        if (groups == null) {
-            background.execute {
-                val loaded = e.loadEmoji()
-                main.post {
-                    emojiGroups = loaded
-                    e.setEmoji(loaded)
-                }
-            }
-        }
+        loadEmoji(e)
         val height = keysHeight()
         clipPanel?.visibility = View.GONE
         e.layoutParams = e.layoutParams.apply { this.height = height }
@@ -1134,6 +1137,26 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keysRow?.visibility = View.GONE
         e.visibility = View.VISIBLE
     }
+
+    /** The emoji list into [e]: read once, off the main thread. */
+    private fun loadEmoji(e: dev.shebang.devboard.view.EmojiPanelView) {
+        emojiGroups?.let {
+            e.setEmoji(it)
+            return
+        }
+        if (emojiLoading) return
+        emojiLoading = true
+        background.execute {
+            val loaded = e.loadEmoji()
+            main.post {
+                emojiGroups = loaded
+                emojiLoading = false
+                emojiPanel?.setEmoji(loaded)
+            }
+        }
+    }
+
+    private var emojiLoading = false
 
     /** The clipboard history in place of the keys; what is on the clipboard now is recorded first. */
     private fun openClipboard() {
@@ -1152,10 +1175,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     /** The panel's height: the keys', remembered while they show (a panel may already hide them). */
     private var panelHeight = 0
-    private var panelMorph: dev.shebang.devboard.view.PanelMorph? = null
-    /** Where the open panel grew from (its bar button's centre, in the keyboard's column), to shrink back to. */
-    private var panelOriginX = 0f
-    private var panelOriginY = 0f
+    private var buttonMorph: dev.shebang.devboard.view.ButtonMorph? = null
+    /** The bar button the open panel came out of (in the keyboard's column), to go back into. */
+    private var panelButtonFace: android.graphics.RectF? = null
 
     private fun keysHeight(): Int {
         val k = keyboard ?: return panelHeight
@@ -1196,17 +1218,26 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
      */
     private fun morphing(opening: Boolean, change: () -> Unit) {
         val shown = listOf(keysRow, emojiPanel, clipPanel).firstOrNull { it?.visibility == View.VISIBLE }
-        val column = keysRow?.parent as? View
         val button = strip?.bar?.panelButton
-        if (opening && button != null && column != null && button.isShown) {
-            val at = IntArray(2)
-            val columnAt = IntArray(2)
-            button.getLocationInWindow(at)
-            column.getLocationInWindow(columnAt)
-            panelOriginX = (at[0] - columnAt[0] + button.width / 2).toFloat()
-            panelOriginY = (at[1] - columnAt[1] + button.height / 2).toFloat()
+        if (opening && button != null && button.isShown) {
+            panelButtonFace = inColumn(button, android.graphics.RectF(0f, 0f, button.width.toFloat(), button.height.toFloat()))
         }
-        panelMorph?.run(shown, panelOriginX, panelOriginY, opening, change) ?: change()
+        val t = theme
+        if (t == null) {
+            change()
+            return
+        }
+        buttonMorph?.run(shown, panelButtonFace, 8 * resources.displayMetrics.density, t.accent, t.background, opening, change) ?: change()
+    }
+
+    /** [r], in [v]'s coordinates, in the keyboard column's (what the morphs draw over). */
+    private fun inColumn(v: View, r: android.graphics.RectF): android.graphics.RectF? {
+        val column = keysRow?.parent as? View ?: return null
+        val at = IntArray(2)
+        val columnAt = IntArray(2)
+        v.getLocationInWindow(at)
+        column.getLocationInWindow(columnAt)
+        return android.graphics.RectF(r).apply { offset((at[0] - columnAt[0]).toFloat(), (at[1] - columnAt[1]).toFloat()) }
     }
 
     /** Back to the keys. */
