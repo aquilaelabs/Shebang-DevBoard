@@ -397,7 +397,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         cp.visibility = View.GONE
         column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         clipPanel = cp
-        fade = dev.shebang.devboard.view.SwitchFade(column)
+        panelMorph = dev.shebang.devboard.view.PanelMorph(column)
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
         val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
@@ -508,7 +508,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (!restarting) {
-            fade?.finish()
+            panelMorph?.finish()
             closePanels()
         }
         field = FieldInfo.from(info)
@@ -548,9 +548,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         updateMic()
     }
 
-    /** The mic shows where words are typed (text mode, not passwords or terminals) once the add-on is installed. */
+    /** The mic shows where words are typed (text and code mode, not passwords or terminals) once the add-on is installed. */
     private fun updateMic() {
-        strip?.setMicShown(mode == Mode.TEXT && field.allowsComposing && voice.installed())
+        strip?.setMicShown(field.allowsComposing && voice.installed())
     }
 
     /** The mic and the strip follow the add-on: listening (with the voice level), writing, or idle. */
@@ -563,11 +563,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         s.mic.level = if (state == VoiceClient.STATE_HEARING) level else 0
         if (state == VoiceClient.STATE_IDLE) {
+            s.setVoice(false)
             s.suggestions.clear()
             s.setComposing(text.isComposing)
             return
         }
         s.setComposing(true)
+        s.setVoice(true)
         s.suggestions.showPreview(
             when (state) {
                 VoiceClient.STATE_TRANSCRIBING -> "Writing\u2026"
@@ -622,7 +624,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        fade?.finish()
+        panelMorph?.finish()
         closePanels()
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
@@ -969,18 +971,14 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private fun switchMode(m: Mode) {
         if (mode == m) return
-        fading { applyMode(m) }
-    }
-
-    private fun applyMode(m: Mode) {
         text.finishComposing()
         mode = m
         appProfiles.setMode(currentApp, if (m == Mode.CODE) AppProfiles.CODE else AppProfiles.TEXT)
         keyboard?.setShift(ShiftState.OFF, notify = false)
         autoShifted = false
+        keyboard?.morphToNext()
         rebuildGeometry()
         updateAutoCaps()
-        if (m == Mode.CODE) voice.cancel()
         updateMic()
     }
 
@@ -1017,8 +1015,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onBarPanel(item: BarItem) {
         when (item.type) {
-            BarItem.TYPE_EMOJI -> fading { if (emojiPanel?.visibility == View.VISIBLE) closePanels() else openEmoji() }
-            BarItem.TYPE_CLIPBOARD -> fading { if (clipPanel?.visibility == View.VISIBLE) closePanels() else openClipboard() }
+            BarItem.TYPE_EMOJI -> if (emojiPanel?.visibility == View.VISIBLE) morphing(false) { closePanels() } else morphing(true) { openEmoji() }
+            BarItem.TYPE_CLIPBOARD -> if (clipPanel?.visibility == View.VISIBLE) morphing(false) { closePanels() } else morphing(true) { openClipboard() }
         }
     }
 
@@ -1154,7 +1152,10 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     /** The panel's height: the keys', remembered while they show (a panel may already hide them). */
     private var panelHeight = 0
-    private var fade: dev.shebang.devboard.view.SwitchFade? = null
+    private var panelMorph: dev.shebang.devboard.view.PanelMorph? = null
+    /** Where the open panel grew from (its bar button's centre, in the keyboard's column), to shrink back to. */
+    private var panelOriginX = 0f
+    private var panelOriginY = 0f
 
     private fun keysHeight(): Int {
         val k = keyboard ?: return panelHeight
@@ -1189,10 +1190,23 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
     }
 
-    /** Fades between what the keys' area showed and what [change] puts there. */
-    private fun fading(change: () -> Unit) {
+    /**
+     * A panel opening ([opening]: out of the bar button just tapped) or closing (back into the button it came
+     * from) as [change] swaps what the keys' area shows.
+     */
+    private fun morphing(opening: Boolean, change: () -> Unit) {
         val shown = listOf(keysRow, emojiPanel, clipPanel).firstOrNull { it?.visibility == View.VISIBLE }
-        fade?.run(shown, change) ?: change()
+        val column = keysRow?.parent as? View
+        val button = strip?.bar?.panelButton
+        if (opening && button != null && column != null && button.isShown) {
+            val at = IntArray(2)
+            val columnAt = IntArray(2)
+            button.getLocationInWindow(at)
+            column.getLocationInWindow(columnAt)
+            panelOriginX = (at[0] - columnAt[0] + button.width / 2).toFloat()
+            panelOriginY = (at[1] - columnAt[1] + button.height / 2).toFloat()
+        }
+        panelMorph?.run(shown, panelOriginX, panelOriginY, opening, change) ?: change()
     }
 
     /** Back to the keys. */
@@ -1268,7 +1282,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onPanelClose() {
         feedback.keyPress()
-        fading { closePanels() }
+        morphing(false) { closePanels() }
     }
 
     // ---- TextInputController.Ui ----------------------------------------------------------------------

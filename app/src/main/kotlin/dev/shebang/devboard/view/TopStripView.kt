@@ -25,6 +25,7 @@ class TopStripView(context: Context) : LinearLayout(context) {
     /** The suggestions are next-word predictions, not a word in progress. */
     private var predicting = false
     private var codeMode = false
+    private var voice = false
     private var hasAutofill = false
     /** The user swiped the chips away in this field; new suggestions for it stay hidden. */
     private var autofillDismissed = false
@@ -78,7 +79,14 @@ class TopStripView(context: Context) : LinearLayout(context) {
         apply()
     }
 
-    /** Code mode always shows the bar only. */
+    /** Dictation is under way: its status line shows, in code mode too. */
+    fun setVoice(active: Boolean) {
+        if (voice == active) return
+        voice = active
+        apply()
+    }
+
+    /** Code mode shows the bar only (but for dictation's status line). */
     fun setCodeMode(code: Boolean) {
         codeMode = code
         apply()
@@ -125,8 +133,8 @@ class TopStripView(context: Context) : LinearLayout(context) {
         val showBar: Boolean
         when {
             codeMode -> {
-                showBar = true
-                showSuggestions = false
+                showBar = !voice
+                showSuggestions = voice
             }
             mode == StripMode.ALWAYS_BAR -> {
                 showBar = true
