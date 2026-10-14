@@ -20,9 +20,6 @@ import dev.shebang.devboard.R
 
 /** The horizontally scrolling row of terminal keys, modifiers and snippets. */
 class TerminalBarView(context: Context) : HorizontalScrollView(context) {
-    /** The button of the panel opened or closed last (the emoji or clipboard glyph), which panels grow out of. */
-    var panelButton: View? = null
-        private set
 
     interface Listener {
         fun onBarKey(item: BarItem)
@@ -114,12 +111,7 @@ class TerminalBarView(context: Context) : HorizontalScrollView(context) {
                 v.contentDescription = context.getString(glyphName(item))
                 v.setOnClickListener {
                     listener?.onBarPress()
-                    if (item.isPanel) {
-                        panelButton = v
-                        listener?.onBarPanel(item)
-                    } else {
-                        listener?.onBarAction(item)
-                    }
+                    if (item.isPanel) listener?.onBarPanel(item) else listener?.onBarAction(item)
                 }
             }
             item.isAction -> {

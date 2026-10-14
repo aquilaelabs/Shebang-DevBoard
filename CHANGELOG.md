@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Switching to symbols, emoji or the clipboard grows out of the button you tapped: it lifts off, becomes a circle in the middle and widens into the new screen, and going back flies home into the button (87ac489)
+- Switching between letters, symbols, emoji and the clipboard is instant again: the fade added in 0.6.3 is gone
 
 ### Fixed
 

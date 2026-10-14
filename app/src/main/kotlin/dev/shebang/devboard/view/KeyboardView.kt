@@ -265,13 +265,6 @@ class KeyboardView(context: Context) : View(context) {
         invalidate()
     }
 
-    /** The face of the key doing [action], in this view's coordinates, or null when the layout has none. */
-    fun keyFace(action: KeyAction): RectF? =
-        geometry?.keys?.firstOrNull { it.action == action }?.let { RectF(it.left, it.top, it.right, it.bottom - lip) }
-
-    /** A key face's corner radius. */
-    val keyRadius: Float get() = radius
-
     fun setShift(state: ShiftState, notify: Boolean = true) {
         if (shiftState == state) return
         shiftState = state
