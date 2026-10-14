@@ -951,10 +951,13 @@ class TextInputController(
         if (glide != null && ic.getTextBeforeCursor(glide.text.length, 0)?.toString() == glide.text) {
             deleteBefore(ic, glide.text.length)
             glides.deletePending(glide.words)
+            glides.textDeleted()
             lastGlide = null
             clearCandidates()
             return
         }
+        // Not a letter off a word being written: text that was there before goes.
+        if (!isComposing) glides.textDeleted()
         settle()
         if (isComposing) {
             // Backing up into a glided word and taking letters off it: it was wrong.
@@ -1174,6 +1177,7 @@ class TextInputController(
         val fromPending = glides.deletePending(n)
         // Words before the last glide that went too were glided before it, if they were glided at all.
         if (glides.pendingCount == 0) glides.deleteHeld(n - fromPending)
+        glides.textDeleted()
         settle()
     }
 

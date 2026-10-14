@@ -31,12 +31,22 @@ class ClipboardChip(private val context: Context) {
 
     class Offer(val text: String, val preview: String, val stamp: Long)
 
+    private var listener: ClipboardManager.OnPrimaryClipChangedListener? = null
+
     fun listen(onChange: () -> Unit) {
-        clipboard?.addPrimaryClipChangedListener {
+        val l = ClipboardManager.OnPrimaryClipChangedListener {
             seenChangeAt = SystemClock.elapsedRealtime()
-            seenStamp = clipboard.primaryClipDescription?.timestamp ?: Long.MIN_VALUE
+            seenStamp = clipboard?.primaryClipDescription?.timestamp ?: Long.MIN_VALUE
             onChange()
         }
+        listener = l
+        clipboard?.addPrimaryClipChangedListener(l)
+    }
+
+    /** No more copies are followed: the keyboard is stopping, and the system keeps listeners it is not told to drop. */
+    fun stop() {
+        listener?.let { clipboard?.removePrimaryClipChangedListener(it) }
+        listener = null
     }
 
     /** The text on the clipboard now, for the history; null when it is not text or the copying app marked it sensitive. */

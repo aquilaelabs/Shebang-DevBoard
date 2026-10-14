@@ -694,9 +694,51 @@ class GlideCommitTest {
     }
 
     @Test
+    fun aDeletedGlideFollowedByMoreDeletingIsNotCountedAsReplaced() {
+        // Backing up past it, into the words before.
+        type("so ")
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        controller.backspace()
+        type("we ")
+        // Holding backspace through the sentence: whole words go after it.
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        controller.backspaceWord()
+        type("we ")
+        // A slip in the replacement itself is still the replacement.
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        type("wd")
+        controller.backspace()
+        type("e ")
+        assertEquals(listOf(GlideOutcomes.REPLACED_OFFERED to 2), replacements)
+    }
+
+    @Test
     fun aGlideDeletedRightAwayCountsAsDeleted() {
         glide("hello")
         controller.backspace()
+        leaveField()
+        assertEquals(listOf(GlideOutcomes.DELETED), outcomes)
+    }
+
+    @Test
+    fun aSentenceWipedByHoldingBackspaceIsNotCountedAsMisread() {
+        glide("hello")
+        glide("world")
+        glide("again")
+        // Held: the last glide goes whole, then a word per tick.
+        controller.backspace()
+        controller.backspaceWord()
+        controller.backspaceWord()
+        type("so ")
+        leaveField()
+        assertEquals(emptyList<Int>(), outcomes)
+        // One glided word deleted, then something else written: misread.
+        glide("hello")
+        controller.backspaceWord()
+        type("so ")
         leaveField()
         assertEquals(listOf(GlideOutcomes.DELETED), outcomes)
     }

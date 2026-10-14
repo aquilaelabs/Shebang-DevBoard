@@ -307,8 +307,7 @@ class FieldCompatibilityTest {
             DevBoardService.running?.let { s -> s.inputShownForTest && s.keysForTest.isNotEmpty() } == true
         }
         assertTrue("the keyboard did not come up in the $kind field", up)
-        // The keyboard remembers code mode per app, and these fields are all one app's: a run that follows someone
-        // using code mode there would find no letters. The tests type in text mode.
+        // A terminal field reopens in code mode when it was last used in this app: the tests type in text mode.
         if (service().keysForTest.any { it.action == KeyAction.MODE_TEXT }) {
             val abc = keyFor(KeyAction.MODE_TEXT)
             instrumentation.runOnMainSync { service().tapForTest(abc) }

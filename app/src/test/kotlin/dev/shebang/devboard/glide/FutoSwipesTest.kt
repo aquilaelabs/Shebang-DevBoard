@@ -5,6 +5,8 @@ import dev.shebang.devboard.ime.GlideText
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
+import kotlin.math.abs
+import kotlin.math.sqrt
 
 /**
  * Replays real swipes from the FUTO swipe dataset (swipe.futo.org, MIT licence; see THIRD_PARTY_NOTICES.md),
@@ -193,6 +195,97 @@ class FutoSwipesTest {
         for ((k, p) in plain) {
             val q = adapted[k]!!
             println("FUTOADAPT   ${k.padEnd(4)} ${p.n} swipes  top-1 ${pct(p.top1, p.n)} without, ${pct(q.top1, q.n)} adapted")
+        }
+    }
+
+    /**
+     * Whether the inward pull seen in one owner's adaptation (the keys at the edges reached short, toward the
+     * middle; R20) holds for everyone: where FUTO's swipers pass each letter, averaged over half the sessions,
+     * then given to the decoder as starting offsets on the other half's sessions, against none and half of them.
+     */
+    @Test
+    fun futoPopulationOffsets() {
+        val sessions = ArrayList<String>()
+        val loaded = load(sessions = sessions)
+        assumeTrue("FUTO_SWIPES not set or not a file", loaded != null)
+        val swipes = loaded!!.first
+        val train = sessions.distinct().sorted().filterIndexed { i, _ -> i % 2 == 0 }.toHashSet()
+        val decoder = StreamingGlideDecoder(GlideBenchmarkTest.language, GlideParams())
+        fun read(sw: ReplayGlide, offsets: FloatArray?): GlideResult? {
+            decoder.begin(sw.layout, GlideContext(sw.context, context2 = sw.context2, sentence = GlideText.sentenceWords(sw.before)), sw.t[0], offsets = offsets)
+            for (i in sw.x.indices) decoder.addPoint(sw.x[i], sw.y[i], sw.t[i])
+            return decoder.finish()
+        }
+        val sumU = DoubleArray(26)
+        val sumV = DoubleArray(26)
+        val count = IntArray(26)
+        for (i in swipes.indices) {
+            if (sessions[i] !in train) continue
+            val sw = swipes[i]
+            val target = dictionary.indexOfLower(sw.word)
+            val r = read(sw, null) ?: continue
+            // Where the stroke passed the word's letters: as read, or re-aligned to the word meant.
+            val obs = if (r.words.lastOrNull() == target) r.observations.lastOrNull()
+            else r.strokes.lastOrNull()?.let { decoder.observeWord(sw.layout, null, it, target) }
+            obs ?: continue
+            var k = 0
+            while (k + 2 < obs.size) {
+                val c = obs[k].toInt()
+                if (c in 0..25 && abs(obs[k + 1]) <= 0.8f && abs(obs[k + 2]) <= 0.8f) {
+                    sumU[c] += obs[k + 1]
+                    sumV[c] += obs[k + 2]
+                    count[c]++
+                }
+                k += 3
+            }
+        }
+        val prior = FloatArray(52)
+        // Each key's column on QWERTY, in key pitches from the middle of the rows.
+        val column = FloatArray(26)
+        for ((row, start) in listOf("qwertyuiop" to -4.5f, "asdfghjkl" to -4f, "zxcvbnm" to -3f)) {
+            for ((j, ch) in row.withIndex()) column[ch - 'a'] = start + j
+        }
+        var sxx = 0.0
+        var sxu = 0.0
+        println("FUTOPOP key   n      u      v   (key pitches; + is right / down)")
+        for (c in 0 until 26) {
+            if (count[c] == 0) continue
+            var u = (sumU[c] / count[c]).toFloat()
+            var v = (sumV[c] / count[c]).toFloat()
+            sxx += count[c] * column[c] * column[c].toDouble()
+            sxu += count[c] * column[c] * u.toDouble()
+            println("FUTOPOP   ${'a' + c} ${count[c].toString().padStart(6)} ${"%+.3f".format(u)} ${"%+.3f".format(v)}")
+            val len = sqrt(u * u + v * v)
+            if (len > GlideAdaptation.MAX_OFFSET) {
+                u *= GlideAdaptation.MAX_OFFSET / len
+                v *= GlideAdaptation.MAX_OFFSET / len
+            }
+            prior[c] = u
+            prior[26 + c] = v
+        }
+        println("FUTOPOP horizontal pull: ${"%+.3f".format(sxu / sxx)} key pitches per pitch from the middle (negative: toward it)")
+        val half = FloatArray(52) { prior[it] / 2 }
+        fun bucket(w: String) = when (w.length) { 2 -> "2"; 3 -> "3"; 4 -> "4"; in 5..7 -> "5-7"; else -> "8+" }
+        val scores = listOf(null to "none", half to "half", prior to "full").map { (o, name) ->
+            val by = sortedMapOf<String, Score>()
+            for (i in swipes.indices) {
+                if (sessions[i] in train) continue
+                val sw = swipes[i]
+                val r = read(sw, o)
+                val ok = r != null && r.words.lastOrNull() == dictionary.indexOfLower(sw.word)
+                for (key in listOf("all", bucket(sw.word))) {
+                    val sc = by.getOrPut(key) { Score() }
+                    sc.n++
+                    if (ok) sc.top1++
+                }
+            }
+            name to by
+        }
+        val pct = GlideBenchmarkTest::pct
+        println("FUTOPOP trained on ${train.size} sessions, scored on the other ${sessions.distinct().size - train.size}")
+        for (key in scores[0].second.keys) {
+            println("FUTOPOP   ${key.padEnd(4)} ${scores[0].second[key]!!.n} swipes  top-1 " +
+                scores.joinToString("  ") { (name, by) -> "$name ${pct(by[key]!!.top1, by[key]!!.n)}" })
         }
     }
 
