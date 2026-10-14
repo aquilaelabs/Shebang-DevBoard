@@ -910,3 +910,8 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   the joined name to the personal words, which now accept a full stop inside a word. Considered and not
   done: a space at every full stop (it broke node.js and every filename), and deciding at the letter after
   the full stop (one letter cannot tell "node.js" from a missed space).
+- **Opening on letters** (the owner's ask, 14 Oct: a sentence ended with "?" from code mode left the keyboard on
+  symbols the next time it came up). The keyboard used to reopen in the mode last used in each app (30 Sep); now
+  it opens on letters every time it comes up in a new field, and a field restarted in place keeps its mode. A
+  terminal field (no text to read, keys sent as events) still reopens in code mode when that was last used in its
+  app, since symbols are most of what is typed there.

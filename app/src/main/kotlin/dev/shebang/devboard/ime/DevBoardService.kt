@@ -514,11 +514,15 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keyboard?.enterSpoken = field.enterSpoken
         val app = info?.packageName.orEmpty()
         if (app != currentApp) {
-            // Another app: its own mode (the one last used there) and its own bar.
+            // Another app: its own bar.
             currentApp = app
             if (app != packageName) appProfiles.noteApp(app)
-            mode = if (appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
             applyBar()
+        }
+        // Opening, the keyboard starts on letters (code mode left on after a sentence's last "?" is not wanted
+        // next time); a terminal reopens in the mode last used in its app, where symbols are most of the typing.
+        if (!restarting) {
+            mode = if (field.isTerminal && appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
         }
         // Words deleted in settings (same process) take effect the next time the keyboard opens; so do word packs
         // turned on or off, and word lists imported.
