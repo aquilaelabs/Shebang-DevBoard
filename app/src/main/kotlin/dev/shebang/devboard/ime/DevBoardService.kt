@@ -507,6 +507,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
         if (!restarting) closePanels()
+        val wasTerminal = field.isTerminal
         field = FieldInfo.from(info)
         RecentFields.record(info, field)
         text.startInput(field)
@@ -521,7 +522,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         // Opening, the keyboard starts on letters (code mode left on after a sentence's last "?" is not wanted
         // next time); a terminal reopens in the mode last used in its app, where symbols are most of the typing.
-        if (!restarting) {
+        // A field restarted in place keeps its mode, unless it became another kind: a browser's page offers no
+        // text field (TYPE_NULL, taken for a terminal) until it restarts as the form field tapped.
+        if (!restarting || field.isTerminal != wasTerminal) {
             mode = if (field.isTerminal && appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
         }
         // Words deleted in settings (same process) take effect the next time the keyboard opens; so do word packs
@@ -544,9 +547,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         updateMic()
     }
 
-    /** The mic shows where words are typed (text mode, not passwords or terminals) once the add-on is installed. */
+    /** The mic shows where words are typed (text and code mode, not passwords or terminals) once the add-on is installed. */
     private fun updateMic() {
-        strip?.setMicShown(mode == Mode.TEXT && field.allowsComposing && voice.installed())
+        strip?.setMicShown(field.allowsComposing && voice.installed())
     }
 
     /** The mic and the strip follow the add-on: listening (with the voice level), writing, or idle. */
@@ -559,11 +562,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         s.mic.level = if (state == VoiceClient.STATE_HEARING) level else 0
         if (state == VoiceClient.STATE_IDLE) {
+            s.setVoice(false)
             s.suggestions.clear()
             s.setComposing(text.isComposing)
             return
         }
         s.setComposing(true)
+        s.setVoice(true)
         s.suggestions.showPreview(
             when (state) {
                 VoiceClient.STATE_TRANSCRIBING -> "Writing\u2026"
@@ -971,7 +976,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         autoShifted = false
         rebuildGeometry()
         updateAutoCaps()
-        if (m == Mode.CODE) voice.cancel()
         updateMic()
     }
 
