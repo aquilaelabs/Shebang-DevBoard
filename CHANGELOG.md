@@ -9,6 +9,7 @@
 ### Fixed
 
 - The microphone stays in the bar in symbols mode, and switching to symbols no longer stops dictation (de3bd5c)
+- A form field in a browser (Firefox) opens on letters instead of symbols (df613c7)
 
 ## 0.6.3: 2026-10-14
 
