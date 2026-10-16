@@ -914,4 +914,7 @@ Ambiguities were resolved with the simplest sensible option; each is recorded he
   symbols the next time it came up). The keyboard used to reopen in the mode last used in each app (30 Sep); now
   it opens on letters every time it comes up in a new field, and a field restarted in place keeps its mode. A
   terminal field (no text to read, keys sent as events) still reopens in code mode when that was last used in its
-  app, since symbols are most of what is typed there.
+  app, since symbols are most of what is typed there. A field restarted in place as another kind is chosen for
+  again (15 Oct, the owner's report: a Firefox form opened on symbols): browsers offer TYPE_NULL while the page
+  has no focused input and restart as the form field once it has one, so keeping the mode across that restart
+  carried the "terminal" code mode into an ordinary text field.

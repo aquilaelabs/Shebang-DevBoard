@@ -70,6 +70,7 @@ class FieldTestActivity : ComponentActivity() {
             WEB_TEXTAREA -> web("<textarea id=f autocapitalize=off autofocus oninput=\"Android.text(this.value)\" style=\"$WEB_STYLE\"></textarea>")
             WEB_TERMINAL -> webPage("file:///android_asset/fieldtest/terminal.html")
             TERMINAL -> TerminalView(this)
+            RESTARTING -> RestartingView(this)
             else -> error("unknown field $kind")
         }
         setContentView(fieldView, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -225,6 +226,55 @@ class FieldTestActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * A browser engine's field, as Firefox's GeckoView gives one: focused, it first offers TYPE_NULL, then restarts
+     * input in place as a text field (the keyboard sees restarting = true). What is typed is kept in [keys].
+     */
+    private inner class RestartingView(context: Context) : View(context) {
+        private var text = false
+
+        init {
+            isFocusable = true
+            isFocusableInTouchMode = true
+            setBackgroundColor(android.graphics.Color.DKGRAY)
+        }
+
+        override fun onCheckIsTextEditor() = true
+
+        override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection {
+            outAttrs.inputType = if (text) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_WEB_EDIT_TEXT else InputType.TYPE_NULL
+            outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN or (if (text) EditorInfo.IME_ACTION_GO else 0)
+            return object : BaseInputConnection(this, text) {
+                override fun commitText(t: CharSequence, newCursorPosition: Int): Boolean {
+                    keys.append(t)
+                    save()
+                    return true
+                }
+            }
+        }
+
+        override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: android.graphics.Rect?) {
+            super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+            if (!gainFocus) text = false
+        }
+
+        override fun onTouchEvent(event: android.view.MotionEvent): Boolean {
+            if (event.action == android.view.MotionEvent.ACTION_UP) {
+                val imm = context.getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+                text = false
+                requestFocus()
+                imm.restartInput(this)
+                imm.showSoftInput(this, 0)
+                // The page's input is found a moment later: the same view restarts as a text field.
+                postDelayed({
+                    text = true
+                    imm.restartInput(this)
+                }, 300)
+            }
+            return true
+        }
+    }
+
     companion object {
         const val EXTRA_FIELD = "field"
         const val EXTRA_FINISH = "finish"
@@ -246,6 +296,8 @@ class FieldTestActivity : ComponentActivity() {
         /** xterm.js in a WebView: a browser terminal, whose field's text is everything the shell would get. */
         const val WEB_TERMINAL = "web_terminal"
         const val TERMINAL = "terminal"
+        /** Opens as TYPE_NULL and restarts in place as a text field, as Firefox's fields do. */
+        const val RESTARTING = "restarting"
         private const val WEB_STYLE = "width:100%;height:100vh;font-size:22px;box-sizing:border-box"
 
         fun actionName(id: Int) = when (id) {

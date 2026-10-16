@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.4: 2026-10-16
+
+### Changed
+
+- Export diagnostics also says, for a deleted glided word, where its replacement stood among the words the stroke could have been (bands only, never the words) (64e990c)
+- Switching between letters, symbols, emoji and the clipboard is instant again: the fade added in 0.6.3 is gone
+
+### Fixed
+
+- The microphone stays in the bar in symbols mode, and switching to symbols no longer stops dictation (de3bd5c)
+- A form field in a browser (Firefox) opens on letters instead of symbols (df613c7)
+- The emoji and clipboard panels show their content the first time they open, instead of an empty grid or the "nothing copied" message for a moment (5ef20d0)
+
 ## 0.6.3: 2026-10-14
 
 ### Changed

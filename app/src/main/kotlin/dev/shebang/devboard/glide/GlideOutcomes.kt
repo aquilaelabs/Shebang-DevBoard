@@ -24,7 +24,7 @@ class GlideOutcomes(private val file: File?) {
     private data class Stored(val codes: List<Int> = emptyList(), val replaced: List<Int> = emptyList())
 
     private val codes = ArrayDeque<Int>()
-    /** Deleted glided words and what replaced them: how * 32 + letters, the last [MAX]. */
+    /** Deleted glided words and what replaced them: rank * 128 + how * 32 + letters, the last [MAX]. */
     private val replaced = ArrayDeque<Int>()
     private var loaded = false
     private var dirty = false
@@ -58,9 +58,9 @@ class GlideOutcomes(private val file: File?) {
 
     /** A glided word of [letters] letters deleted on its own, and what the next word written was ([how]). */
     @Synchronized
-    fun addReplacement(how: Int, letters: Int) {
+    fun addReplacement(how: Int, letters: Int, rank: Int = RANK_UNKNOWN) {
         load()
-        replaced.addLast(how * 32 + letters.coerceIn(0, 31))
+        replaced.addLast(rank * 128 + how * 32 + letters.coerceIn(0, 31))
         while (replaced.size > MAX) replaced.removeFirst()
         dirty = true
     }
@@ -112,7 +112,13 @@ class GlideOutcomes(private val file: File?) {
             // A glided word deleted on its own, and the next word written: was the fix one the strip offered?
             fun replacements(of: List<Int>) = buildJsonObject {
                 put("deleted", JsonPrimitive(of.size))
-                for ((i, name) in REPLACED_NAMES.withIndex()) put(name, JsonPrimitive(of.count { it / 32 == i }))
+                for ((i, name) in REPLACED_NAMES.withIndex()) put(name, JsonPrimitive(of.count { (it / 32) % 4 == i }))
+                // Where the replacement stood among the stroke's candidates by shape (saved since 0.6.4).
+                val ranked = of.filter { it / 128 != RANK_UNKNOWN }
+                put("byShapeRank", buildJsonObject {
+                    put("measured", JsonPrimitive(ranked.size))
+                    for ((i, name) in RANK_NAMES.withIndex()) put(name, JsonPrimitive(ranked.count { it / 128 == i + 1 }))
+                })
             }
             val r = replaced.toList()
             put("replacedAfterDelete", buildJsonObject {
@@ -137,6 +143,14 @@ class GlideOutcomes(private val file: File?) {
         const val REPLACED_OFFERED = 1
         const val REPLACED_OTHER = 2
         private val REPLACED_NAMES = listOf("bySameWord", "byAWordTheStripOffered", "byAnotherWord")
+        /** Where a replacement (not the same word) stood among the deleted glide's candidates by shape. */
+        const val RANK_UNKNOWN = 0
+        const val RANK_TOP_3 = 1
+        const val RANK_4_TO_10 = 2
+        const val RANK_LOWER = 3
+        const val RANK_NOT_A_CANDIDATE = 4
+        const val RANK_NOT_A_WORD = 5
+        private val RANK_NAMES = listOf("amongTheBest3", "fourthToTenth", "lower", "notACandidate", "notADictionaryWord")
         private val NAMES = listOf("kept", "fixedFromStrip", "glidedAgain", "edited", "deleted", "fixedByNextGlide")
         private val LENGTHS = listOf("1" to 0..1, "2" to 2..2, "3" to 3..3, "4" to 4..4, "5" to 5..5, "6-7" to 6..7, "8+" to 8..31)
         /** Bits above the length (5) and the outcome (3): reach band, duration band, and whether they are known. */

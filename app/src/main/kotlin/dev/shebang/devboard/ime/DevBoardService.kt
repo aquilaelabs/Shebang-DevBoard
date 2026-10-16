@@ -325,8 +325,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideOutcomes.add(outcome, letters, reach, durationMs)
     }
 
-    override fun glideReplaced(how: Int, letters: Int) {
-        glideOutcomes.addReplacement(how, letters)
+    override fun glideReplaced(how: Int, letters: Int, rank: Int) {
+        glideOutcomes.addReplacement(how, letters, rank)
     }
 
     override fun learnGlide(observations: FloatArray) {
@@ -390,14 +390,16 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         e.visibility = View.GONE
         column.addView(e, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         emojiPanel = e
-        emojiGroups?.let { e.setEmoji(it) }
+        // Read ahead, so the panel is full the first time it opens (B24).
+        loadEmoji(e)
         val cp = dev.shebang.devboard.view.ClipboardPanelView(this)
         cp.listener = this
         cp.imageFile = { clipHistory.imageFile(it) }
         cp.visibility = View.GONE
         column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         clipPanel = cp
-        fade = dev.shebang.devboard.view.SwitchFade(column)
+        // The history read ahead too, so the panel opens on the copies rather than on its empty message (B25).
+        refreshClipPanel()
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
         val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
@@ -507,10 +509,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
-        if (!restarting) {
-            fade?.finish()
-            closePanels()
-        }
+        if (!restarting) closePanels()
+        val wasTerminal = field.isTerminal
         field = FieldInfo.from(info)
         RecentFields.record(info, field)
         text.startInput(field)
@@ -525,7 +525,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         // Opening, the keyboard starts on letters (code mode left on after a sentence's last "?" is not wanted
         // next time); a terminal reopens in the mode last used in its app, where symbols are most of the typing.
-        if (!restarting) {
+        // A field restarted in place keeps its mode, unless it became another kind: a browser's page offers no
+        // text field (TYPE_NULL, taken for a terminal) until it restarts as the form field tapped.
+        if (!restarting || field.isTerminal != wasTerminal) {
             mode = if (field.isTerminal && appProfiles.modeFor(app) == AppProfiles.CODE) Mode.CODE else Mode.TEXT
         }
         // Words deleted in settings (same process) take effect the next time the keyboard opens; so do word packs
@@ -548,9 +550,9 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         updateMic()
     }
 
-    /** The mic shows where words are typed (text mode, not passwords or terminals) once the add-on is installed. */
+    /** The mic shows where words are typed (text and code mode, not passwords or terminals) once the add-on is installed. */
     private fun updateMic() {
-        strip?.setMicShown(mode == Mode.TEXT && field.allowsComposing && voice.installed())
+        strip?.setMicShown(field.allowsComposing && voice.installed())
     }
 
     /** The mic and the strip follow the add-on: listening (with the voice level), writing, or idle. */
@@ -563,11 +565,13 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         }
         s.mic.level = if (state == VoiceClient.STATE_HEARING) level else 0
         if (state == VoiceClient.STATE_IDLE) {
+            s.setVoice(false)
             s.suggestions.clear()
             s.setComposing(text.isComposing)
             return
         }
         s.setComposing(true)
+        s.setVoice(true)
         s.suggestions.showPreview(
             when (state) {
                 VoiceClient.STATE_TRANSCRIBING -> "Writing\u2026"
@@ -622,7 +626,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
     }
 
     override fun onFinishInputView(finishingInput: Boolean) {
-        fade?.finish()
         closePanels()
         // The chips were for that field; the next one gets its own response.
         autofillGeneration++
@@ -969,10 +972,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     private fun switchMode(m: Mode) {
         if (mode == m) return
-        fading { applyMode(m) }
-    }
-
-    private fun applyMode(m: Mode) {
         text.finishComposing()
         mode = m
         appProfiles.setMode(currentApp, if (m == Mode.CODE) AppProfiles.CODE else AppProfiles.TEXT)
@@ -980,7 +979,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         autoShifted = false
         rebuildGeometry()
         updateAutoCaps()
-        if (m == Mode.CODE) voice.cancel()
         updateMic()
     }
 
@@ -1017,8 +1015,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onBarPanel(item: BarItem) {
         when (item.type) {
-            BarItem.TYPE_EMOJI -> fading { if (emojiPanel?.visibility == View.VISIBLE) closePanels() else openEmoji() }
-            BarItem.TYPE_CLIPBOARD -> fading { if (clipPanel?.visibility == View.VISIBLE) closePanels() else openClipboard() }
+            BarItem.TYPE_EMOJI -> if (emojiPanel?.visibility == View.VISIBLE) closePanels() else openEmoji()
+            BarItem.TYPE_CLIPBOARD -> if (clipPanel?.visibility == View.VISIBLE) closePanels() else openClipboard()
         }
     }
 
@@ -1119,16 +1117,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val k = keyboard ?: return
         val e = emojiPanel ?: return
         text.finishComposing()
-        val groups = emojiGroups
-        if (groups == null) {
-            background.execute {
-                val loaded = e.loadEmoji()
-                main.post {
-                    emojiGroups = loaded
-                    e.setEmoji(loaded)
-                }
-            }
-        }
+        loadEmoji(e)
         val height = keysHeight()
         clipPanel?.visibility = View.GONE
         e.layoutParams = e.layoutParams.apply { this.height = height }
@@ -1136,6 +1125,26 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keysRow?.visibility = View.GONE
         e.visibility = View.VISIBLE
     }
+
+    /** The emoji list into [e]: read once, off the main thread. */
+    private fun loadEmoji(e: dev.shebang.devboard.view.EmojiPanelView) {
+        emojiGroups?.let {
+            e.setEmoji(it)
+            return
+        }
+        if (emojiLoading) return
+        emojiLoading = true
+        background.execute {
+            val loaded = e.loadEmoji()
+            main.post {
+                emojiGroups = loaded
+                emojiLoading = false
+                emojiPanel?.setEmoji(loaded)
+            }
+        }
+    }
+
+    private var emojiLoading = false
 
     /** The clipboard history in place of the keys; what is on the clipboard now is recorded first. */
     private fun openClipboard() {
@@ -1154,7 +1163,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     /** The panel's height: the keys', remembered while they show (a panel may already hide them). */
     private var panelHeight = 0
-    private var fade: dev.shebang.devboard.view.SwitchFade? = null
 
     private fun keysHeight(): Int {
         val k = keyboard ?: return panelHeight
@@ -1187,12 +1195,6 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
             val items = clipHistory.list()
             main.post { cp.show(items) }
         }
-    }
-
-    /** Fades between what the keys' area showed and what [change] puts there. */
-    private fun fading(change: () -> Unit) {
-        val shown = listOf(keysRow, emojiPanel, clipPanel).firstOrNull { it?.visibility == View.VISIBLE }
-        fade?.run(shown, change) ?: change()
     }
 
     /** Back to the keys. */
@@ -1268,7 +1270,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
 
     override fun onPanelClose() {
         feedback.keyPress()
-        fading { closePanels() }
+        closePanels()
     }
 
     // ---- TextInputController.Ui ----------------------------------------------------------------------

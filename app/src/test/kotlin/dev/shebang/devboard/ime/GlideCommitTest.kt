@@ -36,6 +36,8 @@ class GlideCommitTest {
     private val outcomeStrokes = ArrayList<Pair<Float, Long>>()
     /** Deleted glided words' replacements: (how, letters). */
     private val replacements = ArrayList<Pair<Int, Int>>()
+    /** Where each replacement stood among the deleted glide's candidates by shape. */
+    private val ranks = ArrayList<Int>()
 
     private val controller = TextInputController(
         { ic },
@@ -61,8 +63,9 @@ class GlideCommitTest {
                 outcomes += outcome
                 outcomeStrokes += reach to durationMs
             }
-            override fun glideReplaced(how: Int, letters: Int) {
+            override fun glideReplaced(how: Int, letters: Int, rank: Int) {
                 replacements += how to letters
+                ranks += rank
             }
         },
     ).also {
@@ -721,6 +724,29 @@ class GlideCommitTest {
         controller.backspace()
         leaveField()
         assertEquals(listOf(GlideOutcomes.DELETED), outcomes)
+    }
+
+    @Test
+    fun aReplacementIsPlacedAmongTheDeletedGlidesCandidatesByShape() {
+        // The test's candidates cost 0, 1, 2... in the order given: "ad" is third best, "it" sixth.
+        glide("as", runnersUp = listOf("we", "ad", "so", "is", "it"))
+        controller.backspace()
+        type("ad ")
+        glide("as", runnersUp = listOf("we", "ad", "so", "is", "it"))
+        controller.backspace()
+        type("it ")
+        // A dictionary word the stroke never offered.
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        type("hello ")
+        // The same word again says nothing about rank.
+        glide("as", runnersUp = listOf("we"))
+        controller.backspace()
+        glide("as")
+        assertEquals(
+            listOf(GlideOutcomes.RANK_TOP_3, GlideOutcomes.RANK_4_TO_10, GlideOutcomes.RANK_NOT_A_CANDIDATE, GlideOutcomes.RANK_UNKNOWN),
+            ranks,
+        )
     }
 
     @Test
