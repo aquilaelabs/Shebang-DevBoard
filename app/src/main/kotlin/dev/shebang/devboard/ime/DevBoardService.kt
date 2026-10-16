@@ -390,13 +390,16 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         e.visibility = View.GONE
         column.addView(e, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         emojiPanel = e
-        emojiGroups?.let { e.setEmoji(it) }
+        // Read ahead, so the panel is full the first time it opens (B24).
+        loadEmoji(e)
         val cp = dev.shebang.devboard.view.ClipboardPanelView(this)
         cp.listener = this
         cp.imageFile = { clipHistory.imageFile(it) }
         cp.visibility = View.GONE
         column.addView(cp, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0))
         clipPanel = cp
+        // The history read ahead too, so the panel opens on the copies rather than on its empty message (B25).
+        refreshClipPanel()
         // The popup overlay covers strip and keys so a top-row preview can draw above its key.
         val container = ImeRootView(this, column, p)
         // The IME window hosts the system's navigation bar (back and IME-switcher buttons) at its bottom on
@@ -1114,16 +1117,7 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         val k = keyboard ?: return
         val e = emojiPanel ?: return
         text.finishComposing()
-        val groups = emojiGroups
-        if (groups == null) {
-            background.execute {
-                val loaded = e.loadEmoji()
-                main.post {
-                    emojiGroups = loaded
-                    e.setEmoji(loaded)
-                }
-            }
-        }
+        loadEmoji(e)
         val height = keysHeight()
         clipPanel?.visibility = View.GONE
         e.layoutParams = e.layoutParams.apply { this.height = height }
@@ -1131,6 +1125,26 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         keysRow?.visibility = View.GONE
         e.visibility = View.VISIBLE
     }
+
+    /** The emoji list into [e]: read once, off the main thread. */
+    private fun loadEmoji(e: dev.shebang.devboard.view.EmojiPanelView) {
+        emojiGroups?.let {
+            e.setEmoji(it)
+            return
+        }
+        if (emojiLoading) return
+        emojiLoading = true
+        background.execute {
+            val loaded = e.loadEmoji()
+            main.post {
+                emojiGroups = loaded
+                emojiLoading = false
+                emojiPanel?.setEmoji(loaded)
+            }
+        }
+    }
+
+    private var emojiLoading = false
 
     /** The clipboard history in place of the keys; what is on the clipboard now is recorded first. */
     private fun openClipboard() {
