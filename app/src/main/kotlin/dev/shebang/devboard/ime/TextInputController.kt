@@ -89,7 +89,7 @@ class TextInputController(
         /** How a glided word of [letters] letters ended up ([GlideOutcomes] outcome), once it is final. */
         fun glideOutcome(outcome: Int, letters: Int, reach: Float, durationMs: Long) = Unit
         /** A deleted glided word of [letters] letters was replaced by the next word written: how ([GlideOutcomes] REPLACED_ constant). */
-        fun glideReplaced(how: Int, letters: Int) = Unit
+        fun glideReplaced(how: Int, letters: Int, rank: Int) = Unit
 
         companion object {
             val NONE = object : Learner {
@@ -340,7 +340,7 @@ class TextInputController(
     private var lastGlide: GlideCommit? = null
 
     /** When glided words are learned: the last glide's words are open, then held a while, then learned. */
-    private val glides = GlideLearning(learner) { field }
+    private val glides = GlideLearning(learner, { dictionaryInUse?.indexOf(it) ?: -1 }) { field }
 
     private var dictionaryInUse: Dictionary? = null
 

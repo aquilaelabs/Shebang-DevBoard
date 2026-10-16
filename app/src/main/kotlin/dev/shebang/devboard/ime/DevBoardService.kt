@@ -325,8 +325,8 @@ class DevBoardService : InputMethodService(), KeyboardView.Listener, TerminalBar
         glideOutcomes.add(outcome, letters, reach, durationMs)
     }
 
-    override fun glideReplaced(how: Int, letters: Int) {
-        glideOutcomes.addReplacement(how, letters)
+    override fun glideReplaced(how: Int, letters: Int, rank: Int) {
+        glideOutcomes.addReplacement(how, letters, rank)
     }
 
     override fun learnGlide(observations: FloatArray) {

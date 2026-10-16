@@ -33,6 +33,8 @@ internal class GlidedWord(
  */
 internal class GlideLearning(
     private val learner: TextInputController.Learner,
+    /** A word's dictionary index (any case), or -1: for where a replacement stood among a stroke's candidates. */
+    private val wordIndex: (String) -> Int,
     private val field: () -> FieldInfo,
 ) {
     /** The last glide's words, not yet learned. */
@@ -169,7 +171,26 @@ internal class GlideLearning(
             d.offered.any { it.equals(text, ignoreCase = true) } -> GlideOutcomes.REPLACED_OFFERED
             else -> GlideOutcomes.REPLACED_OTHER
         }
-        learner.glideReplaced(how, d.text.length)
+        learner.glideReplaced(how, d.text.length, if (how == GlideOutcomes.REPLACED_SAME) GlideOutcomes.RANK_UNKNOWN else shapeRank(d.word, text))
+    }
+
+    /**
+     * Where [text] stood among [w]'s stroke's candidates by shape alone (the decoder's gesture cost, before
+     * the language model): among the best three, fourth to tenth, lower, not a candidate at all, or not a
+     * dictionary word. Only the band is kept, never the word.
+     */
+    private fun shapeRank(w: GlideWord, text: String): Int {
+        if (w.locked) return GlideOutcomes.RANK_UNKNOWN
+        val idx = wordIndex(text)
+        if (idx < 0) return GlideOutcomes.RANK_NOT_A_WORD
+        val at = w.candidates.indexOf(idx)
+        if (at < 0) return GlideOutcomes.RANK_NOT_A_CANDIDATE
+        val better = w.acoustic.count { it < w.acoustic[at] }
+        return when {
+            better < 3 -> GlideOutcomes.RANK_TOP_3
+            better < 10 -> GlideOutcomes.RANK_4_TO_10
+            else -> GlideOutcomes.RANK_LOWER
+        }
     }
 
     /** A glided word's outcome, for the diagnostics (not where the app asks keyboards not to learn). */

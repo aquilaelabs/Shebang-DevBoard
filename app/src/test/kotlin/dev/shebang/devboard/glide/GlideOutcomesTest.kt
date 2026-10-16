@@ -49,6 +49,27 @@ class GlideOutcomesTest {
     }
 
     @Test
+    fun replacementsKeepWhereTheyStoodAmongTheStrokesCandidates() {
+        val o = GlideOutcomes(file)
+        // Saved before ranks were kept: counted as before, not measured.
+        o.addReplacement(GlideOutcomes.REPLACED_OTHER, 3)
+        o.addReplacement(GlideOutcomes.REPLACED_OFFERED, 3, GlideOutcomes.RANK_TOP_3)
+        o.addReplacement(GlideOutcomes.REPLACED_OTHER, 3, GlideOutcomes.RANK_NOT_A_CANDIDATE)
+        o.addReplacement(GlideOutcomes.REPLACED_OTHER, 2, GlideOutcomes.RANK_4_TO_10)
+        o.save()
+        val r = GlideOutcomes(file).summary()["replacedAfterDelete"]!!.jsonObject
+        fun rank(group: String, key: String) = r[group]!!.jsonObject["byShapeRank"]!!.jsonObject[key]!!.jsonPrimitive.int
+        // How each was replaced still reads the same with a rank alongside.
+        assertEquals(2, r["threeOrMoreLetters"]!!.jsonObject["byAnotherWord"]!!.jsonPrimitive.int)
+        assertEquals(1, r["threeOrMoreLetters"]!!.jsonObject["byAWordTheStripOffered"]!!.jsonPrimitive.int)
+        assertEquals(3, rank("all", "measured"))
+        assertEquals(1, rank("all", "amongTheBest3"))
+        assertEquals(1, rank("threeOrMoreLetters", "notACandidate"))
+        assertEquals(1, rank("oneOrTwoLetters", "fourthToTenth"))
+        assertEquals(0, rank("all", "lower"))
+    }
+
+    @Test
     fun strokesAreCountedInBandsOfReachAndDuration() {
         val o = GlideOutcomes(file)
         // A tap that slid: one letter, under a key, quick; deleted.
